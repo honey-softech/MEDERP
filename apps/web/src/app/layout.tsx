@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   description: "Hospital ERP for web and mobile: patients, appointments, billing, pharmacy, and lab.",
 };
 
+// App pages load hospital data at runtime; skip build-time prerender (no DB in Docker build).
+export const dynamic = "force-dynamic";
+
 export const viewport = {
   width: "device-width",
   initialScale: 1,

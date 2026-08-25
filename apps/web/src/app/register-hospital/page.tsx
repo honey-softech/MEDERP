@@ -214,71 +214,92 @@ export default function RegisterHospitalPage() {
       setError(adminMobileError);
       return;
     }
+    if (!adminPassword || adminPassword.length < 6) {
+      setError("Super admin password must be at least 6 characters.");
+      return;
+    }
     setPending(true);
 
-    if (!pkg?.razorpayEnabled) {
-      setPending(false);
-      setError("Online payment is not configured yet. Ask the software admin to add Razorpay test keys.");
-      return;
-    }
+    try {
+      if (!pkg?.razorpayEnabled) {
+        setError(
+          "Online payment is not configured on the server. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and NEXT_PUBLIC_RAZORPAY_KEY_ID in Railway → MEDERP → Variables, then redeploy.",
+        );
+        setPending(false);
+        return;
+      }
 
-    const orderResponse = await fetch("/api/public/register-hospital/order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(registrationPayload),
-    });
-    const orderData = await orderResponse.json().catch(() => ({}));
-    if (!orderResponse.ok) {
-      setPending(false);
-      setError(orderData.error ?? "Could not start payment.");
-      return;
-    }
+      const orderResponse = await fetch("/api/public/register-hospital/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registrationPayload),
+      });
+      const raw = await orderResponse.text();
+      let orderData: Record<string, unknown> = {};
+      try {
+        orderData = raw ? JSON.parse(raw) : {};
+      } catch {
+        orderData = {};
+      }
+      if (!orderResponse.ok) {
+        setError(String(orderData.error ?? `Could not start payment (${orderResponse.status}).`));
+        setPending(false);
+        return;
+      }
 
-    const mode: "subscription" | "order" = orderData.mode === "order" ? "order" : "subscription";
-    if (orderData.notice) {
-      setNotice(String(orderData.notice));
-    }
+      const mode: "subscription" | "order" = orderData.mode === "order" ? "order" : "subscription";
+      if (orderData.notice) {
+        setNotice(String(orderData.notice));
+      }
 
-    const scriptReady = await loadRazorpayCheckoutScript();
-    if (!scriptReady || !window.Razorpay) {
-      setPending(false);
-      setError("Could not load Razorpay Checkout. Check your network and try again.");
-      return;
-    }
+      const scriptReady = await loadRazorpayCheckoutScript();
+      if (!scriptReady || !window.Razorpay) {
+        setError("Could not load Razorpay Checkout. Check your network and try again.");
+        setPending(false);
+        return;
+      }
 
-    const checkout = new window.Razorpay({
-      key: orderData.keyId,
-      ...(mode === "subscription"
-        ? { subscription_id: orderData.subscriptionId }
-        : { order_id: orderData.orderId, amount: orderData.amount, currency: orderData.currency || "INR" }),
-      name: "MedERP",
-      description:
-        mode === "subscription"
-          ? `Monthly subscription — ${orderData.hospitalName || name}`
-          : `Hospital registration — ${orderData.hospitalName || name}`,
-      prefill: {
-        name: orderData.prefill?.name || adminUsername,
-        contact: orderData.prefill?.contact || adminMobile,
-      },
-      theme: { color: "#1976d2" },
-      handler: (response) => {
-        void completeRegistration(response, { mode, planId: orderData.planId });
-      },
-      modal: {
-        ondismiss: () => {
-          setPending(false);
-          if (mode === "subscription" && orderData.shortUrl) {
-            setNotice(
-              "Checkout was closed. You can complete the same monthly subscription on Razorpay’s hosted page if card lookup fails.",
-            );
-            setError("");
-            return;
-          }
-          setError("Payment was cancelled. You can try again when ready.");
+      const checkout = new window.Razorpay({
+        key: String(orderData.keyId ?? ""),
+        ...(mode === "subscription"
+          ? { subscription_id: String(orderData.subscriptionId ?? "") }
+          : {
+              order_id: String(orderData.orderId ?? ""),
+              amount: Number(orderData.amount),
+              currency: String(orderData.currency || "INR"),
+            }),
+        name: "MedERP",
+        description:
+          mode === "subscription"
+            ? `Monthly subscription — ${String(orderData.hospitalName || name)}`
+            : `Hospital registration — ${String(orderData.hospitalName || name)}`,
+        prefill: {
+          name: String((orderData.prefill as { name?: string } | undefined)?.name || adminUsername),
+          contact: String((orderData.prefill as { contact?: string } | undefined)?.contact || adminMobile),
         },
-      },
-    });
-    checkout.open();
+        theme: { color: "#1976d2" },
+        handler: (response) => {
+          void completeRegistration(response, { mode, planId: orderData.planId ? String(orderData.planId) : undefined });
+        },
+        modal: {
+          ondismiss: () => {
+            setPending(false);
+            if (mode === "subscription" && orderData.shortUrl) {
+              setNotice(
+                "Checkout was closed. You can complete the same monthly subscription on Razorpay’s hosted page if card lookup fails.",
+              );
+              setError("");
+              return;
+            }
+            setError("Payment was cancelled. You can try again when ready.");
+          },
+        },
+      });
+      checkout.open();
+    } catch (err) {
+      setPending(false);
+      setError(err instanceof Error ? err.message : "Could not start payment. Please try again.");
+    }
   }
 
   return (

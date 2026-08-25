@@ -1,36 +1,50 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { FilterableTable } from "@/components/filterable-table";
+import { LAB_VIEW_ROLES, LAB_WORK_ROLES, patientName, requireHospitalPage } from "@/lib/front-desk";
+import { prettyLabStatus } from "@/lib/lab-catalog";
+import { prisma } from "@/lib/prisma";
 
-const tests = [
-  { code: "CBC", name: "Complete Blood Count", price: "₹450", tat: "4 hours" },
-  { code: "LFT", name: "Liver Function Test", price: "₹700", tat: "6 hours" },
-  { code: "LIPID", name: "Lipid Profile", price: "₹550", tat: "6 hours" },
-];
+export default async function LabPage() {
+  const user = await requireHospitalPage();
+  if (user.role === "DOCTOR" || user.role === "NURSE") redirect("/patients");
+  if (!LAB_VIEW_ROLES.includes(user.role)) redirect("/");
 
-export default function LabPage() {
+  const orders = await prisma.labOrder.findMany({
+    where: {
+      hospitalId: user.hospitalId,
+      status: { in: LAB_WORK_ROLES.includes(user.role) ? ["PAID", "SAMPLE_COLLECTED", "RESULTED"] : ["PAID", "SAMPLE_COLLECTED", "RESULTED", "AWAITING_PAYMENT"] },
+      fulfillment: "HOSPITAL_LAB",
+    },
+    orderBy: { updatedAt: "desc" },
+    include: { patient: true, items: true },
+    take: 80,
+  });
+
   return (
     <AppShell title="Laboratory">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="px-5 py-3 font-medium">Code</th>
-              <th className="px-5 py-3 font-medium">Test</th>
-              <th className="px-5 py-3 font-medium">Price</th>
-              <th className="px-5 py-3 font-medium">Turnaround</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tests.map((row) => (
-              <tr key={row.code} className="border-t border-slate-100">
-                <td className="px-5 py-3 font-mono text-xs">{row.code}</td>
-                <td className="px-5 py-3 font-medium">{row.name}</td>
-                <td className="px-5 py-3">{row.price}</td>
-                <td className="px-5 py-3">{row.tat}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <p className="mb-6 text-sm text-slate-500">
+        Paid requests appear here. Upload the report and mark done. The doctor is notified; the file is on the patient record for the doctor and nurse.
+      </p>
+      <FilterableTable
+        empty="No lab work in queue. Reception must collect payment first."
+        minWidthClass="min-w-[48rem]"
+        rows={orders.map((order) => ({
+          id: order.id,
+          patient: patientName(order.patient),
+          tests: order.items.map((item) => item.nameSnapshot).join(", "),
+          status: prettyLabStatus(order.status),
+          when: (order.paidAt ?? order.createdAt).toLocaleString("en-IN"),
+          href: `/lab/${order.id}`,
+        }))}
+        columns={[
+          { key: "patient", header: "Patient", className: "font-medium", hrefKey: "href" },
+          { key: "tests", header: "Tests" },
+          { key: "status", header: "Status" },
+          { key: "when", header: "Updated" },
+        ]}
+      />
     </AppShell>
   );
 }

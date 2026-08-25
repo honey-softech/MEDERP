@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Hospital" ADD COLUMN "opdFee" DECIMAL(12,2) NOT NULL DEFAULT 500;

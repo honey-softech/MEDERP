@@ -1,44 +1,62 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { FilterableTable } from "@/components/filterable-table";
+import { primaryButtonClass } from "@/components/auth-shell";
+import { ageYears, FRONT_DESK_ROLES, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { prisma } from "@/lib/prisma";
 
-const patients = [
-  { mrn: "MRN-1001", name: "Rahul Sharma", age: 37, blood: "B+", phone: "+91 98765 43210" },
-  { mrn: "MRN-1002", name: "Fatima Khan", age: 31, blood: "O+", phone: "+91 98111 22334" },
-  { mrn: "MRN-1003", name: "Arjun Patel", age: 52, blood: "A+", phone: "+91 99000 44556" },
-];
+export default async function PatientsPage() {
+  const user = await requireHospitalPage();
+  if (user.role === "LAB_TECH") redirect("/lab");
 
-export default function PatientsPage() {
+  const patients = await prisma.patient.findMany({
+    where: {
+      hospitalId: user.hospitalId,
+      mergedIntoId: null,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
   return (
     <AppShell title="Patients">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-slate-500">Registration and medical record numbers</p>
-        <button className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white">
-          Register patient
-        </button>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-slate-500">Search by name, phone, UHID, or family group</p>
+        {FRONT_DESK_ROLES.includes(user.role) ? (
+          <Link href="/patients/new" className={primaryButtonClass}>
+            Register patient
+          </Link>
+        ) : null}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="px-5 py-3 font-medium">MRN</th>
-              <th className="px-5 py-3 font-medium">Name</th>
-              <th className="px-5 py-3 font-medium">Age</th>
-              <th className="px-5 py-3 font-medium">Blood</th>
-              <th className="px-5 py-3 font-medium">Phone</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map((patient) => (
-              <tr key={patient.mrn} className="border-t border-slate-100">
-                <td className="px-5 py-3 font-mono text-xs">{patient.mrn}</td>
-                <td className="px-5 py-3 font-medium">{patient.name}</td>
-                <td className="px-5 py-3">{patient.age}</td>
-                <td className="px-5 py-3">{patient.blood}</td>
-                <td className="px-5 py-3">{patient.phone}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <FilterableTable
+        searchPlaceholder="Search name, phone, or UHID"
+        rows={patients.map((row) => ({
+          id: row.id,
+          mrn: row.mrn,
+          name: patientName(row),
+          age: String(ageYears(row.dateOfBirth)),
+          gender: prettyEnum(row.gender),
+          phone: row.phone ?? "—",
+          family: row.familyGroupCode ?? "—",
+          href: `/patients/${row.id}`,
+          ...(FRONT_DESK_ROLES.includes(user.role)
+            ? { edit: "Edit", editHref: `/patients/${row.id}/edit` }
+            : {}),
+        }))}
+        empty="No patients registered yet."
+        columns={[
+          { key: "mrn", header: "UHID / MRN", className: "font-mono text-xs", hrefKey: "href" },
+          { key: "name", header: "Name", className: "font-medium", hrefKey: "href" },
+          { key: "age", header: "Age" },
+          { key: "gender", header: "Gender" },
+          { key: "phone", header: "Phone" },
+          { key: "family", header: "Family" },
+          ...(FRONT_DESK_ROLES.includes(user.role)
+            ? [{ key: "edit", header: "Action", filter: false as const, hrefKey: "editHref" }]
+            : []),
+        ]}
+      />
     </AppShell>
   );
 }

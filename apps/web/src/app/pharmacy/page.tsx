@@ -1,37 +1,62 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { FilterableTable } from "@/components/filterable-table";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { PHARMACY_ROLES, listPharmacyInventory } from "@/lib/pharmacy";
+import { requireHospitalPage } from "@/lib/front-desk";
 
-const medicines = [
-  { sku: "PARA-500", name: "Paracetamol 500mg", stock: 1200, reorder: 200, price: "₹2.50" },
-  { sku: "AMOX-250", name: "Amoxicillin 250mg", stock: 80, reorder: 100, price: "₹8.00" },
-];
+export default async function PharmacyPage() {
+  const user = await requireHospitalPage();
+  if (user.role === "DOCTOR" || user.role === "NURSE") redirect("/");
+  if (!PHARMACY_ROLES.includes(user.role)) redirect("/");
 
-export default function PharmacyPage() {
+  const inventory = await listPharmacyInventory(user.hospitalId);
+  const low = inventory.filter((row) => row.lowStock).length;
+  const near = inventory.filter((row) => row.expiringIn30).length;
+
   return (
     <AppShell title="Pharmacy">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="px-5 py-3 font-medium">SKU</th>
-              <th className="px-5 py-3 font-medium">Medicine</th>
-              <th className="px-5 py-3 font-medium">Stock</th>
-              <th className="px-5 py-3 font-medium">Reorder at</th>
-              <th className="px-5 py-3 font-medium">Unit price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {medicines.map((row) => (
-              <tr key={row.sku} className="border-t border-slate-100">
-                <td className="px-5 py-3 font-mono text-xs">{row.sku}</td>
-                <td className="px-5 py-3 font-medium">{row.name}</td>
-                <td className="px-5 py-3">{row.stock}</td>
-                <td className="px-5 py-3">{row.reorder}</td>
-                <td className="px-5 py-3">{row.price}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-text-secondary">
+            Batch-level stock. Low stock: {low} · Expiring in 30 days: {near}
+          </p>
+        </div>
+        <Link href="/pharmacy/stock-in" className={primaryButtonClass}>
+          Stock in (GRN)
+        </Link>
+        <Link href="/pharmacy/prescriptions" className={secondaryButtonClass}>
+          Prescription billing
+        </Link>
       </div>
+      <FilterableTable
+        empty="No medicines in inventory yet. Use Stock in (GRN) to receive the first batch."
+        searchPlaceholder="Search medicine…"
+        rows={inventory.map((row) => ({
+          id: row.id,
+          name: row.name,
+          salt: row.genericName ?? "—",
+          manufacturer: row.manufacturer ?? "—",
+          stock: String(row.stock),
+          batches: String(row.batchCount),
+          reorder: String(row.reorderLevel),
+          flags: [row.lowStock ? "Low" : "", row.expiringIn30 ? "≤30d" : row.nearExpiry ? "≤90d" : "", row.expired ? "Expired" : ""]
+            .filter(Boolean)
+            .join(" · ") || "—",
+          barcode: row.barcode ?? "—",
+        }))}
+        columns={[
+          { key: "name", header: "Medicine", className: "font-medium" },
+          { key: "salt", header: "Salt" },
+          { key: "manufacturer", header: "Manufacturer" },
+          { key: "stock", header: "Stock" },
+          { key: "batches", header: "Batches" },
+          { key: "reorder", header: "Reorder at" },
+          { key: "flags", header: "Alerts" },
+          { key: "barcode", header: "Barcode", className: "font-mono text-xs" },
+        ]}
+      />
     </AppShell>
   );
 }

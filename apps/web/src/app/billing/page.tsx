@@ -1,35 +1,51 @@
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { FilterableTable } from "@/components/filterable-table";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { inr, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { prisma } from "@/lib/prisma";
 
-const invoices = [
-  { id: "INV-2401", patient: "Rahul Sharma", total: "₹3,250", status: "Issued" },
-  { id: "INV-2402", patient: "Fatima Khan", total: "₹1,180", status: "Paid" },
-];
+export default async function BillingPage() {
+  const user = await requireHospitalPage();
+  const invoices = await prisma.invoice.findMany({
+    where: { hospitalId: user.hospitalId },
+    include: { patient: true },
+    orderBy: { issuedAt: "desc" },
+    take: 80,
+  });
 
-export default function BillingPage() {
   return (
     <AppShell title="Billing">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="px-5 py-3 font-medium">Invoice</th>
-              <th className="px-5 py-3 font-medium">Patient</th>
-              <th className="px-5 py-3 font-medium">Total</th>
-              <th className="px-5 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="px-5 py-3 font-mono text-xs">{row.id}</td>
-                <td className="px-5 py-3 font-medium">{row.patient}</td>
-                <td className="px-5 py-3">{row.total}</td>
-                <td className="px-5 py-3">{row.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link href="/billing/new" className={primaryButtonClass}>
+          New invoice
+        </Link>
+        <Link href="/billing/advance" className={secondaryButtonClass}>
+          Collect advance
+        </Link>
+        <Link href="/billing/collections" className={secondaryButtonClass}>
+          Daily collections
+        </Link>
       </div>
+      <FilterableTable
+        rows={invoices.map((row) => ({
+          id: row.id,
+          invoice: row.invoiceNo,
+          patient: patientName(row.patient),
+          total: inr(row.netTotal),
+          paid: inr(row.paidAmount),
+          status: prettyEnum(row.status),
+          href: `/billing/${row.id}`,
+        }))}
+        empty="No invoices yet."
+        columns={[
+          { key: "invoice", header: "Invoice", className: "font-mono text-xs", hrefKey: "href" },
+          { key: "patient", header: "Patient", className: "font-medium", hrefKey: "href" },
+          { key: "total", header: "Net total" },
+          { key: "paid", header: "Paid" },
+          { key: "status", header: "Status" },
+        ]}
+      />
     </AppShell>
   );
 }

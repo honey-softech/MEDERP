@@ -1,0 +1,50 @@
+import { NextResponse } from "next/server";
+import { writeAuditLog } from "@/lib/audit";
+import { forbidUnless, requireHospitalActor } from "@/lib/front-desk";
+import { WARD_HOUSEKEEPING_ROLES, assertWardsModuleEnabled, updateBedStatus, wardErrorResponse } from "@/lib/wards";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+const ACTIONS = ["ready", "maintenance", "block", "unblock"] as const;
+
+export async function PATCH(request: Request, context: Ctx) {
+  const scoped = await requireHospitalActor();
+  if (scoped.error) return scoped.error;
+  const denied = forbidUnless(scoped.user.role, WARD_HOUSEKEEPING_ROLES);
+  if (denied) return denied;
+
+  try {
+    await assertWardsModuleEnabled(scoped.user.hospitalId);
+  } catch (error) {
+    return wardErrorResponse(error);
+  }
+
+  const { id } = await context.params;
+  const body = await request.json().catch(() => null);
+  const action = String(body?.action ?? "") as (typeof ACTIONS)[number];
+  if (!ACTIONS.includes(action)) {
+    return NextResponse.json({ error: "Unknown bed action." }, { status: 400 });
+  }
+
+  try {
+    const bed = await updateBedStatus({
+      hospitalId: scoped.user.hospitalId,
+      bedId: id,
+      action,
+    });
+    await writeAuditLog({
+      request,
+      hospitalId: scoped.user.hospitalId,
+      actorUserId: scoped.user.id,
+      actorUsername: scoped.user.username,
+      actorRole: scoped.user.role,
+      action: "BED_STATUS_CHANGED",
+      entity: "Bed",
+      entityId: bed.id,
+      summary: `${scoped.user.username} set bed ${bed.number} to ${bed.status.toLowerCase()}.`,
+    });
+    return NextResponse.json({ bed });
+  } catch (error) {
+    return wardErrorResponse(error);
+  }
+}

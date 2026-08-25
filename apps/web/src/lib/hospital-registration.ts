@@ -1,0 +1,278 @@
+import type { AppRole, PaymentMethod } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { DEFAULT_OTP, hashPassword, normalizeHospitalCode, normalizeMobile } from "@/lib/auth";
+import { isValidHospitalCode, slugFromHospitalName } from "@/lib/hospital-code";
+import { mobileValidationError } from "@/lib/phone";
+import { writeAuditLog } from "@/lib/audit";
+import { seedHospitalDepartments } from "@/lib/front-desk";
+import { seedHospitalWards } from "@/lib/wards";
+import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platform-billing";
+import { upsertHospitalSubscription, unixToDate } from "@/lib/hospital-subscription";
+import { isSubscriptionTierId, type SubscriptionTierId } from "@/lib/subscription-tiers";
+import { pricingFromSettings } from "@/lib/platform-pricing";
+
+export class HospitalRegistrationError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+
+export type RegisterHospitalInput = {
+  name: string;
+  code: string;
+  address?: string | null;
+  phone?: string | null;
+  adminUsername: string;
+  adminMobile: string;
+  adminPassword: string;
+  tierId?: string;
+  /** @deprecated use tierId */
+  extraStaffSlots?: number;
+  /** @deprecated use tierId */
+  pharmacyEnabled?: boolean;
+  /** @deprecated use tierId */
+  labEnabled?: boolean;
+  invoiceStatus?: "PAID" | "ISSUED";
+  paymentMethod?: PaymentMethod | null;
+  paymentNotes?: string | null;
+  termsAccepted?: boolean;
+  razorpayPlanId?: string | null;
+  razorpaySubscriptionId?: string | null;
+  razorpayPaymentId?: string | null;
+  subscriptionCurrentStart?: number | null;
+  subscriptionCurrentEnd?: number | null;
+  subscriptionChargeAt?: number | null;
+  actor: {
+    userId?: string | null;
+    username: string;
+    role?: AppRole | string | null;
+  };
+  request?: Request;
+};
+
+export async function allocateUniqueHospitalCode(name: string, requested?: string | null) {
+  const preferred = requested ? normalizeHospitalCode(requested) : "";
+  const base =
+    (isValidHospitalCode(preferred) ? preferred : slugFromHospitalName(name)) || "HSP";
+  const candidates = [base];
+  for (let i = 2; i <= 99; i++) {
+    const suffix = String(i);
+    candidates.push(`${base.slice(0, Math.max(3, 12 - suffix.length))}${suffix}`);
+  }
+  candidates.push(`${base.slice(0, 8)}${Date.now().toString(36).toUpperCase().slice(-4)}`.slice(0, 12));
+
+  for (const code of candidates) {
+    if (!isValidHospitalCode(code)) continue;
+    const taken = await prisma.hospital.findUnique({ where: { code } });
+    if (!taken) return code;
+  }
+  return `${"HSP"}${Date.now().toString(36).toUpperCase()}`.slice(0, 12);
+}
+
+export type PreparedRegistration = {
+  name: string;
+  code: string;
+  address: string | null;
+  phone: string | null;
+  adminUsername: string;
+  adminMobile: string;
+  adminPassword: string;
+  tierId: SubscriptionTierId;
+  quote: Awaited<ReturnType<typeof calculateRegistrationTotal>>;
+};
+
+function resolveTierId(input: {
+  tierId?: string;
+  extraStaffSlots?: number;
+  pharmacyEnabled?: boolean;
+  labEnabled?: boolean;
+}): SubscriptionTierId {
+  if (input.tierId && isSubscriptionTierId(input.tierId)) return input.tierId;
+  // Legacy payload → nearest fixed tier
+  return pricingFromSettings(null, {
+    extraStaffSlots: input.extraStaffSlots ?? 0,
+    pharmacyEnabled: Boolean(input.pharmacyEnabled),
+    labEnabled: Boolean(input.labEnabled),
+  }).tier.id;
+}
+
+/** Validate registration fields and compute quote without creating the hospital. */
+export async function prepareHospitalRegistration(
+  input: Omit<
+    RegisterHospitalInput,
+    | "actor"
+    | "request"
+    | "invoiceStatus"
+    | "paymentMethod"
+    | "paymentNotes"
+    | "razorpayPlanId"
+    | "razorpaySubscriptionId"
+    | "razorpayPaymentId"
+    | "subscriptionCurrentStart"
+    | "subscriptionCurrentEnd"
+    | "subscriptionChargeAt"
+  >,
+): Promise<PreparedRegistration> {
+  const name = input.name.trim();
+  const address = input.address?.trim() || null;
+  const phone = normalizeMobile(String(input.phone ?? ""));
+  const adminUsername = input.adminUsername.trim();
+  const adminMobile = normalizeMobile(input.adminMobile);
+  const adminPassword = input.adminPassword;
+  const tierId = resolveTierId(input);
+
+  if (!name) {
+    throw new HospitalRegistrationError("Hospital name is required.", 400);
+  }
+  const hospitalPhoneError = mobileValidationError(phone, "Hospital mobile");
+  if (hospitalPhoneError) {
+    throw new HospitalRegistrationError(hospitalPhoneError, 400);
+  }
+  const adminMobileError = mobileValidationError(adminMobile, "Super admin mobile");
+  if (adminMobileError) {
+    throw new HospitalRegistrationError(adminMobileError, 400);
+  }
+  if (adminUsername.length < 3 || !/^[a-zA-Z0-9._]+$/.test(adminUsername)) {
+    throw new HospitalRegistrationError(
+      "Super admin username must be at least 3 letters, numbers, dots, or underscores.",
+      400,
+    );
+  }
+  if (adminPassword.length < 6) {
+    throw new HospitalRegistrationError("Super admin password must be at least 6 characters.", 400);
+  }
+
+  const code = await allocateUniqueHospitalCode(name, input.code);
+
+  const phoneTaken = await prisma.hospital.findFirst({ where: { phone } });
+  if (phoneTaken) {
+    throw new HospitalRegistrationError("That hospital mobile number is already registered.", 409);
+  }
+
+  const userTaken = await prisma.appUser.findFirst({
+    where: { OR: [{ username: adminUsername }, { mobile: adminMobile }] },
+  });
+  if (userTaken) {
+    throw new HospitalRegistrationError(
+      userTaken.mobile === adminMobile
+        ? "That super admin mobile number is already registered. Sign in with this number, or use another."
+        : "Super admin username is already in use.",
+      409,
+    );
+  }
+
+  const quote = await calculateRegistrationTotal({ tierId });
+
+  if (!(quote.total > 0)) {
+    throw new HospitalRegistrationError("Registration total must be greater than zero.", 400);
+  }
+
+  return {
+    name,
+    code,
+    address,
+    phone,
+    adminUsername,
+    adminMobile,
+    adminPassword,
+    tierId,
+    quote,
+  };
+}
+
+export async function registerHospital(input: RegisterHospitalInput) {
+  if (input.termsAccepted === false) {
+    throw new HospitalRegistrationError("You must accept the Terms & Conditions to register.", 400);
+  }
+
+  const prepared = await prepareHospitalRegistration(input);
+  const invoiceStatus = input.invoiceStatus ?? "ISSUED";
+  const tier = prepared.quote.tier;
+
+  const hospital = await prisma.hospital.create({
+    data: {
+      name: prepared.name,
+      code: prepared.code,
+      address: prepared.address,
+      phone: prepared.phone,
+      subscriptionTier: tier.id,
+      includedStaffSlots: prepared.quote.includedStaffSlots,
+      extraStaffSlots: 0,
+      unlimitedStaffSeats: prepared.quote.unlimitedStaffSeats,
+      pharmacyEnabled: tier.pharmacyEnabled,
+      labEnabled: tier.labEnabled,
+      inventoryEnabled: tier.inventoryEnabled,
+      users: {
+        create: {
+          username: prepared.adminUsername,
+          mobile: prepared.adminMobile,
+          passwordHash: await hashPassword(prepared.adminPassword),
+          otpCode: DEFAULT_OTP,
+          isVerified: true,
+          role: "SUPER_ADMIN",
+        },
+      },
+    },
+    include: {
+      users: { where: { role: "SUPER_ADMIN" }, select: { id: true, username: true, mobile: true, role: true } },
+    },
+  });
+
+  await seedHospitalDepartments(hospital.id);
+  await seedHospitalWards(hospital.id);
+
+  const invoice = await createPlatformInvoice({
+    hospitalId: hospital.id,
+    lines: prepared.quote.lines,
+    total: prepared.quote.total,
+    paymentMethod: input.paymentMethod ?? null,
+    notes: input.paymentNotes ?? `Hospital registration — ${hospital.code} — ${tier.name}`,
+    status: invoiceStatus,
+    razorpayPaymentId: input.razorpayPaymentId ?? null,
+    razorpaySubscriptionId: input.razorpaySubscriptionId ?? null,
+  });
+
+  if (input.razorpaySubscriptionId && input.razorpayPlanId) {
+    await upsertHospitalSubscription({
+      hospitalId: hospital.id,
+      razorpayPlanId: input.razorpayPlanId,
+      razorpaySubscriptionId: input.razorpaySubscriptionId,
+      monthlyAmount: prepared.quote.total,
+      status: "ACTIVE",
+      termsAcceptedAt: new Date(),
+      currentPeriodStart: unixToDate(input.subscriptionCurrentStart),
+      currentPeriodEnd: unixToDate(input.subscriptionCurrentEnd),
+      nextChargeAt: unixToDate(input.subscriptionChargeAt),
+    });
+  }
+
+  const superAdmin = hospital.users[0];
+  await writeAuditLog({
+    request: input.request,
+    hospitalId: hospital.id,
+    actorUserId: input.actor.userId ?? superAdmin?.id,
+    actorUsername: input.actor.username,
+    actorRole: input.actor.role,
+    action: "HOSPITAL_CREATED",
+    entity: "Hospital",
+    entityId: hospital.id,
+    summary: `${input.actor.username} registered hospital ${hospital.name} (${hospital.code}); invoice ${invoice.invoiceNo}.`,
+    metadata: {
+      hospitalCode: hospital.code,
+      superAdmin: prepared.adminUsername,
+      tierId: prepared.tierId,
+      pharmacyEnabled: tier.pharmacyEnabled,
+      labEnabled: tier.labEnabled,
+      inventoryEnabled: tier.inventoryEnabled,
+      invoiceNo: invoice.invoiceNo,
+      total: prepared.quote.total,
+      invoiceStatus,
+      razorpaySubscriptionId: input.razorpaySubscriptionId ?? null,
+    },
+  });
+
+  return { hospital, superAdmin, invoice, quote: prepared.quote };
+}

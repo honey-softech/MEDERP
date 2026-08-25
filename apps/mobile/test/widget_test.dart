@@ -6,6 +6,6 @@ void main() {
     await tester.pumpWidget(const MedErpApp());
     await tester.pump();
     expect(find.text('MedERP'), findsWidgets);
-    expect(find.text('Patients'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 }

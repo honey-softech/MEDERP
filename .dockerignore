@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+apps/mobile
+*.md
+.env
+.env.*
+!.env.example

@@ -1,7 +1,7 @@
 [build]
-builder = "RAILPACK"
-buildCommand = "npm install --prefix apps/web && npm run build --prefix apps/web"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "npm run start --prefix apps/web"
-releaseCommand = "npm exec --prefix apps/web -- prisma migrate deploy"
+startCommand = "npm run start"
+releaseCommand = "npx prisma migrate deploy"

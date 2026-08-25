@@ -59,6 +59,7 @@ export default function SignupPage() {
     } finally {
       setPending(false);
     }
+  }
 
   return (
     <AuthShell

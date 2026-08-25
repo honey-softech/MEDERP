@@ -22,7 +22,11 @@ export type HospitalActor = NonNullable<Awaited<ReturnType<typeof getCurrentUser
   hospitalId: string;
 };
 
-export async function requireHospitalActor() {
+export type HospitalActorResult =
+  | { error: NextResponse; user?: undefined }
+  | { user: HospitalActor; error?: undefined };
+
+export async function requireHospitalActor(): Promise<HospitalActorResult> {
   const user = await getCurrentUser();
   if (!user) {
     return { error: NextResponse.json({ error: "Sign in required." }, { status: 401 }) };

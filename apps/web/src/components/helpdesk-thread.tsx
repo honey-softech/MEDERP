@@ -123,7 +123,11 @@ export function HelpdeskThread({
         <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
           <label className="block min-w-40 flex-1 text-sm font-medium text-slate-700">
             Status
-            <select className={fieldClass} value={nextStatus} onChange={(event) => setNextStatus(event.target.value)}>
+            <select
+              className={fieldClass}
+              value={nextStatus}
+              onChange={(event) => setNextStatus(event.target.value as HelpdeskTicketStatus)}
+            >
               {["OPEN", "IN_PROGRESS", "WAITING_REPLY", "RESOLVED", "CLOSED"].map((item) => (
                 <option key={item} value={item}>
                   {item.replace(/_/g, " ")}

@@ -13,7 +13,7 @@ async function requireHospitalSuperAdmin() {
   if (!actor || actor.role !== "SUPER_ADMIN" || !actor.hospitalId) {
     return { error: NextResponse.json({ error: "Hospital super admin access required." }, { status: 403 }) };
   }
-  return { actor };
+  return { actor: { ...actor, hospitalId: actor.hospitalId } };
 }
 
 export async function PATCH(request: Request, context: Ctx) {
@@ -35,11 +35,11 @@ export async function PATCH(request: Request, context: Ctx) {
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const requestedRole = String(body?.role ?? existing.role) as AppRole;
-    let role = existing.role;
+    let role = existing.role as Exclude<AppRole, "SOFTWARE_ADMIN" | "HELPDESK">;
     if (existing.role === "SUPER_ADMIN") {
       role = "SUPER_ADMIN";
-    } else if (STAFF_ROLES.includes(requestedRole)) {
-      role = requestedRole;
+    } else if ((STAFF_ROLES as readonly AppRole[]).includes(requestedRole)) {
+      role = requestedRole as Exclude<AppRole, "SOFTWARE_ADMIN" | "HELPDESK" | "SUPER_ADMIN">;
     } else {
       return NextResponse.json({ error: "Select a valid hospital staff role." }, { status: 400 });
     }

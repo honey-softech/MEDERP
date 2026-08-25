@@ -49,12 +49,24 @@ export async function pickFefoBatch(itemId: string, quantity: number) {
   });
 }
 
+const pharmacyRxInclude = {
+  lines: { include: { pharmacyItem: true, batch: true } },
+  patient: true,
+  appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } } } },
+  invoice: true,
+} as const;
+
 export async function refreshRxLinePricing(orderId: string) {
   const order = await prisma.pharmacyRxOrder.findUnique({
     where: { id: orderId },
     include: { lines: true },
   });
-  if (!order || order.status !== "AWAITING_PAYMENT") return order;
+  if (!order || order.status !== "AWAITING_PAYMENT") {
+    return prisma.pharmacyRxOrder.findUnique({
+      where: { id: orderId },
+      include: pharmacyRxInclude,
+    });
+  }
 
   let total = 0;
   for (const line of order.lines) {
@@ -82,12 +94,7 @@ export async function refreshRxLinePricing(orderId: string) {
   return prisma.pharmacyRxOrder.update({
     where: { id: orderId },
     data: { totalAmount: total },
-    include: {
-      lines: { include: { pharmacyItem: true, batch: true } },
-      patient: true,
-      appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } } } },
-      invoice: true,
-    },
+    include: pharmacyRxInclude,
   });
 }
 
@@ -203,12 +210,7 @@ export async function listPendingPharmacyRx(hospitalId: string) {
 export async function getPharmacyRxForAppointment(hospitalId: string, appointmentId: string) {
   const order = await prisma.pharmacyRxOrder.findFirst({
     where: { hospitalId, appointmentId },
-    include: {
-      lines: { include: { pharmacyItem: true, batch: true } },
-      patient: true,
-      appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } } } },
-      invoice: true,
-    },
+    include: pharmacyRxInclude,
   });
   if (!order) return null;
   if (order.status === "AWAITING_PAYMENT") {

@@ -265,7 +265,9 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
                   summary: assessment?.summary ?? "",
                   prescription: assessment?.prescription ?? "",
                   advice: assessment?.advice ?? "",
-                  followUpAt: assessment?.followUpAt ?? "",
+                  followUpAt: assessment?.followUpAt
+                    ? new Date(assessment.followUpAt).toISOString().slice(0, 10)
+                    : "",
                 }}
               />
               {canAssess && summaryApproved ? (

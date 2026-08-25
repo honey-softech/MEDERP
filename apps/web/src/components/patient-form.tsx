@@ -147,7 +147,7 @@ export function PatientForm({
 
     if (response.status === 409 && data.duplicates) {
       setDuplicates(data.duplicates);
-      setError(data.error);
+      setError(data.error ?? "");
       return;
     }
     if (!response.ok) {

@@ -31,7 +31,7 @@ export async function POST(request: Request, context: Ctx) {
 
   const fromHelpdesk = canHandleHelpdesk(user.role);
   const nextStatus = fromHelpdesk
-    ? ticket.status === "CLOSED" || ticket.status === "RESOLVED"
+    ? ticket.status === "RESOLVED"
       ? ticket.status
       : "IN_PROGRESS"
     : "WAITING_REPLY";

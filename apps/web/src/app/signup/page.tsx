@@ -34,21 +34,31 @@ export default function SignupPage() {
     }
     setPending(true);
 
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, mobile, password, role }),
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, mobile, password, role }),
+      });
+      const raw = await response.text();
+      let data: { error?: string; mobile?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = { error: "Server returned an invalid response." };
+      }
 
-    if (!response.ok) {
+      if (!response.ok) {
+        setError(data.error ?? `Signup failed (${response.status}).`);
+        return;
+      }
+
+      router.push(`/signup/verify?mobile=${encodeURIComponent(data.mobile ?? mobile)}`);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
       setPending(false);
-      setError(data.error ?? "Signup failed.");
-      return;
     }
-
-    router.push(`/signup/verify?mobile=${encodeURIComponent(data.mobile)}`);
-  }
 
   return (
     <AuthShell

@@ -1,0 +1,7 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "npm install --prefix apps/web && npm run build --prefix apps/web"
+
+[deploy]
+startCommand = "npm run start --prefix apps/web"
+releaseCommand = "npm exec --prefix apps/web -- prisma migrate deploy"

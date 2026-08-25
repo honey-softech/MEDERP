@@ -2,9 +2,16 @@
   "name": "mederp",
   "private": true,
   "description": "Hospital ERP — Next.js web, Flutter mobile, PostgreSQL",
+  "packageManager": "npm@10",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "dev": "npm run dev --prefix apps/web",
     "dev:web": "npm run dev --prefix apps/web",
+    "build": "npm install --prefix apps/web && npm run build --prefix apps/web",
     "build:web": "npm run build --prefix apps/web",
+    "start": "npm run start --prefix apps/web",
     "db:migrate": "npm run db:migrate --prefix apps/web",
     "db:seed": "npm run db:seed --prefix apps/web",
     "db:studio": "npm run db:studio --prefix apps/web",

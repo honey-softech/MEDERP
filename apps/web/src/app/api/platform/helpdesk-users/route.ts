@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DEFAULT_OTP, getCurrentUser, hashPassword, normalizeMobile } from "@/lib/auth";
+import { getCurrentUser, hashPassword, normalizeMobile, passwordValidationError } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -42,8 +42,9 @@ export async function POST(request: Request) {
   if (mobile.length < 10) {
     return NextResponse.json({ error: "Enter a valid mobile number." }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+  const passwordError = passwordValidationError(password);
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
   }
 
   const clash = await prisma.appUser.findFirst({ where: { OR: [{ username }, { mobile }] } });
@@ -56,7 +57,9 @@ export async function POST(request: Request) {
       username,
       mobile,
       passwordHash: await hashPassword(password),
-      otpCode: DEFAULT_OTP,
+      otpCode: null,
+      otpExpiresAt: null,
+      otpAttempts: 0,
       isVerified: true,
       role: "HELPDESK",
     },

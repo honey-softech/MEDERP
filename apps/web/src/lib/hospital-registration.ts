@@ -1,6 +1,6 @@
 import type { AppRole, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_OTP, hashPassword, normalizeHospitalCode, normalizeMobile } from "@/lib/auth";
+import { hashPassword, MIN_PASSWORD_LENGTH, normalizeHospitalCode, normalizeMobile, passwordValidationError } from "@/lib/auth";
 import { isValidHospitalCode, slugFromHospitalName } from "@/lib/hospital-code";
 import { mobileValidationError } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
@@ -27,6 +27,7 @@ export type RegisterHospitalInput = {
   phone?: string | null;
   adminUsername: string;
   adminMobile: string;
+  adminEmail?: string | null;
   adminPassword: string;
   tierId?: string;
   /** @deprecated use tierId */
@@ -79,10 +80,19 @@ export type PreparedRegistration = {
   phone: string | null;
   adminUsername: string;
   adminMobile: string;
+  adminEmail: string;
   adminPassword: string;
   tierId: SubscriptionTierId;
   quote: Awaited<ReturnType<typeof calculateRegistrationTotal>>;
 };
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function resolveTierId(input: {
   tierId?: string;
@@ -121,6 +131,7 @@ export async function prepareHospitalRegistration(
   const phone = normalizeMobile(String(input.phone ?? ""));
   const adminUsername = input.adminUsername.trim();
   const adminMobile = normalizeMobile(input.adminMobile);
+  const adminEmail = normalizeEmail(String(input.adminEmail ?? ""));
   const adminPassword = input.adminPassword;
   const tierId = resolveTierId(input);
 
@@ -135,14 +146,20 @@ export async function prepareHospitalRegistration(
   if (adminMobileError) {
     throw new HospitalRegistrationError(adminMobileError, 400);
   }
+  if (!isValidEmail(adminEmail)) {
+    throw new HospitalRegistrationError("Enter a valid super admin email for payment receipts.", 400);
+  }
   if (adminUsername.length < 3 || !/^[a-zA-Z0-9._]+$/.test(adminUsername)) {
     throw new HospitalRegistrationError(
       "Super admin username must be at least 3 letters, numbers, dots, or underscores.",
       400,
     );
   }
-  if (adminPassword.length < 6) {
-    throw new HospitalRegistrationError("Super admin password must be at least 6 characters.", 400);
+  if (passwordValidationError(adminPassword)) {
+    throw new HospitalRegistrationError(
+      `Super admin password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      400,
+    );
   }
 
   const code = await allocateUniqueHospitalCode(name, input.code);
@@ -177,6 +194,7 @@ export async function prepareHospitalRegistration(
     phone,
     adminUsername,
     adminMobile,
+    adminEmail,
     adminPassword,
     tierId,
     quote,
@@ -209,15 +227,18 @@ export async function registerHospital(input: RegisterHospitalInput) {
         create: {
           username: prepared.adminUsername,
           mobile: prepared.adminMobile,
+          email: prepared.adminEmail,
           passwordHash: await hashPassword(prepared.adminPassword),
-          otpCode: DEFAULT_OTP,
           isVerified: true,
           role: "SUPER_ADMIN",
         },
       },
     },
     include: {
-      users: { where: { role: "SUPER_ADMIN" }, select: { id: true, username: true, mobile: true, role: true } },
+      users: {
+        where: { role: "SUPER_ADMIN" },
+        select: { id: true, username: true, mobile: true, email: true, role: true },
+      },
     },
   });
 

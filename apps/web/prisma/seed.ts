@@ -16,8 +16,8 @@ async function main() {
     create: {
       username: "softwareadmin",
       mobile: "9999999999",
-      passwordHash: await bcrypt.hash("Software@123", 10),
-      otpCode: "1234",
+      passwordHash: await bcrypt.hash("Software@123", 12),
+      otpCode: null,
       isVerified: true,
       role: "SOFTWARE_ADMIN",
     },

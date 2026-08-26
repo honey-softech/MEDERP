@@ -53,6 +53,7 @@ export default function RegisterHospitalPage() {
   const [phone, setPhone] = useState("");
   const [adminUsername, setAdminUsername] = useState("");
   const [adminMobile, setAdminMobile] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [tierId, setTierId] = useState("STARTER");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -73,6 +74,7 @@ export default function RegisterHospitalPage() {
       setPhone(draft.phone);
       setAdminUsername(draft.adminUsername);
       setAdminMobile(draft.adminMobile);
+      setAdminEmail(draft.adminEmail || "");
       setTierId(draft.tierId || "STARTER");
       setTermsAccepted(draft.termsAccepted);
       skipCodeFetch.current = Boolean(draft.code);
@@ -96,10 +98,11 @@ export default function RegisterHospitalPage() {
       phone,
       adminUsername,
       adminMobile,
+      adminEmail,
       tierId,
       termsAccepted,
     });
-  }, [draftReady, name, code, address, phone, adminUsername, adminMobile, tierId, termsAccepted]);
+  }, [draftReady, name, code, address, phone, adminUsername, adminMobile, adminEmail, tierId, termsAccepted]);
 
   async function assignHospitalCode(hospitalName: string, keep?: string) {
     if (hospitalName.trim().length < 2) return;
@@ -154,11 +157,12 @@ export default function RegisterHospitalPage() {
       phone,
       adminUsername,
       adminMobile,
+      adminEmail,
       adminPassword,
       tierId,
       termsAccepted,
     }),
-    [name, code, address, phone, adminUsername, adminMobile, adminPassword, tierId, termsAccepted],
+    [name, code, address, phone, adminUsername, adminMobile, adminEmail, adminPassword, tierId, termsAccepted],
   );
 
   async function completeRegistration(
@@ -214,8 +218,13 @@ export default function RegisterHospitalPage() {
       setError(adminMobileError);
       return;
     }
-    if (!adminPassword || adminPassword.length < 6) {
-      setError("Super admin password must be at least 6 characters.");
+    const email = adminEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Enter a valid super admin email for payment receipts.");
+      return;
+    }
+    if (!adminPassword || adminPassword.length < 8) {
+      setError("Super admin password must be at least 8 characters.");
       return;
     }
     setPending(true);
@@ -276,6 +285,7 @@ export default function RegisterHospitalPage() {
         prefill: {
           name: String((orderData.prefill as { name?: string } | undefined)?.name || adminUsername),
           contact: String((orderData.prefill as { contact?: string } | undefined)?.contact || adminMobile),
+          email: String((orderData.prefill as { email?: string } | undefined)?.email || adminEmail),
         },
         theme: { color: "#1976d2" },
         handler: (response) => {
@@ -365,6 +375,18 @@ export default function RegisterHospitalPage() {
             value={adminMobile}
             onChange={(event) => setAdminMobile(event.target.value.replace(/[^\d+]/g, ""))}
             placeholder="10-digit mobile — used to sign in"
+            required
+          />
+        </label>
+        <label className="text-sm font-medium text-slate-700">
+          Super admin email
+          <input
+            className={fieldClass}
+            type="email"
+            autoComplete="email"
+            value={adminEmail}
+            onChange={(event) => setAdminEmail(event.target.value)}
+            placeholder="Used for Razorpay payment receipts"
             required
           />
         </label>

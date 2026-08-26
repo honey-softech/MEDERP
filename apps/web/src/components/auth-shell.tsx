@@ -3,6 +3,9 @@ export {
   fieldClass,
   primaryButtonClass,
   secondaryButtonClass,
+  compactButtonClass,
+  compactPrimaryButtonClass,
+  textActionClass,
 } from "@/lib/ui";
 
 export function AuthShell({

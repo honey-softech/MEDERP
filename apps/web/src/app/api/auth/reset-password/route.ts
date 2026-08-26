@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, normalizeMobile } from "@/lib/auth";
+import { hashPassword, normalizeMobile, passwordValidationError } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { otpErrorMessage, verifyAndConsumeOtp } from "@/lib/otp";
+import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const limited = checkRateLimit(clientKey(request, "reset-password"), {
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+    lockMs: 15 * 60 * 1000,
+  });
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Too many attempts. Try again in ${limited.retryAfterSec} seconds.` },
+      { status: 429 },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const mobile = normalizeMobile(String(body?.mobile ?? ""));
   const otp = String(body?.otp ?? "").trim();
@@ -12,19 +26,19 @@ export async function POST(request: Request) {
   if (!mobile || !otp) {
     return NextResponse.json({ error: "Mobile number and OTP are required." }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+  const passwordError = passwordValidationError(password);
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
   }
 
   const user = await prisma.appUser.findUnique({ where: { mobile } });
-  if (!user) {
-    return NextResponse.json({ error: "No account found for this mobile number." }, { status: 404 });
+  if (!user || user.isActive === false) {
+    return NextResponse.json({ error: "Invalid or expired OTP." }, { status: 400 });
   }
-  if (user.isActive === false) {
-    return NextResponse.json({ error: "This account is inactive. Contact hospital admin." }, { status: 403 });
-  }
-  if (user.otpCode !== otp) {
-    return NextResponse.json({ error: "Invalid OTP." }, { status: 400 });
+
+  const result = await verifyAndConsumeOtp(user, otp);
+  if (!result.ok) {
+    return NextResponse.json({ error: otpErrorMessage(result.error) }, { status: 400 });
   }
 
   await prisma.$transaction([
@@ -33,6 +47,9 @@ export async function POST(request: Request) {
       data: {
         passwordHash: await hashPassword(password),
         isVerified: true,
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
       },
     }),
     prisma.appSession.deleteMany({ where: { userId: user.id } }),

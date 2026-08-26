@@ -14,6 +14,8 @@ import {
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
+  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  if (denied) return denied;
 
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";

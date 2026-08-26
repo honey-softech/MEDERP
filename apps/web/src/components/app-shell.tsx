@@ -157,7 +157,8 @@ const softwareAdminNav: NavSection[] = [
   {
     title: "Platform",
     items: [
-      { href: "/platform/hospitals", label: "Hospitals" },
+      { href: "/platform/hospitals", label: "Hospital list" },
+      { href: "/platform/hospitals/new", label: "Create hospital" },
       { href: "/platform/billing-settings", label: "Billing settings" },
       { href: "/platform/users", label: "All users" },
       { href: "/platform/join-requests", label: "Join requests" },
@@ -309,9 +310,11 @@ function filterNavByModules(
 export async function AppShell({
   title,
   children,
+  dense = false,
 }: {
   title: string;
   children: React.ReactNode;
+  dense?: boolean;
 }) {
   const user = await getCurrentUser();
   const modules = {
@@ -355,6 +358,7 @@ export async function AppShell({
       hospitalLabel={user?.hospital ? `${user.hospital.name} · ${user.hospital.code}` : undefined}
       userLabel={user ? `${user.username} · ${user.role.replace(/_/g, " ")}` : undefined}
       nav={nav}
+      dense={dense}
     >
       {children}
     </AppShellFrame>

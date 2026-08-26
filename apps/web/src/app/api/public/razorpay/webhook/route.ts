@@ -14,12 +14,12 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-razorpay-signature") ?? "";
 
-  if (process.env.RAZORPAY_WEBHOOK_SECRET?.trim()) {
-    if (!verifyRazorpayWebhookSignature(rawBody, signature)) {
-      return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
-    }
-  } else {
-    console.warn("RAZORPAY_WEBHOOK_SECRET is not set; accepting webhook without signature verification.");
+  if (!process.env.RAZORPAY_WEBHOOK_SECRET?.trim()) {
+    console.error("RAZORPAY_WEBHOOK_SECRET is not set; rejecting webhook.");
+    return NextResponse.json({ error: "Webhook verification is not configured." }, { status: 503 });
+  }
+  if (!verifyRazorpayWebhookSignature(rawBody, signature)) {
+    return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
   }
 
   const payload = JSON.parse(rawBody) as {

@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import type { AppRole, EmploymentStatus, EmploymentType, Gender, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { nextCounter, pad, sanitizePhotoData } from "@/lib/front-desk";
@@ -30,7 +30,7 @@ export function staffRoleFor(role: AppRole): UserRole | null {
 }
 
 export function generateStaffPassword() {
-  return `Med${randomBytes(3).toString("hex")}@${10 + Math.floor(Math.random() * 89)}`;
+  return `Med${randomBytes(4).toString("hex")}@${randomInt(10, 99)}`;
 }
 
 export function suggestedUsername(firstName: string, lastName: string) {

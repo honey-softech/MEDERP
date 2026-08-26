@@ -2,8 +2,24 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeMobile } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { otpErrorMessage, verifyAndConsumeOtp } from "@/lib/otp";
+import { checkRateLimit, clientKey } from "@/lib/rate-limit";
+
+const GENERIC_OTP_ERROR = "Invalid or expired OTP.";
 
 export async function POST(request: Request) {
+  const limited = checkRateLimit(clientKey(request, "verify-otp"), {
+    limit: 20,
+    windowMs: 15 * 60 * 1000,
+    lockMs: 15 * 60 * 1000,
+  });
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Too many attempts. Try again in ${limited.retryAfterSec} seconds.` },
+      { status: 429 },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const mobile = normalizeMobile(String(body?.mobile ?? ""));
   const otp = String(body?.otp ?? "").trim();
@@ -14,11 +30,12 @@ export async function POST(request: Request) {
 
   const user = await prisma.appUser.findUnique({ where: { mobile } });
   if (!user) {
-    return NextResponse.json({ error: "No account found for this mobile number." }, { status: 404 });
+    return NextResponse.json({ error: GENERIC_OTP_ERROR }, { status: 400 });
   }
 
-  if (user.otpCode !== otp) {
-    return NextResponse.json({ error: "Invalid OTP." }, { status: 400 });
+  const result = await verifyAndConsumeOtp(user, otp);
+  if (!result.ok) {
+    return NextResponse.json({ error: otpErrorMessage(result.error) }, { status: 400 });
   }
 
   await prisma.appUser.update({

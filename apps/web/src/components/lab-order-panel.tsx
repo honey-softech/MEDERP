@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ExternalReportForm } from "@/components/external-report-form";
-import { primaryButtonClass } from "@/components/auth-shell";
+import { compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
 import { inr } from "@/lib/front-desk";
 import { labStatusClass, prettyLabStatus } from "@/lib/lab-catalog";
 
@@ -26,87 +26,89 @@ export function LabOrderPanel({
   canWork = false,
   canViewReport = false,
   canAttachExternal = false,
-  patientPhone = null,
+  canPrint = false,
+  appointmentId = "",
 }: {
   orders: LabOrder[];
   canCollect?: boolean;
   canWork?: boolean;
   canViewReport?: boolean;
   canAttachExternal?: boolean;
+  canPrint?: boolean;
+  appointmentId?: string;
   patientPhone?: string | null;
 }) {
   if (orders.length === 0) return null;
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-      <h4 className="font-semibold">Investigations</h4>
-      <p className="text-xs text-slate-500">
-        Each paid or completed request stays listed. The doctor can order another set anytime on this visit.
-      </p>
-      {orders.map((order) => {
-        const external = order.fulfillment === "EXTERNAL";
-        return (
-          <article key={order.id} className="rounded-xl border border-slate-100 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${labStatusClass(order.status)}`}>
-                {prettyLabStatus(order.status)}
-              </span>
-              {external ? (
-                <span className="text-xs font-medium text-slate-500">Done outside</span>
-              ) : (
-                <span className="text-sm font-medium">{inr(order.totalAmount)}</span>
-              )}
-            </div>
-            {external ? (
-              <p className="mt-2 text-xs text-slate-500">
-                {patientPhone
-                  ? `Patient mobile ${patientPhone}. WhatsApp/SMS of this list will be sent later.`
-                  : "No mobile on file. Add a number on the patient record so the list can be sent later."}
-              </p>
-            ) : null}
-            <ul className="mt-3 space-y-2 text-sm">
-              {order.items.map((item) => (
-                <li key={item.id} className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="font-medium">{item.nameSnapshot}</p>
-                  <p className="text-xs text-slate-500">{item.categorySnapshot}</p>
-                </li>
-              ))}
-            </ul>
-            {(canViewReport || (external && canAttachExternal)) && order.status === "RESULTED" && order.reportFileName ? (
-              <p className="mt-3 text-sm">
-                <a className="font-medium text-teal-700 hover:underline" href={`/api/lab/orders/${order.id}/report`}>
-                  Open report · {order.reportFileName}
+    <section className="rounded-lg border border-border bg-surface p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-text-primary">Investigations</h4>
+        {canPrint && appointmentId ? (
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" className={compactButtonClass} disabled title="WhatsApp and SMS will be added later">
+              Send
+            </button>
+            <Link href={`/appointments/${appointmentId}/investigations`} className={compactButtonClass}>
+              Print
+            </Link>
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-2 space-y-2">
+        {orders.map((order) => {
+          const external = order.fulfillment === "EXTERNAL";
+          const reportReady = order.status === "RESULTED" && order.reportFileName;
+          return (
+            <article key={order.id} className="rounded-lg border border-border/80 px-2.5 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${labStatusClass(order.status)}`}>
+                  {prettyLabStatus(order.status)}
+                </span>
+                <span className="text-[11px] text-text-secondary">
+                  {external ? "Outside" : inr(order.totalAmount)}
+                </span>
+              </div>
+              <ul className="mt-1.5 flex flex-wrap gap-1">
+                {order.items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-full bg-app-bg px-2 py-0.5 text-[11px] font-medium text-text-primary"
+                    title={item.categorySnapshot}
+                  >
+                    {item.nameSnapshot}
+                  </li>
+                ))}
+              </ul>
+              {reportReady && (canViewReport || (external && canAttachExternal)) ? (
+                <a
+                  className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
+                  href={`/api/lab/orders/${order.id}/report`}
+                >
+                  Open report
                 </a>
-              </p>
-            ) : order.status === "RESULTED" ? (
-              <p className="mt-3 text-xs text-slate-500">Report is on the patient record for the doctor and nurse.</p>
-            ) : external ? (
-              <p className="mt-3 text-xs text-slate-500">Waiting for the patient to bring the outside report.</p>
-            ) : (
-              <p className="mt-3 text-xs text-slate-500">Lab report pending</p>
-            )}
-            {external && canAttachExternal && order.status !== "CANCELLED" ? (
-              <ExternalReportForm
-                orderId={order.id}
-                reportFileName={order.reportFileName}
-                locked={order.status === "RESULTED"}
-              />
-            ) : null}
-            <div className="mt-3 flex flex-wrap gap-2">
+              ) : null}
+              {external && canAttachExternal && order.status !== "CANCELLED" ? (
+                <ExternalReportForm
+                  orderId={order.id}
+                  reportFileName={order.reportFileName}
+                  locked={order.status === "RESULTED"}
+                />
+              ) : null}
               {canCollect && !external && order.status === "AWAITING_PAYMENT" ? (
-                <Link href={`/billing/lab/${order.id}`} className={primaryButtonClass}>
-                  Collect lab payment
+                <Link href={`/billing/lab/${order.id}`} className={`${compactPrimaryButtonClass} mt-1.5`}>
+                  Collect fee
                 </Link>
               ) : null}
               {canWork && !external && (order.status === "PAID" || order.status === "SAMPLE_COLLECTED") ? (
-                <Link href={`/lab/${order.id}`} className={primaryButtonClass}>
-                  Update lab work
+                <Link href={`/lab/${order.id}`} className={`${compactPrimaryButtonClass} mt-1.5`}>
+                  Update lab
                 </Link>
               ) : null}
-            </div>
-          </article>
-        );
-      })}
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }

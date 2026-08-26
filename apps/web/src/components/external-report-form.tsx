@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { secondaryButtonClass } from "@/components/auth-shell";
+import { compactButtonClass } from "@/components/auth-shell";
 
 export function ExternalReportForm({
   orderId,
@@ -35,17 +35,14 @@ export function ExternalReportForm({
   }
 
   return (
-    <div className="mt-3">
-      <p className="text-sm font-medium text-slate-700">Attach report brought by the patient</p>
+    <div className="mt-1.5">
       <label
-        className={`mt-2 flex cursor-pointer flex-col items-start gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 ${
-          locked || pending ? "pointer-events-none opacity-60" : "hover:border-teal-600 hover:bg-teal-50"
+        className={`inline-flex cursor-pointer items-center gap-2 ${
+          locked || pending ? "pointer-events-none opacity-60" : ""
         }`}
       >
-        <span className={secondaryButtonClass}>{pending ? "Uploading…" : fileName ? "Replace file" : "Choose PDF or image"}</span>
-        <span className="text-sm text-slate-600">
-          {fileName || "PDF, JPG, or PNG up to 8 MB. After this is attached, the doctor can update the assessment and visit summary."}
-        </span>
+        <span className={compactButtonClass}>{pending ? "Uploading…" : fileName ? "Replace" : "Attach report"}</span>
+        {fileName ? <span className="truncate text-[11px] text-text-secondary">{fileName}</span> : null}
         <input
           className="sr-only"
           type="file"
@@ -58,7 +55,7 @@ export function ExternalReportForm({
           }}
         />
       </label>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
     </div>
   );
 }

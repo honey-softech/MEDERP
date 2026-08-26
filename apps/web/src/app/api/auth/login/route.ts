@@ -1,10 +1,30 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createSession, homeForRole, SESSION_COOKIE, verifyPassword } from "@/lib/auth";
+import {
+  createSession,
+  DUMMY_PASSWORD_HASH,
+  homeForRole,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+  verifyPassword,
+} from "@/lib/auth";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
+import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const limited = checkRateLimit(clientKey(request, "login"), {
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+    lockMs: 15 * 60 * 1000,
+  });
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Too many login attempts. Try again in ${limited.retryAfterSec} seconds.` },
+      { status: 429 },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const mobile = normalizeMobile(String(body?.mobile ?? body?.identifier ?? ""));
   const password = String(body?.password ?? "");
@@ -14,8 +34,10 @@ export async function POST(request: Request) {
   }
 
   const user = await prisma.appUser.findUnique({ where: { mobile } });
+  // Always run bcrypt when user missing to reduce timing enumeration.
+  const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user || !passwordOk) {
     await writeAuditLog({
       request,
       hospitalId: user?.hospitalId,
@@ -40,6 +62,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This account is inactive. Contact hospital admin." }, { status: 403 });
   }
 
+  if (user.hospitalId) {
+    const hospital = await prisma.hospital.findUnique({
+      where: { id: user.hospitalId },
+      select: { isActive: true },
+    });
+    if (hospital && hospital.isActive === false) {
+      return NextResponse.json(
+        { error: "This hospital's access has been stopped. Contact MedERP support." },
+        { status: 403 },
+      );
+    }
+  }
+
   const sessionToken = await createSession(user.id);
   await writeAuditLog({
     request,
@@ -53,6 +88,7 @@ export async function POST(request: Request) {
     summary: `${user.username} signed in as ${user.role.replace(/_/g, " ")}.`,
   });
 
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const response = NextResponse.json({
     ok: true,
     username: user.username,
@@ -61,12 +97,6 @@ export async function POST(request: Request) {
     sessionToken,
     redirectTo: homeForRole(user.role, user.hospitalId),
   });
-  response.cookies.set(SESSION_COOKIE, sessionToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  });
+  response.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions(expiresAt));
   return response;
 }

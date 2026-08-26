@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { staffIsOnApprovedLeave } from "@/lib/staff-leave";
 
 export const FRONT_DESK_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST"];
+export const WALK_IN_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "DOCTOR"];
+export const PATIENT_REGISTER_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "DOCTOR"];
 export const CLINICAL_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "DOCTOR", "NURSE"];
 export const NURSE_VITALS_ROLES: AppRole[] = ["SUPER_ADMIN", "NURSE"];
 export const DOCTOR_VISIT_ROLES: AppRole[] = ["SUPER_ADMIN", "DOCTOR"];
@@ -91,7 +93,7 @@ export function digitsOnly(value: string) {
 export function sanitizePhotoData(value: unknown) {
   const photo = String(value ?? "").trim();
   if (!photo) return null;
-  if (!photo.startsWith("data:image/")) return null;
+  if (!/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) return null;
   if (photo.length > 900_000) return null;
   return photo;
 }
@@ -166,7 +168,7 @@ export function physicianLine(doctor: {
 export function sanitizeLogoData(value: unknown) {
   const logo = String(value ?? "").trim();
   if (!logo) return null;
-  if (!logo.startsWith("data:image/")) return null;
+  if (!/^data:image\/(png|jpe?g|webp);base64,/i.test(logo)) return null;
   if (logo.length > 1_500_000) return null;
   return logo;
 }

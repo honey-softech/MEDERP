@@ -21,6 +21,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
+  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  if (denied) return denied;
   const { id } = await context.params;
   const invoice = await prisma.invoice.findFirst({
     where: { id, hospitalId: scoped.user.hospitalId },

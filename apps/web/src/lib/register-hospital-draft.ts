@@ -7,6 +7,7 @@ export type RegisterHospitalDraft = {
   phone: string;
   adminUsername: string;
   adminMobile: string;
+  adminEmail: string;
   tierId: string;
   termsAccepted: boolean;
 };
@@ -18,6 +19,7 @@ const empty: RegisterHospitalDraft = {
   phone: "",
   adminUsername: "",
   adminMobile: "",
+  adminEmail: "",
   tierId: "STARTER",
   termsAccepted: false,
 };

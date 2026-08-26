@@ -45,7 +45,7 @@ function ResetPasswordForm() {
   return (
     <AuthShell
       title="Set a new password"
-      subtitle="Enter the OTP sent to your phone, then choose a new password. For now the OTP is 1234."
+      subtitle="Enter the OTP sent to your phone, then choose a new password (at least 8 characters)."
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
@@ -65,7 +65,8 @@ function ResetPasswordForm() {
             inputMode="numeric"
             value={otp}
             onChange={(event) => setOtp(event.target.value)}
-            placeholder="1234"
+            placeholder="6-digit code"
+            maxLength={6}
             required
           />
         </label>
@@ -77,7 +78,7 @@ function ResetPasswordForm() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"
-            minLength={6}
+            minLength={8}
             required
           />
         </label>
@@ -89,7 +90,7 @@ function ResetPasswordForm() {
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             autoComplete="new-password"
-            minLength={6}
+            minLength={8}
             required
           />
         </label>

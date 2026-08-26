@@ -407,7 +407,9 @@ model AppUser {
   username           String           @unique
   mobile             String           @unique
   passwordHash       String
-  otpCode            String           @default("1234")
+  otpCode            String?
+  otpExpiresAt       DateTime?
+  otpAttempts        Int              @default(0)
   isVerified         Boolean          @default(false)
   isActive           Boolean          @default(true)
   role               AppRole          @default(RECEPTIONIST)
@@ -589,6 +591,11 @@ model Patient {
   email               String?
   address             String?
   bloodGroup          String?
+  allergies           String?          @db.Text
+  medicalHistory      String?          @db.Text
+  familyHistory       String?          @db.Text
+  socialHistory       String?          @db.Text
+  currentMedications  String?          @db.Text
   emergencyName       String?
   emergencyPhone      String?
   idProofType         IdProofType?
@@ -720,6 +727,7 @@ model VisitAssessment {
   summary              String?
   prescription         String?
   advice               String?
+  visitOutcome         String?
   followUpAt           DateTime?
   status               VisitAssessmentStatus @default(DRAFT)
   approvedAt           DateTime?

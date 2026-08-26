@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { primaryButtonClass, secondaryButtonClass, fieldClass } from "@/components/auth-shell";
+import Link from "next/link";
+import { primaryButtonClass, secondaryButtonClass, fieldClass, compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { SCAN_MODALITIES, type InvestigationPick, type ScanTabId } from "@/lib/lab-catalog";
 
@@ -42,8 +43,8 @@ export function BloodTestPicker({
   onInvestigationsChange,
   locked = false,
   labEnabled = true,
-  patientPhone = null,
   priorOrderCount = 0,
+  printHref = "",
 }: {
   selectedIds?: string[];
   selectedInvestigations?: InvestigationPick[];
@@ -53,6 +54,8 @@ export function BloodTestPicker({
   labEnabled?: boolean;
   patientPhone?: string | null;
   priorOrderCount?: number;
+  compact?: boolean;
+  printHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("blood");
@@ -62,7 +65,6 @@ export function BloodTestPicker({
   const initialPicks = selectedInvestigations ?? (selectedIds ?? []).map((testId) => ({ testId }));
   const [draft, setDraft] = useState<InvestigationPick[]>(initialPicks);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
-  const [selectedOpen, setSelectedOpen] = useState(true);
 
   useEffect(() => {
     setDraft(selectedInvestigations ?? (selectedIds ?? []).map((testId) => ({ testId })));
@@ -149,56 +151,33 @@ export function BloodTestPicker({
   const usgTest = byCode.get("USG");
 
   return (
-    <div className="md:col-span-2 rounded-xl border border-border bg-app-bg/50 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h4 className="font-semibold text-text-primary">Investigations</h4>
-          <p className="mt-1 text-sm text-text-secondary">
-            {labEnabled
-              ? "Choose blood tests, X-ray, CT, or MRI. For scans, pick the body part so the request is specific."
-              : "Choose blood tests, X-ray, CT, or MRI for the patient to do outside. For scans, pick the body part. WhatsApp/SMS will be added later."}
-            {priorOrderCount > 0
-              ? ` Earlier requests stay on this visit — you can order more after the first round is done.`
-              : ""}
-          </p>
-          {!labEnabled ? (
-            <p className="mt-2 text-xs text-slate-500">
-              {patientPhone
-                ? `Patient mobile on file: ${patientPhone}. The investigation list will be sent here once messaging is connected.`
-                : "No mobile number on the patient file yet. Add one so the list can be sent later."}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedLines.length > 0 ? (
-            <ExpandToggle open={selectedOpen} onToggle={() => setSelectedOpen((v) => !v)} count={selectedLines.length} />
+    <div className="rounded-lg border border-border bg-app-bg/50 p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-text-primary">Tests / scans</h4>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {printHref && selectedLines.length > 0 ? (
+            <Link href={printHref} className={compactButtonClass}>
+              Print
+            </Link>
           ) : null}
           {locked ? null : (
-            <button className={primaryButtonClass} type="button" onClick={() => setOpen(true)}>
-              {draft.length
-                ? "Change this request"
-                : priorOrderCount > 0
-                  ? "Order more tests / scans"
-                  : "Select tests / scans"}
+            <button className={compactPrimaryButtonClass} type="button" onClick={() => setOpen(true)}>
+              {draft.length ? "Change" : priorOrderCount > 0 ? "Add more" : "Add"}
             </button>
           )}
         </div>
       </div>
-      {selectedOpen ? (
-        selectedLines.length === 0 ? (
-          <p className="mt-3 text-sm text-text-secondary">No tests or scans selected.</p>
-        ) : (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {selectedLines.map((row) => (
-              <li
-                key={row.key}
-                className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-text-primary ring-1 ring-border"
-              >
-                {row.label}
-              </li>
-            ))}
-          </ul>
-        )
+      {selectedLines.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {selectedLines.map((row) => (
+            <li
+              key={row.key}
+              className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-text-primary ring-1 ring-border"
+            >
+              {row.label}
+            </li>
+          ))}
+        </ul>
       ) : null}
 
       {open ? (
@@ -211,10 +190,7 @@ export function BloodTestPicker({
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-text-primary">Select tests and scans</h3>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    {draft.length} selected
-                    {labEnabled ? "." : ". These will be done outside this hospital."} For X-ray, CT, and MRI, choose the body part.
-                  </p>
+                  <p className="mt-1 text-sm text-text-secondary">{draft.length} selected</p>
                 </div>
                 <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>
                   Close

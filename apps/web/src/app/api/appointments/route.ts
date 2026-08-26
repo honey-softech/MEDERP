@@ -3,7 +3,9 @@ import type { QueueType, ReferralSource, VisitType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  CLINICAL_VIEW_ROLES,
   FRONT_DESK_ROLES,
+  WALK_IN_ROLES,
   doctorIsOnLeave,
   doctorName,
   forbidUnless,
@@ -11,6 +13,7 @@ import {
   patientName,
   requireHospitalActor,
   sanitizePhotoData,
+  staffIdForAppUser,
   tokenLabel,
 } from "@/lib/front-desk";
 import { notifyNursesOfConsult } from "@/lib/notifications";
@@ -22,6 +25,8 @@ const REFERRALS: ReferralSource[] = ["SELF", "DOCTOR", "INSURANCE"];
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
+  const denied = forbidUnless(scoped.user.role, CLINICAL_VIEW_ROLES);
+  if (denied) return denied;
 
   const { searchParams } = new URL(request.url);
   const doctorId = searchParams.get("doctorId") ?? undefined;
@@ -57,14 +62,29 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, FRONT_DESK_ROLES);
-  if (denied) return denied;
+  const canFrontDesk = FRONT_DESK_ROLES.includes(scoped.user.role);
+  const canWalkIn = WALK_IN_ROLES.includes(scoped.user.role);
+  if (!canWalkIn) {
+    const denied = forbidUnless(scoped.user.role, WALK_IN_ROLES);
+    if (denied) return denied;
+  }
 
   const body = await request.json().catch(() => null);
   const patientId = String(body?.patientId ?? "");
-  const doctorId = String(body?.doctorId ?? "");
+  let doctorId = String(body?.doctorId ?? "");
   const departmentId = String(body?.departmentId ?? "");
   const queueType = (String(body?.queueType ?? "SCHEDULED") as QueueType);
+
+  if (!canFrontDesk) {
+    if (queueType !== "WALK_IN") {
+      return NextResponse.json({ error: "Doctors can add walk-ins to their own queue." }, { status: 403 });
+    }
+    const myStaffId = await staffIdForAppUser(scoped.user.id, scoped.user.hospitalId);
+    if (!myStaffId) {
+      return NextResponse.json({ error: "Your doctor profile is not linked. Ask the hospital admin." }, { status: 400 });
+    }
+    doctorId = myStaffId;
+  }
   const visitType = (String(body?.visitType ?? "NEW") as VisitType);
   const referralSource = (String(body?.referralSource ?? "SELF") as ReferralSource);
   const referredBy = String(body?.referredBy ?? "").trim() || null;

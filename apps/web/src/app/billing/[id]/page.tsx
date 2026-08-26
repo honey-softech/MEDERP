@@ -4,11 +4,13 @@ import { AppShell } from "@/components/app-shell";
 import { InvoiceActions } from "@/components/billing-forms";
 import { PrintButton } from "@/components/print-button";
 import { secondaryButtonClass } from "@/components/auth-shell";
-import { FRONT_DESK_ROLES, WAIVER_APPROVER_ROLES, doctorName, inr, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { BILLING_ROLES, FRONT_DESK_ROLES, WAIVER_APPROVER_ROLES, doctorName, inr, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireHospitalPage();
+  if (!BILLING_ROLES.includes(user.role)) redirect("/");
   const { id } = await params;
   const invoice = await prisma.invoice.findFirst({
     where: { id, hospitalId: user.hospitalId },

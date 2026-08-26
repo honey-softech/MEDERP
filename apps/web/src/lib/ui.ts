@@ -10,7 +10,16 @@ export const primaryButtonClass =
   "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60";
 
 export const secondaryButtonClass =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text-primary hover:bg-app-bg disabled:opacity-60";
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text-primary hover:bg-app-bg disabled:opacity-60";
+
+export const compactButtonClass =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text-primary hover:bg-app-bg disabled:opacity-60 sm:h-10 sm:rounded-lg sm:px-4 sm:text-sm";
+
+export const compactPrimaryButtonClass =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white hover:bg-primary-dark disabled:opacity-60 sm:h-10 sm:rounded-lg sm:px-4 sm:text-sm";
+
+export const textActionClass =
+  "inline-flex items-center text-xs font-medium text-text-secondary underline-offset-2 hover:text-primary hover:underline";
 
 export const iconButtonClass =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-secondary hover:bg-app-bg hover:text-text-primary";

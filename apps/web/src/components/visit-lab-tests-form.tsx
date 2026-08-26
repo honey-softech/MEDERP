@@ -49,14 +49,6 @@ export function VisitLabTestsForm({
 
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-      <div>
-        <h4 className="font-semibold">Order more tests / scans</h4>
-        <p className="mt-1 text-sm text-slate-500">
-          {priorOrderCount > 0
-            ? `${priorOrderCount} earlier request${priorOrderCount === 1 ? "" : "s"} already on this visit. Add another set anytime after reviewing reports.`
-            : "Add blood tests or scans for this visit."}
-        </p>
-      </div>
       <BloodTestPicker
         selectedInvestigations={investigations}
         onInvestigationsChange={setInvestigations}
@@ -64,6 +56,7 @@ export function VisitLabTestsForm({
         labEnabled={labEnabled}
         patientPhone={patientPhone}
         priorOrderCount={priorOrderCount}
+        printHref={`/appointments/${appointmentId}/investigations`}
       />
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {locked ? null : (

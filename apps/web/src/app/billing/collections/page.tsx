@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
-import { dayRange, doctorName, inr, localDayKey, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { BILLING_ROLES, dayRange, doctorName, inr, localDayKey, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
 export default async function CollectionsPage({
   searchParams,
@@ -8,6 +9,7 @@ export default async function CollectionsPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const user = await requireHospitalPage();
+  if (!BILLING_ROLES.includes(user.role)) redirect("/");
   const { date } = await searchParams;
   const selected = date ? new Date(date) : new Date();
   const { start, end } = dayRange(Number.isNaN(selected.getTime()) ? new Date() : selected);

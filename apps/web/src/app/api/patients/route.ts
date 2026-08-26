@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import type { FamilyRelation, Gender, IdProofType } from "@prisma/client";
+import type { AppRole, FamilyRelation, Gender, IdProofType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import {
-  FRONT_DESK_ROLES,
+  PATIENT_REGISTER_ROLES,
+  CLINICAL_VIEW_ROLES,
   digitsOnly,
   ensureFamilyGroup,
   findDuplicatePatients,
@@ -16,10 +17,13 @@ import {
 const GENDERS: Gender[] = ["MALE", "FEMALE", "OTHER"];
 const ID_PROOFS: IdProofType[] = ["AADHAAR", "PAN", "PASSPORT", "DRIVING_LICENSE", "VOTER_ID", "OTHER"];
 const RELATIONS: FamilyRelation[] = ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"];
+const PATIENT_VIEW_ROLES: AppRole[] = [...CLINICAL_VIEW_ROLES, "ACCOUNTANT"];
 
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
+  const denied = forbidUnless(scoped.user.role, PATIENT_VIEW_ROLES);
+  if (denied) return denied;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -96,7 +100,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, FRONT_DESK_ROLES);
+  const denied = forbidUnless(scoped.user.role, PATIENT_REGISTER_ROLES);
   if (denied) return denied;
 
   try {
@@ -110,6 +114,11 @@ export async function POST(request: Request) {
   const email = String(body?.email ?? "").trim() || null;
   const address = String(body?.address ?? "").trim() || null;
   const bloodGroup = String(body?.bloodGroup ?? "").trim() || null;
+  const allergies = String(body?.allergies ?? "").trim() || null;
+  const medicalHistory = String(body?.medicalHistory ?? "").trim() || null;
+  const familyHistory = String(body?.familyHistory ?? "").trim() || null;
+  const socialHistory = String(body?.socialHistory ?? "").trim() || null;
+  const currentMedications = String(body?.currentMedications ?? "").trim() || null;
   const emergencyName = String(body?.emergencyName ?? "").trim() || null;
   const emergencyPhone = String(body?.emergencyPhone ?? "").trim() || null;
   const idProofType = body?.idProofType ? (String(body.idProofType) as IdProofType) : null;
@@ -189,6 +198,11 @@ export async function POST(request: Request) {
       email,
       address: address || guardian?.address || null,
       bloodGroup,
+      allergies,
+      medicalHistory,
+      familyHistory,
+      socialHistory,
+      currentMedications,
       emergencyName: emergencyName || (guardian ? `${guardian.firstName} ${guardian.lastName}` : null),
       emergencyPhone: emergencyPhone || guardian?.phone || null,
       idProofType,

@@ -22,6 +22,7 @@ export function VisitSummaryDocument({
   systemicExamination,
   advice,
   followUpAt,
+  visitOutcome,
   prescription,
   printedBy,
   printedAt,
@@ -48,6 +49,7 @@ export function VisitSummaryDocument({
   systemicExamination?: string | null;
   advice?: string | null;
   followUpAt?: string | null;
+  visitOutcome?: string | null;
   prescription?: string | null;
   printedBy: string;
   printedAt: string;
@@ -152,7 +154,13 @@ export function VisitSummaryDocument({
 
       <Section title="Systemic examination" body={systemicExamination} />
       <Section title="Advice" body={advice} accent />
-      {followUpAt ? <Section title="Follow-up" body={followUpAt} /> : null}
+      {visitOutcome === "DISCHARGE" ? (
+        <Section title="Outcome" body="Discharged" />
+      ) : followUpAt ? (
+        <Section title="Follow-up" body={followUpAt} />
+      ) : visitOutcome === "FOLLOW_UP" ? (
+        <Section title="Outcome" body="Follow up" />
+      ) : null}
       <Section title="Lab report" body="" />
 
       <section className="vs-section">

@@ -13,16 +13,25 @@ export function AppointmentForm({
   departments,
   defaultQueueType = "SCHEDULED",
   initialPatient,
+  defaultDoctorId,
+  lockDoctor = false,
+  defaultDepartmentId,
+  redirectToVisit = false,
 }: {
   doctors: Option[];
   departments: Option[];
   defaultQueueType?: "SCHEDULED" | "WALK_IN";
   initialPatient?: PatientOption | null;
+  defaultDoctorId?: string;
+  lockDoctor?: boolean;
+  defaultDepartmentId?: string;
+  redirectToVisit?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const walkInDefault = defaultQueueType === "WALK_IN";
+  const lockedDoctor = lockDoctor ? doctors.find((row) => row.id === defaultDoctorId) : null;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,7 +54,7 @@ export function AppointmentForm({
       return;
     }
     const appointmentId = data.appointment?.id as string | undefined;
-    if (payload.queueType === "WALK_IN" && appointmentId) {
+    if (payload.queueType === "WALK_IN" && appointmentId && !redirectToVisit) {
       router.push(`/billing/collect/${appointmentId}`);
     } else {
       router.push(appointmentId ? `/appointments/${appointmentId}` : "/appointments");
@@ -75,25 +84,33 @@ export function AppointmentForm({
           registerHref={walkInDefault ? "/patients/new?next=walkin" : "/patients/new?next=appointment"}
         />
       </div>
-      <label className="text-sm font-medium text-slate-700">
-        Doctor
-        <select className={fieldClass} name="doctorId" required>
-          <option value="">Select doctor</option>
-          {doctors.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        {doctors.length === 0 ? (
-          <span className="mt-1 block text-xs font-normal text-amber-700">
-            No doctor users in this hospital yet. Add one under Hospital users with the Doctor role.
-          </span>
-        ) : null}
-      </label>
+      {lockDoctor && defaultDoctorId ? (
+        <label className="text-sm font-medium text-slate-700">
+          Doctor
+          <input type="hidden" name="doctorId" value={defaultDoctorId} />
+          <input className={`${fieldClass} bg-slate-50`} value={lockedDoctor?.label ?? "You"} readOnly />
+        </label>
+      ) : (
+        <label className="text-sm font-medium text-slate-700">
+          Doctor
+          <select className={fieldClass} name="doctorId" required defaultValue={defaultDoctorId ?? ""}>
+            <option value="">Select doctor</option>
+            {doctors.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          {doctors.length === 0 ? (
+            <span className="mt-1 block text-xs font-normal text-amber-700">
+              No doctor users in this hospital yet. Add one under Hospital users with the Doctor role.
+            </span>
+          ) : null}
+        </label>
+      )}
       <label className="text-sm font-medium text-slate-700">
         Department
-        <select className={fieldClass} name="departmentId" required>
+        <select className={fieldClass} name="departmentId" required defaultValue={defaultDepartmentId ?? ""}>
           <option value="">Select department</option>
           {departments.map((item) => (
             <option key={item.id} value={item.id}>
@@ -106,13 +123,17 @@ export function AppointmentForm({
         Date and time
         <input className={fieldClass} type="datetime-local" name="scheduledAt" required={!walkInDefault} />
       </label>
-      <label className="text-sm font-medium text-slate-700">
-        Queue type
-        <select className={fieldClass} name="queueType" defaultValue={defaultQueueType}>
-          <option value="SCHEDULED">Scheduled</option>
-          <option value="WALK_IN">Walk-in</option>
-        </select>
-      </label>
+      {walkInDefault && lockDoctor ? (
+        <input type="hidden" name="queueType" value="WALK_IN" />
+      ) : (
+        <label className="text-sm font-medium text-slate-700">
+          Queue type
+          <select className={fieldClass} name="queueType" defaultValue={defaultQueueType}>
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="WALK_IN">Walk-in</option>
+          </select>
+        </label>
+      )}
       <label className="text-sm font-medium text-slate-700">
         Visit type
         <select className={fieldClass} name="visitType" defaultValue="NEW">

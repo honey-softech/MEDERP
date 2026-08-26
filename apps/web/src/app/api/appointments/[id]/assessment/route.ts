@@ -101,6 +101,9 @@ export async function POST(request: Request, context: Ctx) {
     const summary = text(body?.summary);
     const prescription = text(body?.prescription);
     const advice = text(body?.advice);
+    const visitOutcomeRaw = String(body?.visitOutcome ?? "").trim().toUpperCase();
+    const visitOutcome =
+      visitOutcomeRaw === "FOLLOW_UP" || visitOutcomeRaw === "DISCHARGE" ? visitOutcomeRaw : null;
     const investigations = parseInvestigationPicks(body ?? {});
 
     const approve = action === "approve";
@@ -125,13 +128,19 @@ export async function POST(request: Request, context: Ctx) {
       summary,
       prescription,
       advice,
+      visitOutcome,
       followUpAt,
-      status: approve ? ("APPROVED" as const) : ("DRAFT" as const),
-      approvedAt: approve ? new Date() : null,
-      approvedByUserId: approve ? scoped.user.id : null,
-      approvedByUsername: approve ? scoped.user.username : null,
+      status: approve || wasApproved ? ("APPROVED" as const) : ("DRAFT" as const),
+      approvedAt: approve ? new Date() : wasApproved ? appointment.assessment?.approvedAt ?? null : null,
+      approvedByUserId: approve ? scoped.user.id : wasApproved ? appointment.assessment?.approvedByUserId ?? null : null,
+      approvedByUsername: approve
+        ? scoped.user.username
+        : wasApproved
+          ? appointment.assessment?.approvedByUsername ?? null
+          : null,
     };
 
+    const created = !appointment.assessment;
     const assessment = appointment.assessment
       ? await prisma.visitAssessment.update({ where: { id: appointment.assessment.id }, data })
       : await prisma.visitAssessment.create({ data });
@@ -145,25 +154,27 @@ export async function POST(request: Request, context: Ctx) {
       investigations,
     });
 
-    await writeAuditLog({
-      request,
-      hospitalId: scoped.user.hospitalId,
-      actorUserId: scoped.user.id,
-      actorUsername: scoped.user.username,
-      actorRole: scoped.user.role,
-      action: approve
-        ? wasApproved
-          ? "VISIT_SUMMARY_REPUBLISHED"
-          : "VISIT_SUMMARY_APPROVED"
-        : "VISIT_SUMMARY_SAVED",
-      entity: "VisitAssessment",
-      entityId: assessment.id,
-      summary: approve
-        ? wasApproved
-          ? `${scoped.user.username} published a new visit summary version for ${patientName(appointment.patient)}.`
-          : `${scoped.user.username} approved the visit summary for ${patientName(appointment.patient)}.`
-        : `${scoped.user.username} saved a draft visit summary for ${patientName(appointment.patient)}.`,
-    });
+    if (approve || created) {
+      await writeAuditLog({
+        request,
+        hospitalId: scoped.user.hospitalId,
+        actorUserId: scoped.user.id,
+        actorUsername: scoped.user.username,
+        actorRole: scoped.user.role,
+        action: approve
+          ? wasApproved
+            ? "VISIT_SUMMARY_REPUBLISHED"
+            : "VISIT_SUMMARY_APPROVED"
+          : "VISIT_SUMMARY_SAVED",
+        entity: "VisitAssessment",
+        entityId: assessment.id,
+        summary: approve
+          ? wasApproved
+            ? `${scoped.user.username} published a new visit summary version for ${patientName(appointment.patient)}.`
+            : `${scoped.user.username} approved the visit summary for ${patientName(appointment.patient)}.`
+          : `${scoped.user.username} saved a draft visit summary for ${patientName(appointment.patient)}.`,
+      });
+    }
 
     if (approve) {
       await notifySummaryApproved({

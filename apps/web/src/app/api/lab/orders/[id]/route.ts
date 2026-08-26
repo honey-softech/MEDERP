@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
-import { LAB_WORK_ROLES, forbidUnless, patientName, requireHospitalActor } from "@/lib/front-desk";
+import { LAB_VIEW_ROLES, LAB_WORK_ROLES, forbidUnless, patientName, requireHospitalActor } from "@/lib/front-desk";
 import { notifyLabResults } from "@/lib/lab";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -9,6 +9,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
+  const denied = forbidUnless(scoped.user.role, LAB_VIEW_ROLES);
+  if (denied) return denied;
   const { id } = await context.params;
   const order = await prisma.labOrder.findFirst({
     where: { id, hospitalId: scoped.user.hospitalId },

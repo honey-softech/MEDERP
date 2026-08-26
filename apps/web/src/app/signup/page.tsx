@@ -64,7 +64,7 @@ export default function SignupPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Sign up first, then request to join a hospital that is already listed. OTP is 1234 for now."
+      subtitle="Sign up first, then request to join a hospital that is already listed. We’ll send a one-time code to verify your mobile."
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
@@ -112,6 +112,7 @@ export default function SignupPage() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"
+            minLength={8}
             required
           />
         </label>

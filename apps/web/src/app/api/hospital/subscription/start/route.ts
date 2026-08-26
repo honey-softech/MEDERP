@@ -69,6 +69,8 @@ export async function POST(request: Request) {
         planId: plan.id,
         hospitalCode: hospital.code,
         adminUsername: actor.username,
+        adminEmail: actor.email ?? undefined,
+        adminMobile: actor.mobile,
       });
       return NextResponse.json({
         subscriptionId: subscription.id,
@@ -78,6 +80,11 @@ export async function POST(request: Request) {
         currency: "INR",
         keyId: razorpayKeyId(),
         quote: { total: quote.total, lines: quote.lines },
+        prefill: {
+          name: actor.username,
+          contact: actor.mobile,
+          email: actor.email ?? undefined,
+        },
       });
     }
 

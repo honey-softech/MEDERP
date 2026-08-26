@@ -107,21 +107,72 @@ export async function createSubscriptionPlan(params: {
   return plan;
 }
 
+export async function createRazorpayCustomer(params: {
+  name: string;
+  email: string;
+  contact: string;
+  hospitalCode: string;
+}) {
+  const razorpay = getRazorpayClient();
+  const email = params.email.trim().toLowerCase();
+  const contact = params.contact.trim();
+  const name = params.name.trim() || params.hospitalCode;
+
+  // fail_existing: 0 returns the existing customer when email/contact already exist.
+  const customer = await razorpay.customers.create({
+    name: name.slice(0, 50),
+    email,
+    contact,
+    fail_existing: 0,
+    notes: {
+      hospitalCode: params.hospitalCode,
+      purpose: "mederp_subscription",
+    },
+  });
+  return customer as { id: string };
+}
+
 export async function createRazorpaySubscription(params: {
   planId: string;
   hospitalCode: string;
   adminUsername?: string;
+  adminEmail?: string;
+  adminMobile?: string;
 }) {
   const razorpay = getRazorpayClient();
+  const email = params.adminEmail?.trim().toLowerCase() || "";
+  const contact = params.adminMobile?.trim() || "";
+
+  let customerId: string | undefined;
+  if (email && contact) {
+    const customer = await createRazorpayCustomer({
+      name: params.adminUsername || params.hospitalCode,
+      email,
+      contact,
+      hospitalCode: params.hospitalCode,
+    });
+    customerId = customer.id;
+  }
+
   return razorpay.subscriptions.create({
     plan_id: params.planId,
     total_count: SUBSCRIPTION_TOTAL_COUNT,
     quantity: 1,
     customer_notify: 1,
+    ...(customerId ? { customer_id: customerId } : {}),
+    ...(email || contact
+      ? {
+          notify_info: {
+            ...(email ? { notify_email: email } : {}),
+            ...(contact ? { notify_phone: contact } : {}),
+          },
+        }
+      : {}),
     notes: {
       purpose: "hospital_subscription",
       hospitalCode: params.hospitalCode,
       ...(params.adminUsername ? { adminUsername: params.adminUsername } : {}),
+      ...(email ? { adminEmail: email } : {}),
     },
   });
 }

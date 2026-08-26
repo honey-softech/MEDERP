@@ -95,6 +95,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
             ? appointment.assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
             : null
         }
+        visitOutcome={appointment.assessment.visitOutcome}
         prescription={appointment.assessment.prescription}
         printedBy={user.username}
         printedAt={printedAt}

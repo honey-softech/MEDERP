@@ -121,16 +121,7 @@ export function AddHospitalForm() {
     setMessage(
       `Hospital ${data.hospital.code} created. Platform invoice ${data.invoice?.invoiceNo ?? ""} · ${inr(Number(data.invoice?.netTotal ?? 0))}.`,
     );
-    setName("");
-    setCode("");
-    setAddress("");
-    setPhone("");
-    setAdminUsername("");
-    setAdminMobile("");
-    setAdminPassword("");
-    setTierId("STARTER");
-    setPaymentNotes("");
-    window.location.reload();
+    window.location.href = `/platform/hospitals/${data.hospital.id}`;
   }
 
   return (

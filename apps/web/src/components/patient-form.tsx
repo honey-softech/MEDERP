@@ -31,6 +31,11 @@ export type PatientFormValues = {
   email: string;
   address: string;
   bloodGroup: string;
+  allergies: string;
+  medicalHistory: string;
+  familyHistory: string;
+  socialHistory: string;
+  currentMedications: string;
   emergencyName: string;
   emergencyPhone: string;
   idProofType: string;
@@ -83,6 +88,11 @@ export function PatientForm({
       email: "",
       address: "",
       bloodGroup: "",
+      allergies: "",
+      medicalHistory: "",
+      familyHistory: "",
+      socialHistory: "",
+      currentMedications: "",
       emergencyName: "",
       emergencyPhone: "",
       idProofType: "",
@@ -190,6 +200,18 @@ export function PatientForm({
         </select>
       </label>
       <Field label="Blood group" value={values.bloodGroup} onChange={(v) => setField("bloodGroup", v)} placeholder="B+" />
+
+      <h3 className="md:col-span-2 mt-2 font-semibold">Clinical history</h3>
+      <Area label="Allergies" value={values.allergies} onChange={(v) => setField("allergies", v)} />
+      <Area label="Medical history" value={values.medicalHistory} onChange={(v) => setField("medicalHistory", v)} />
+      <Area label="Family history" value={values.familyHistory} onChange={(v) => setField("familyHistory", v)} />
+      <Area label="Social history" value={values.socialHistory} onChange={(v) => setField("socialHistory", v)} />
+      <Area
+        label="Current medications"
+        value={values.currentMedications}
+        onChange={(v) => setField("currentMedications", v)}
+        className="md:col-span-2"
+      />
 
       <h3 className="md:col-span-2 mt-2 font-semibold">Contact</h3>
       <Field
@@ -335,6 +357,25 @@ function Field({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+    </label>
+  );
+}
+
+function Area({
+  label,
+  value,
+  onChange,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <label className={`text-sm font-medium text-slate-700 ${className ?? ""}`}>
+      {label}
+      <textarea className={fieldClass} rows={2} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

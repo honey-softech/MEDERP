@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PatientForm } from "@/components/patient-form";
 import { getCurrentUser } from "@/lib/auth";
-import { FRONT_DESK_ROLES } from "@/lib/front-desk";
+import { PATIENT_REGISTER_ROLES } from "@/lib/front-desk";
 
 function nextAfterRegister(next?: string) {
   if (next === "walkin") return "/appointments/new?walkin=1";
@@ -18,7 +18,7 @@ export default async function NewPatientPage({
 }) {
   const user = await getCurrentUser();
   if (!user?.hospitalId) redirect("/login");
-  if (!FRONT_DESK_ROLES.includes(user.role)) redirect("/patients");
+  if (!PATIENT_REGISTER_ROLES.includes(user.role)) redirect("/patients");
   const { next } = await searchParams;
   const bookingNext = nextAfterRegister(next);
 

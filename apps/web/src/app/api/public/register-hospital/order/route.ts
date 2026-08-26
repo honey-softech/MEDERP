@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       phone: body.phone != null ? String(body.phone) : null,
       adminUsername: String(body.adminUsername ?? ""),
       adminMobile: String(body.adminMobile ?? ""),
+      adminEmail: body.adminEmail != null ? String(body.adminEmail) : null,
       adminPassword: String(body.adminPassword ?? ""),
       tierId: body.tierId != null ? String(body.tierId) : undefined,
       extraStaffSlots: Number(body.extraStaffSlots ?? 0),
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       prefill: {
         name: prepared.adminUsername,
         contact: prepared.adminMobile,
+        email: prepared.adminEmail,
       },
       hospitalName: prepared.name,
     };
@@ -78,6 +80,8 @@ export async function POST(request: Request) {
         planId: plan.id,
         hospitalCode: prepared.code,
         adminUsername: prepared.adminUsername,
+        adminEmail: prepared.adminEmail,
+        adminMobile: prepared.adminMobile,
       });
 
       return NextResponse.json({

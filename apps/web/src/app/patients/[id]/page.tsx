@@ -6,7 +6,7 @@ import { FamilyLinkForm, MergePatientForm } from "@/components/patient-family-me
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { PatientVisitHistory } from "@/components/patient-visit-history";
-import { CLINICAL_VIEW_ROLES, FRONT_DESK_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, ageYears, inr, patientName, prettyEnum } from "@/lib/front-desk";
+import { CLINICAL_VIEW_ROLES, FRONT_DESK_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, WALK_IN_ROLES, ageYears, inr, patientName, prettyEnum } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 
@@ -59,6 +59,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     : [patient];
 
   const canEdit = FRONT_DESK_ROLES.includes(user.role) && !patient.mergedIntoId;
+  const canWalkIn = WALK_IN_ROLES.includes(user.role) && !patient.mergedIntoId;
   const canAdmit = WARD_ADMIT_ROLES.includes(user.role) && !patient.mergedIntoId;
   const activeStay = patient.admissions[0];
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
@@ -96,6 +97,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             <Link href={`/patients/${patient.id}/edit`} className={primaryButtonClass}>
               Edit details
             </Link>
+            <Link href={`/appointments/new?walkin=1&patientId=${patient.id}`} className={secondaryButtonClass}>
+              Add walk-in
+            </Link>
             <Link href={`/appointments/new?patientId=${patient.id}`} className={secondaryButtonClass}>
               Book appointment
             </Link>
@@ -108,6 +112,10 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
               </Link>
             ) : null}
           </>
+        ) : canWalkIn ? (
+          <Link href={`/appointments/new?walkin=1&patientId=${patient.id}`} className={primaryButtonClass}>
+            Add walk-in
+          </Link>
         ) : null}
       </div>
 
@@ -130,6 +138,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           <div><dt className="text-slate-500">Address</dt><dd>{patient.address ?? "—"}</dd></div>
           <div><dt className="text-slate-500">Blood group</dt><dd>{patient.bloodGroup ?? "—"}</dd></div>
           <div><dt className="text-slate-500">Insurance</dt><dd>{patient.insuranceProvider ?? "—"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-slate-500">Allergies</dt><dd>{patient.allergies ?? "—"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-slate-500">Medical history</dt><dd>{patient.medicalHistory ?? "—"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-slate-500">Family history</dt><dd>{patient.familyHistory ?? "—"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-slate-500">Social history</dt><dd>{patient.socialHistory ?? "—"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-slate-500">Current medications</dt><dd>{patient.currentMedications ?? "—"}</dd></div>
         </dl>
       </section>
 
@@ -165,6 +178,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 email: "",
                 address: patient.address ?? "",
                 bloodGroup: "",
+                allergies: "",
+                medicalHistory: "",
+                familyHistory: "",
+                socialHistory: "",
+                currentMedications: "",
                 emergencyName: patientName(patient),
                 emergencyPhone: patient.phone ?? "",
                 idProofType: "",

@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { DoctorVisitActions } from "@/components/doctor-visit-actions";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { OpdDayNav } from "@/components/opd-day-nav";
 import {
+  CLINICAL_VIEW_ROLES,
   DOCTOR_VISIT_ROLES,
   FRONT_DESK_ROLES,
   NURSE_VITALS_ROLES,
   PRINT_SUMMARY_ROLES,
+  WALK_IN_ROLES,
   dayRange,
   doctorName,
   groupByDoctor,
@@ -29,6 +32,7 @@ export default async function QueuePage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const user = await requireHospitalPage();
+  if (!CLINICAL_VIEW_ROLES.includes(user.role)) redirect("/");
   const { date } = await searchParams;
   const selectedDay = parseLocalDay(date);
   const { start, end } = dayRange(selectedDay);
@@ -104,7 +108,7 @@ export default async function QueuePage({
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <OpdDayNav action="/queue" dateValue={dateValue} />
-          {canManage && isToday ? (
+          {WALK_IN_ROLES.includes(user.role) && isToday ? (
             <Link href="/appointments/new?walkin=1" className={primaryButtonClass}>
               Add walk-in
             </Link>
@@ -180,22 +184,30 @@ export default async function QueuePage({
                         </div>
                         <span className="rounded-full bg-teal-50 px-3 py-1 text-xs text-teal-800">{prettyEnum(row.status)}</span>
                       </div>
-                      {(canDoctorVisit && row.status !== "CANCELLED") ||
-                      (canPrintSummary && row.assessment?.status === "APPROVED") ||
-                      (canDoctorVisit && row.assessment) ? (
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {canDoctorVisit && row.status !== "CANCELLED" ? (
-                            <Link href={`/appointments/${row.id}`} className={primaryButtonClass}>
-                              {row.assessment?.status === "APPROVED" ? "View assessment" : "Doctor assessment"}
-                            </Link>
-                          ) : null}
-                          {row.assessment &&
-                          ((canDoctorVisit && row.assessment) ||
-                            (canPrintSummary && row.assessment.status === "APPROVED")) ? (
-                            <Link href={`/appointments/${row.id}/summary`} className={secondaryButtonClass}>
-                              {row.assessment.status === "APPROVED" ? "Print record" : "Preview summary"}
-                            </Link>
-                          ) : null}
+                      {canDoctorVisit && row.status !== "CANCELLED" ? (
+                        <DoctorVisitActions
+                          id={row.id}
+                          status={row.status}
+                          summaryApproved={row.assessment?.status === "APPROVED"}
+                          assessmentHref={`/appointments/${row.id}`}
+                          assessmentLabel={
+                            row.assessment?.status === "APPROVED" ? "View assessment" : "Doctor assessment"
+                          }
+                          summaryHref={
+                            row.assessment ? `/appointments/${row.id}/summary` : undefined
+                          }
+                          summaryLabel={
+                            row.assessment?.status === "APPROVED" ? "Print record" : "Preview summary"
+                          }
+                        />
+                      ) : null}
+                      {!canDoctorVisit &&
+                      canPrintSummary &&
+                      row.assessment?.status === "APPROVED" ? (
+                        <div className="mt-3">
+                          <Link href={`/appointments/${row.id}/summary`} className={`${secondaryButtonClass} h-10`}>
+                            Print record
+                          </Link>
                         </div>
                       ) : null}
                       {canManage && isToday ? (
@@ -205,25 +217,25 @@ export default async function QueuePage({
                           </Link>
                           <AppointmentActions id={row.id} status={row.status} />
                         </div>
-                      ) : canManage && !isToday ? (
+                      ) : null}
+                      {canManage && !isToday ? (
                         <Link href={`/appointments/${row.id}`} className="mt-3 inline-block text-sm text-teal-700 hover:underline">
                           View visit details
                         </Link>
-                      ) : canDoctorVisit ? (
-                        <DoctorVisitActions
-                          id={row.id}
-                          status={row.status}
-                          summaryApproved={row.assessment?.status === "APPROVED"}
-                        />
-                      ) : canRecordVitals && isToday && !row.vitals ? (
+                      ) : null}
+                      {!canDoctorVisit && !canManage && canRecordVitals && isToday && !row.vitals ? (
                         <Link href={`/appointments/${row.id}`} className="mt-3 inline-block text-sm font-medium text-teal-700 hover:underline">
                           Record vitals
                         </Link>
-                      ) : (
+                      ) : null}
+                      {!canDoctorVisit &&
+                      !canManage &&
+                      !(canRecordVitals && isToday && !row.vitals) &&
+                      !(canPrintSummary && row.assessment?.status === "APPROVED") ? (
                         <Link href={`/appointments/${row.id}`} className="mt-3 inline-block text-sm text-teal-700 hover:underline">
                           View visit details
                         </Link>
-                      )}
+                      ) : null}
                     </article>
                   ))
                 )}

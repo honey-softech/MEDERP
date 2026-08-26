@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_OTP, STAFF_ROLES, getCurrentUser, hashPassword } from "@/lib/auth";
+import { STAFF_ROLES, getCurrentUser, hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -45,15 +45,29 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const actor = await getCurrentUser();
-  if (!actor || actor.role !== "SUPER_ADMIN" || !actor.hospitalId) {
-    return NextResponse.json({ error: "Hospital super admin access required." }, { status: 403 });
+  if (!actor) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
 
   try {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const isPlatformAdmin = actor.role === "SOFTWARE_ADMIN";
+    const hospitalId = isPlatformAdmin
+      ? String(body?.hospitalId ?? "").trim()
+      : actor.role === "SUPER_ADMIN"
+        ? actor.hospitalId
+        : null;
+    if (!hospitalId || (!isPlatformAdmin && actor.role !== "SUPER_ADMIN")) {
+      return NextResponse.json({ error: "Hospital admin access required." }, { status: 403 });
+    }
+
     const role = String(body?.role ?? "RECEPTIONIST") as AppRole;
-    if (!STAFF_ROLES.includes(role)) {
-      return NextResponse.json({ error: "Super admin can only add hospital staff roles." }, { status: 400 });
+    const allowedRoles: AppRole[] = isPlatformAdmin ? ["SUPER_ADMIN", ...STAFF_ROLES] : STAFF_ROLES;
+    if (!allowedRoles.includes(role)) {
+      return NextResponse.json(
+        { error: isPlatformAdmin ? "Select a valid hospital role." : "Super admin can only add hospital staff roles." },
+        { status: 400 },
+      );
     }
 
     const parsed = parseEmployeeBody(body, role);
@@ -67,29 +81,39 @@ export async function POST(request: Request) {
     }
 
     const hospital = await prisma.hospital.findUnique({
-      where: { id: actor.hospitalId },
+      where: { id: hospitalId },
       select: { pharmacyEnabled: true, labEnabled: true },
     });
     if (!hospital) {
       return NextResponse.json({ error: "Hospital not found." }, { status: 404 });
     }
-    const moduleError = moduleErrorForRole(role, hospital);
-    if (moduleError) {
-      return NextResponse.json({ error: moduleError }, { status: 403 });
+    if (role !== "SUPER_ADMIN") {
+      const moduleError = moduleErrorForRole(role, hospital);
+      if (moduleError) {
+        return NextResponse.json({ error: moduleError }, { status: 403 });
+      }
     }
 
-    try {
-      await assertStaffSeatAvailable(actor.hospitalId);
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Staff limit reached." },
-        { status: 403 },
-      );
+    if (role !== "SUPER_ADMIN") {
+      try {
+        await assertStaffSeatAvailable(hospitalId);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Staff limit reached." },
+          { status: 403 },
+        );
+      }
     }
 
     const password = String(body?.password ?? "").trim();
-    const generatedPassword = password.length >= 6 ? null : generateStaffPassword();
-    const passwordToHash = password.length >= 6 ? password : generatedPassword!;
+    if (password && password.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
+        { status: 400 },
+      );
+    }
+    const generatedPassword = password.length >= MIN_PASSWORD_LENGTH ? null : generateStaffPassword();
+    const passwordToHash = password.length >= MIN_PASSWORD_LENGTH ? password : generatedPassword!;
 
     const username = await uniqueUsername(input.username || suggestedUsername(input.firstName, input.lastName));
     const clash = await prisma.appUser.findFirst({
@@ -97,9 +121,7 @@ export async function POST(request: Request) {
         OR: [
           { username },
           { mobile },
-          ...(input.employeeId
-            ? [{ hospitalId: actor.hospitalId, employeeId: input.employeeId }]
-            : []),
+          ...(input.employeeId ? [{ hospitalId, employeeId: input.employeeId }] : []),
         ],
       },
     });
@@ -109,7 +131,7 @@ export async function POST(request: Request) {
 
     if (input.departmentId) {
       const department = await prisma.department.findFirst({
-        where: { id: input.departmentId, hospitalId: actor.hospitalId },
+        where: { id: input.departmentId, hospitalId },
         select: { id: true },
       });
       if (!department) {
@@ -117,17 +139,19 @@ export async function POST(request: Request) {
       }
     }
 
-    const userCode = await nextUserCode(actor.hospitalId, role);
+    const userCode = await nextUserCode(hospitalId, role);
     const user = await prisma.appUser.create({
       data: {
         username,
         mobile,
         passwordHash: await hashPassword(passwordToHash),
-        otpCode: DEFAULT_OTP,
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
         isVerified: true,
         isActive: input.isActive,
         role,
-        hospitalId: actor.hospitalId,
+        hospitalId,
         userCode,
         employeeId: input.employeeId,
         firstName: input.firstName,
@@ -145,15 +169,17 @@ export async function POST(request: Request) {
       select: { id: true, username: true, mobile: true, role: true, userCode: true, employeeId: true },
     });
 
-    await upsertEmployeeStaff({
-      hospitalId: actor.hospitalId,
-      appUserId: user.id,
-      input: { ...input, mobile, username },
-    });
+    if (role !== "SUPER_ADMIN") {
+      await upsertEmployeeStaff({
+        hospitalId,
+        appUserId: user.id,
+        input: { ...input, mobile, username },
+      });
+    }
 
     await writeAuditLog({
       request,
-      hospitalId: actor.hospitalId,
+      hospitalId,
       actorUserId: actor.id,
       actorUsername: actor.username,
       actorRole: actor.role,

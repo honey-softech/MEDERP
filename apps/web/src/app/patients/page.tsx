@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
 import { primaryButtonClass } from "@/components/auth-shell";
-import { ageYears, FRONT_DESK_ROLES, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { ageYears, FRONT_DESK_ROLES, PATIENT_REGISTER_ROLES, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 
 export default async function PatientsPage() {
@@ -23,7 +23,7 @@ export default async function PatientsPage() {
     <AppShell title="Patients">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-500">Search by name, phone, UHID, or family group</p>
-        {FRONT_DESK_ROLES.includes(user.role) ? (
+        {PATIENT_REGISTER_ROLES.includes(user.role) ? (
           <Link href="/patients/new" className={primaryButtonClass}>
             Register patient
           </Link>

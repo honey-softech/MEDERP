@@ -1,10 +1,12 @@
 import { AppShell } from "@/components/app-shell";
 import { InvoiceCreateForm } from "@/components/billing-forms";
-import { dayRange, doctorName, patientName, requireHospitalPage } from "@/lib/front-desk";
+import { BILLING_ROLES, dayRange, doctorName, patientName, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
 export default async function NewInvoicePage() {
   const user = await requireHospitalPage();
+  if (!BILLING_ROLES.includes(user.role)) redirect("/");
   const { start, end } = dayRange(new Date());
   const appointments = await prisma.appointment.findMany({
     where: {

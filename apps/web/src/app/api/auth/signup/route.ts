@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { STAFF_ROLES, DEFAULT_OTP, hashPassword } from "@/lib/auth";
+import { STAFF_ROLES, hashPassword, passwordValidationError } from "@/lib/auth";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
+import { issueOtp } from "@/lib/otp";
+import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import type { AppRole } from "@prisma/client";
 
 export async function POST(request: Request) {
+  const limited = checkRateLimit(clientKey(request, "signup"), {
+    limit: 8,
+    windowMs: 60 * 60 * 1000,
+    lockMs: 60 * 60 * 1000,
+  });
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Too many signup attempts. Try again in ${limited.retryAfterSec} seconds.` },
+      { status: 429 },
+    );
+  }
+
   try {
     const body = await request.json().catch(() => null);
     const username = String(body?.username ?? "").trim();
@@ -25,8 +39,9 @@ export async function POST(request: Request) {
     if (!isValidIndianMobile(mobile)) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
     }
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+    const passwordError = passwordValidationError(password);
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 });
     }
     if (!STAFF_ROLES.includes(requestedRole)) {
       return NextResponse.json({ error: "Select a valid hospital role." }, { status: 400 });
@@ -44,11 +59,12 @@ export async function POST(request: Request) {
         username,
         mobile,
         passwordHash: await hashPassword(password),
-        otpCode: DEFAULT_OTP,
         isVerified: false,
         role: requestedRole,
       },
     });
+
+    await issueOtp(user.id, user.mobile, "signup");
 
     await writeAuditLog({
       request,
@@ -65,7 +81,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       mobile: user.mobile,
-      message: "Account created. Enter OTP 1234 to verify, then request to join a listed hospital.",
+      message: "Account created. Enter the OTP sent to your mobile to verify, then request to join a listed hospital.",
     });
   } catch (error) {
     console.error("Signup failed", error);

@@ -41,6 +41,10 @@ export async function POST(request: Request) {
       phone: body?.phone != null ? String(body.phone) : null,
       adminUsername: String(body?.adminUsername ?? ""),
       adminMobile: String(body?.adminMobile ?? ""),
+      adminEmail:
+        body?.adminEmail != null && String(body.adminEmail).trim()
+          ? String(body.adminEmail)
+          : `${String(body?.adminUsername ?? "admin").trim().toLowerCase() || "admin"}@mederp.local`,
       adminPassword: String(body?.adminPassword ?? ""),
       tierId: body?.tierId != null ? String(body.tierId) : undefined,
       extraStaffSlots: Number(body?.extraStaffSlots ?? 0),

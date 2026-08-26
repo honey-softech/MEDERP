@@ -152,6 +152,11 @@ export function HospitalSeatSubscriptionForm({
       subscription_id: createData.subscriptionId,
       name: "MedERP",
       description: "Monthly auto-debit — linked on payment",
+      prefill: {
+        name: createData.prefill?.name,
+        contact: createData.prefill?.contact,
+        email: createData.prefill?.email,
+      },
       handler: (response) => {
         void (async () => {
           if (!("razorpay_subscription_id" in response) || !response.razorpay_subscription_id) {

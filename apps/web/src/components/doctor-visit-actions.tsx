@@ -1,17 +1,28 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { compactPrimaryButtonClass, compactButtonClass } from "@/components/auth-shell";
 
 export function DoctorVisitActions({
   id,
   status,
   summaryApproved = false,
+  assessmentHref,
+  summaryHref,
+  assessmentLabel,
+  summaryLabel,
+  showHint = true,
 }: {
   id: string;
   status: string;
   summaryApproved?: boolean;
+  assessmentHref?: string;
+  summaryHref?: string;
+  assessmentLabel?: string;
+  summaryLabel?: string;
+  showHint?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -43,32 +54,45 @@ export function DoctorVisitActions({
   const closed = ["CANCELLED", "COMPLETED", "NO_SHOW"].includes(status);
   if (closed) {
     return status === "COMPLETED" ? (
-      <p className="mt-3 text-sm font-medium text-teal-800">Visit marked done.</p>
+      <p className="text-xs font-medium text-teal-800">Visit marked done.</p>
     ) : null;
   }
 
+  const showStart = status !== "IN_PROGRESS";
+
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {status !== "IN_PROGRESS" ? (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {showStart ? (
         <button
-          className={secondaryButtonClass}
+          className={compactButtonClass}
           type="button"
           disabled={Boolean(pending)}
           onClick={() => void run("start")}
         >
-          {pending === "start" ? "Starting…" : "Patient in room / start consult"}
+          {pending === "start" ? "Starting…" : "Start consult"}
         </button>
       ) : null}
       <button
-        className={primaryButtonClass}
+        className={compactPrimaryButtonClass}
         type="button"
         disabled={Boolean(pending) || !summaryApproved}
+        title={!summaryApproved ? "Approve the summary before marking done" : undefined}
         onClick={() => void run("complete")}
       >
-        {pending === "complete" ? "Saving…" : "Mark visit done"}
+        {pending === "complete" ? "Saving…" : "Done"}
       </button>
-      {!summaryApproved ? (
-        <p className="w-full text-sm text-teal-900">Approve the visit summary and prescription before marking this visit done.</p>
+      {assessmentHref ? (
+        <Link href={assessmentHref} className={compactButtonClass}>
+          {assessmentLabel ?? "Doctor assessment"}
+        </Link>
+      ) : null}
+      {summaryHref ? (
+        <Link href={summaryHref} className={compactButtonClass}>
+          {summaryLabel ?? "Preview summary"}
+        </Link>
+      ) : null}
+      {showHint && !summaryApproved ? (
+        <p className="w-full text-xs text-text-secondary sm:w-auto">Approve the summary before marking done.</p>
       ) : null}
       {error ? <p className="w-full text-sm text-red-600">{error}</p> : null}
     </div>

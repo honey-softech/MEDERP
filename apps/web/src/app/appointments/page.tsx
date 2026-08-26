@@ -6,6 +6,8 @@ import { LeaveForm } from "@/components/leave-form";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import {
   FRONT_DESK_ROLES,
+  PATIENT_REGISTER_ROLES,
+  WALK_IN_ROLES,
   dayRange,
   doctorName,
   listBookableDoctors,
@@ -95,6 +97,17 @@ export default async function AppointmentsPage({
             <Link href="/patients/new?next=appointment" className={secondaryButtonClass}>
               Register patient
             </Link>
+          </>
+        ) : WALK_IN_ROLES.includes(user.role) ? (
+          <>
+            <Link href="/appointments/new?walkin=1" className={primaryButtonClass}>
+              Add walk-in
+            </Link>
+            {PATIENT_REGISTER_ROLES.includes(user.role) ? (
+              <Link href="/patients/new?next=walkin" className={secondaryButtonClass}>
+                Register patient
+              </Link>
+            ) : null}
           </>
         ) : null}
         <Link

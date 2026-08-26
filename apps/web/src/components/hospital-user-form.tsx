@@ -106,16 +106,36 @@ export default function HospitalUserForm({
   departments = [],
   plain = false,
   onCreated,
+  createUrl = "/api/hospital/users",
+  updateUrl,
+  returnHref = "/hospital/users",
+  allowSuperAdminRole = false,
+  hospitalId,
 }: {
   initial?: HospitalUserFormInitial;
   departments?: { id: string; label: string }[];
   plain?: boolean;
   onCreated?: (generatedPassword?: string) => void;
+  createUrl?: string;
+  updateUrl?: string;
+  returnHref?: string;
+  allowSuperAdminRole?: boolean;
+  hospitalId?: string;
 }) {
   const router = useRouter();
   const editing = Boolean(initial?.id);
-  const roleLocked = initial?.role === "SUPER_ADMIN";
-  const [values, setValues] = useState<HospitalUserFormInitial>({ ...empty, ...initial, role: initial?.role && initial.role !== "SUPER_ADMIN" ? initial.role : initial?.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "RECEPTIONIST" });
+  const roleLocked = initial?.role === "SUPER_ADMIN" && !allowSuperAdminRole;
+  const roleOptions = allowSuperAdminRole
+    ? [{ value: "SUPER_ADMIN", label: "Hospital super admin" }, ...roles]
+    : roles;
+  const [values, setValues] = useState<HospitalUserFormInitial>({
+    ...empty,
+    ...initial,
+    role:
+      initial?.role && initial.role !== "SOFTWARE_ADMIN" && initial.role !== "HELPDESK"
+        ? initial.role
+        : "RECEPTIONIST",
+  });
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
@@ -127,14 +147,17 @@ export default function HospitalUserForm({
     setValues((current) => ({ ...current, [key]: value }));
   }
 
-  const payload = useMemo(() => ({ ...values, role, password: password || undefined }), [values, role, password]);
+  const payload = useMemo(
+    () => ({ ...values, role, password: password || undefined, ...(hospitalId ? { hospitalId } : {}) }),
+    [values, role, password, hospitalId],
+  );
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setGeneratedPassword("");
     setPending(true);
-    const url = editing ? `/api/hospital/users/${initial!.id}` : "/api/hospital/users";
+    const url = editing ? updateUrl || `/api/hospital/users/${initial!.id}` : createUrl;
     const response = await fetch(url, {
       method: editing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -156,7 +179,7 @@ export default function HospitalUserForm({
       setGeneratedPassword(data.generatedPassword);
     }
     if (editing) {
-      router.push("/hospital/users");
+      router.push(returnHref);
       router.refresh();
       return;
     }
@@ -187,7 +210,7 @@ export default function HospitalUserForm({
         value={roleLocked ? "SUPER_ADMIN" : role}
         disabled={roleLocked}
         onChange={(value) => setField("role", value)}
-        options={roleLocked ? [{ value: "SUPER_ADMIN", label: "Hospital super admin" }] : roles}
+        options={roleLocked ? [{ value: "SUPER_ADMIN", label: "Hospital super admin" }] : roleOptions}
       />
       <Field label="Employee ID" value={values.employeeId} onChange={(v) => setField("employeeId", v)} required placeholder="EMP-1024" />
       {editing && values.userCode ? (

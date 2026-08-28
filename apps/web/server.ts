@@ -22,5 +22,15 @@ app.prepare().then(() => {
     })
     .listen(port, "0.0.0.0", () => {
       console.log(`> Ready on http://0.0.0.0:${port}`);
+      if (process.env.NODE_ENV === "production" && process.env.SKIP_DRUG_IMPORT !== "1") {
+        void import("./src/lib/drug-catalog-import")
+          .then(async ({ ensureDrugCatalog }) => {
+            const { prisma } = await import("./src/lib/prisma");
+            await ensureDrugCatalog(prisma);
+          })
+          .catch((error) => {
+            console.error("Drug catalog ensure failed:", error);
+          });
+      }
     });
 });

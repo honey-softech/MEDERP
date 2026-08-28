@@ -6,12 +6,15 @@ import { countHospitalStaffSeats } from "@/lib/platform-billing";
 import { staffSeatLimit } from "@/lib/platform-pricing";
 import { prisma } from "@/lib/prisma";
 import { CreateUserDialog } from "@/components/create-user-dialog";
+import { backfillHospitalUserIdentity } from "@/lib/employee";
 
 export default async function HospitalUsersPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "SUPER_ADMIN" || !user.hospitalId) {
     redirect("/login");
   }
+
+  await backfillHospitalUserIdentity(user.hospitalId);
 
   const [users, departments, usedSeats, hospital] = await Promise.all([
     prisma.appUser.findMany({

@@ -42,8 +42,67 @@ export function suggestedUsername(firstName: string, lastName: string) {
 
 export async function nextUserCode(hospitalId: string, role: AppRole) {
   const prefix = USER_CODE_PREFIX[role] ?? "USR";
-  const n = await nextCounter(hospitalId, `USER-${prefix}`);
-  return `${prefix}-${pad(n, 6)}`;
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const n = await nextCounter(hospitalId, `USER-${prefix}`);
+    const userCode = `${prefix}-${pad(n, 6)}`;
+    const taken = await prisma.appUser.findFirst({
+      where: { hospitalId, userCode },
+      select: { id: true },
+    });
+    if (!taken) return userCode;
+  }
+  throw new Error("Could not allocate user ID.");
+}
+
+/** Hospital code + registration order, e.g. MEDH-0001, MEDH-0002. */
+export async function nextEmployeeId(hospitalId: string, hospitalCode?: string) {
+  const code =
+    hospitalCode ??
+    (await prisma.hospital.findUnique({ where: { id: hospitalId }, select: { code: true } }))?.code;
+  if (!code) throw new Error("Hospital not found.");
+  const prefix = code.trim().toUpperCase();
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const n = await nextCounter(hospitalId, "EMPLOYEE");
+    const employeeId = `${prefix}-${pad(n, 4)}`;
+    const taken = await prisma.appUser.findFirst({
+      where: { hospitalId, employeeId },
+      select: { id: true },
+    });
+    if (!taken) return employeeId;
+  }
+  throw new Error("Could not allocate employee ID.");
+}
+
+export async function allocateHospitalUserIdentity(hospitalId: string, role: AppRole, hospitalCode?: string) {
+  const userCode = await nextUserCode(hospitalId, role);
+  const employeeId = await nextEmployeeId(hospitalId, hospitalCode);
+  return { userCode, employeeId };
+}
+
+/** Fill missing User ID / Employee ID. Employee IDs that are not hospital-code + sequence are replaced. */
+export async function backfillHospitalUserIdentity(hospitalId: string) {
+  const hospital = await prisma.hospital.findUnique({
+    where: { id: hospitalId },
+    select: { code: true },
+  });
+  if (!hospital) return;
+  const prefix = hospital.code.trim().toUpperCase();
+  const employeePattern = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-\\d{4}$`, "i");
+  const users = await prisma.appUser.findMany({
+    where: { hospitalId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, role: true, userCode: true, employeeId: true },
+  });
+  for (const user of users) {
+    const data: { userCode?: string; employeeId?: string } = {};
+    if (!user.userCode) data.userCode = await nextUserCode(hospitalId, user.role);
+    if (!user.employeeId || !employeePattern.test(user.employeeId)) {
+      data.employeeId = await nextEmployeeId(hospitalId, hospital.code);
+    }
+    if (Object.keys(data).length > 0) {
+      await prisma.appUser.update({ where: { id: user.id }, data });
+    }
+  }
 }
 
 function text(value: unknown) {
@@ -74,7 +133,7 @@ function decimalValue(value: unknown) {
 
 export type EmployeeInput = {
   role: AppRole;
-  employeeId: string;
+  employeeId: string | null;
   firstName: string;
   middleName: string | null;
   lastName: string;
@@ -149,7 +208,7 @@ export type EmployeeInput = {
 export function parseEmployeeBody(body: Record<string, unknown> | null, role: AppRole): { error: string } | { value: EmployeeInput } {
   const firstName = String(body?.firstName ?? "").trim();
   const lastName = String(body?.lastName ?? "").trim();
-  const employeeId = String(body?.employeeId ?? "").trim();
+  const employeeId = String(body?.employeeId ?? "").trim() || null;
   const email = String(body?.email ?? "").trim().toLowerCase();
   const employmentType = body?.employmentType ? (String(body.employmentType) as EmploymentType) : null;
   const gender = body?.gender ? (String(body.gender) as Gender) : null;
@@ -157,7 +216,6 @@ export function parseEmployeeBody(body: Record<string, unknown> | null, role: Ap
   const staffRole = role !== "SUPER_ADMIN" && role !== "SOFTWARE_ADMIN" && role !== "HELPDESK";
 
   if (!firstName || !lastName) return { error: "First name and last name are required." };
-  if (staffRole && !employeeId) return { error: "Employee ID is required." };
   if (staffRole && (!email || !email.includes("@"))) return { error: "A valid email is required." };
   if (employmentType && !EMPLOYMENT_TYPES.includes(employmentType)) {
     return { error: "Select a valid employment type." };

@@ -14,6 +14,7 @@ import { notifySummaryApproved } from "@/lib/notifications";
 import { parseInvestigationPicks } from "@/lib/lab-catalog";
 import { upsertVisitLabOrder } from "@/lib/lab";
 import { syncPharmacyRxFromAssessment } from "@/lib/pharmacy-rx";
+import { activeSignatureFor } from "@/lib/signatures";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -43,6 +44,7 @@ export async function POST(request: Request, context: Ctx) {
         patient: true,
         doctor: { include: { appUser: { select: { username: true } } } },
         assessment: true,
+        hospital: { select: { requireSignatureForApproval: true } },
       },
     });
     if (!appointment) {
@@ -107,12 +109,19 @@ export async function POST(request: Request, context: Ctx) {
     const investigations = parseInvestigationPicks(body ?? {});
 
     const approve = action === "approve";
+    const signature = approve ? await activeSignatureFor(scoped.user.id, scoped.user.hospitalId) : null;
     if (approve) {
       if (!summary) {
         return NextResponse.json({ error: "Add a visit summary before approving." }, { status: 400 });
       }
       if (!prescription) {
         return NextResponse.json({ error: "Add a prescription before approving." }, { status: 400 });
+      }
+      if (!signature && appointment.hospital.requireSignatureForApproval) {
+        return NextResponse.json(
+          { error: "Your signature is not on file. Ask your hospital admin to upload it before approving." },
+          { status: 400 },
+        );
       }
     }
 
@@ -137,6 +146,23 @@ export async function POST(request: Request, context: Ctx) {
         ? scoped.user.username
         : wasApproved
           ? appointment.assessment?.approvedByUsername ?? null
+          : null,
+      // Auto-save keeps an approved summary approved, so these must be preserved the same
+      // way as approvedByUsername or a background save would strip the signature off it.
+      approvedBySignatureId: approve
+        ? signature?.id ?? null
+        : wasApproved
+          ? appointment.assessment?.approvedBySignatureId ?? null
+          : null,
+      approvedByDisplayName: approve
+        ? signature?.displayName ?? null
+        : wasApproved
+          ? appointment.assessment?.approvedByDisplayName ?? null
+          : null,
+      approvedByCredentials: approve
+        ? signature?.credentials ?? null
+        : wasApproved
+          ? appointment.assessment?.approvedByCredentials ?? null
           : null,
     };
 

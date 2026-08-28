@@ -12,6 +12,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:import-drugs": "tsx prisma/import-drug-catalog.ts",
+    "db:ensure-drugs": "tsx prisma/ensure-drug-catalog.ts",
     "db:sync-manufacturers": "tsx prisma/sync-drug-manufacturers.ts"
   },
   "prisma": {

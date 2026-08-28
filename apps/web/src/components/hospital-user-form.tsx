@@ -201,7 +201,9 @@ export default function HospitalUserForm({
       {plain ? null : (
         <div className="md:col-span-2">
           <h3 className="font-semibold">{editing ? "Edit hospital user" : "Add hospital user"}</h3>
-          <p className="mt-1 text-sm text-slate-500">Fields change with the selected role. User ID and password can be generated automatically.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Employee ID is assigned from the hospital code in registration order (HSP-0001, HSP-0002, …). User ID is a separate hospital-unique code mapped to this record. Both are assigned on save.
+          </p>
         </div>
       )}
 
@@ -212,11 +214,15 @@ export default function HospitalUserForm({
         onChange={(value) => setField("role", value)}
         options={roleLocked ? [{ value: "SUPER_ADMIN", label: "Hospital super admin" }] : roleOptions}
       />
-      <Field label="Employee ID" value={values.employeeId} onChange={(v) => setField("employeeId", v)} required placeholder="EMP-1024" />
+      {editing && values.employeeId ? (
+        <Field label="Employee ID" value={values.employeeId} onChange={() => undefined} disabled />
+      ) : (
+        <p className="self-end text-sm text-slate-500">Employee ID is assigned on save from the hospital code (e.g. HSP-0001).</p>
+      )}
       {editing && values.userCode ? (
         <Field label="User ID" value={values.userCode} onChange={() => undefined} disabled />
       ) : (
-        <p className="self-end text-sm text-slate-500">User ID is assigned on save (DOC-000123, NUR-000123, …).</p>
+        <p className="self-end text-sm text-slate-500">User ID is assigned on save (DOC-000001, NUR-000001, …) and stays unique to this hospital.</p>
       )}
 
       <Heading>Account information</Heading>

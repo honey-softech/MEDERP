@@ -36,7 +36,7 @@ function VerifyOtpForm() {
   }
 
   return (
-    <AuthShell title="Verify mobile" subtitle="Enter the 6-digit OTP sent to your phone. Check the server console in local development.">
+        <AuthShell title="Verify mobile" subtitle="Until SMS is connected, use OTP 123456.">
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
           Mobile number
@@ -55,7 +55,7 @@ function VerifyOtpForm() {
             inputMode="numeric"
             value={otp}
             onChange={(event) => setOtp(event.target.value)}
-            placeholder="6-digit code"
+            placeholder="123456"
             maxLength={6}
             required
           />

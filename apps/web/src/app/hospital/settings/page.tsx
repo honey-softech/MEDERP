@@ -1,6 +1,8 @@
 import { AppShell } from "@/components/app-shell";
 import { HospitalBrandingForm } from "@/components/hospital-branding-form";
+import { SignaturePolicyForm } from "@/components/signature-policy-form";
 import { requireHospitalPage } from "@/lib/front-desk";
+import { countStaffWithoutSignature } from "@/lib/signatures";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -8,18 +10,22 @@ export default async function HospitalSettingsPage() {
   const user = await requireHospitalPage();
   if (user.role !== "SUPER_ADMIN") redirect("/");
 
-  const hospital = await prisma.hospital.findUnique({
-    where: { id: user.hospitalId },
-    select: {
-      name: true,
-      code: true,
-      address: true,
-      phone: true,
-      logoData: true,
-      sealData: true,
-      opdFee: true,
-    },
-  });
+  const [hospital, coverage] = await Promise.all([
+    prisma.hospital.findUnique({
+      where: { id: user.hospitalId },
+      select: {
+        name: true,
+        code: true,
+        address: true,
+        phone: true,
+        logoData: true,
+        sealData: true,
+        opdFee: true,
+        requireSignatureForApproval: true,
+      },
+    }),
+    countStaffWithoutSignature(user.hospitalId),
+  ]);
   if (!hospital) redirect("/");
 
   return (
@@ -37,6 +43,10 @@ export default async function HospitalSettingsPage() {
           sealData: hospital.sealData ?? "",
           opdFee: String(Number(hospital.opdFee ?? 500)),
         }}
+      />
+      <SignaturePolicyForm
+        initial={{ requireSignatureForApproval: hospital.requireSignatureForApproval }}
+        coverage={coverage}
       />
     </AppShell>
   );

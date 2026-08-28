@@ -13,6 +13,7 @@ import {
 } from "@/lib/front-desk";
 import { syncLabOrderPaymentFromInvoice } from "@/lib/lab";
 import { notifyHospitalRole } from "@/lib/notifications";
+import { activeSignatureFor } from "@/lib/signatures";
 
 const METHODS: PaymentMethod[] = ["CASH", "CARD", "UPI", "INSURANCE", "ADVANCE"];
 
@@ -83,6 +84,7 @@ export async function PATCH(request: Request, context: Ctx) {
     }
 
     const paidAmount = Number(invoice.paidAmount) + amount;
+    const signature = await activeSignatureFor(actor.id, actor.hospitalId);
     await prisma.$transaction(async (tx) => {
       await tx.payment.create({
         data: {
@@ -94,6 +96,7 @@ export async function PATCH(request: Request, context: Ctx) {
           amount,
           notes,
           receivedByUserId: actor.id,
+          receivedBySignatureId: signature?.id ?? null,
         },
       });
       if (method === "ADVANCE") {

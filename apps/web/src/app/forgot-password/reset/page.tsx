@@ -45,7 +45,7 @@ function ResetPasswordForm() {
   return (
     <AuthShell
       title="Set a new password"
-      subtitle="Enter the OTP sent to your phone, then choose a new password (at least 8 characters)."
+      subtitle="Until SMS is connected, use OTP 123456 for every account. New password must be at least 8 characters."
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
@@ -65,7 +65,7 @@ function ResetPasswordForm() {
             inputMode="numeric"
             value={otp}
             onChange={(event) => setOtp(event.target.value)}
-            placeholder="6-digit code"
+            placeholder="123456"
             maxLength={6}
             required
           />

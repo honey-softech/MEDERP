@@ -11,6 +11,7 @@ import {
   requireHospitalActor,
 } from "@/lib/front-desk";
 import { ensureLabInvoice, syncLabOrderPaymentFromInvoice } from "@/lib/lab";
+import { activeSignatureFor } from "@/lib/signatures";
 
 const METHODS: PaymentMethod[] = ["CASH", "CARD", "UPI"];
 const CARD_BRANDS = ["Visa", "Mastercard", "RuPay", "Amex", "Other"];
@@ -87,6 +88,7 @@ export async function POST(request: Request, context: Ctx) {
       extra: `Lab tests · ${order.items.map((item) => item.nameSnapshot).join(", ")}`,
     });
     const paidAmount = Number(invoice.paidAmount) + amount;
+    const signature = await activeSignatureFor(scoped.user.id, scoped.user.hospitalId);
     await prisma.$transaction([
       prisma.payment.create({
         data: {
@@ -98,6 +100,7 @@ export async function POST(request: Request, context: Ctx) {
           amount,
           notes,
           receivedByUserId: scoped.user.id,
+          receivedBySignatureId: signature?.id ?? null,
         },
       }),
       prisma.invoice.update({

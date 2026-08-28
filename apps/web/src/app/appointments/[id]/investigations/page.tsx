@@ -25,14 +25,25 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
       doctor: { include: { appUser: { select: { username: true } } } },
       department: true,
       hospital: { select: { name: true, address: true, phone: true, logoData: true } },
+      assessment: { select: { status: true } },
       labOrders: {
         where: { status: { not: "CANCELLED" } },
-        include: { items: true },
+        include: {
+          items: true,
+          orderedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
+        },
         orderBy: { createdAt: "asc" },
       },
     },
   });
   if (!appointment) notFound();
+
+  // The slip is only a signed request once the doctor has approved the visit; before that
+  // it is still a working list and must not carry a signature.
+  const signed = appointment.assessment?.status === "APPROVED";
+  const signature = signed
+    ? appointment.labOrders.find((order) => order.orderedBySignature)?.orderedBySignature
+    : null;
 
   const items = appointment.labOrders.flatMap((order) =>
     order.items.map((item) => ({
@@ -81,6 +92,9 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
           items={items}
           printedBy={user.username}
           printedAt={printedAt}
+          signatureImage={signature?.imageData}
+          signatureName={signature?.displayName}
+          signatureCredentials={signature?.credentials}
         />
       </div>
     </AppShell>

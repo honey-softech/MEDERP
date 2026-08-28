@@ -501,6 +501,20 @@ html {
   font-weight: 800;
 }
 
+.vs-sign-img {
+  display: block;
+  max-height: 64px;
+  max-width: 240px;
+  margin: 4px 0 0;
+  object-fit: contain;
+}
+
+.vs-sign-cred {
+  margin: 2px 0 0;
+  color: #616161;
+  font-size: 10px;
+}
+
 .vs-sign-line {
   margin: 16px 0 0;
   width: 240px;
@@ -580,9 +594,15 @@ html {
     padding: 0 !important;
   }
 
-  .vs-stamp {
+  .vs-stamp,
+  .vs-sign-img {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .vs-signoff {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .vs-table th,

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES } from "@/lib/auth";
 import { notifyUser } from "@/lib/notifications";
 import { ensureDoctorStaff } from "@/lib/front-desk";
-import { nextUserCode } from "@/lib/employee";
+import { nextEmployeeId, nextUserCode } from "@/lib/employee";
 import { assertStaffSeatAvailable } from "@/lib/platform-billing";
 import { moduleErrorForRole } from "@/lib/platform-pricing";
 
@@ -89,6 +89,7 @@ export async function approveJoinRequest(params: {
   }
 
   const userCode = request.user.userCode ?? (await nextUserCode(request.hospitalId, role));
+  const employeeId = request.user.employeeId ?? (await nextEmployeeId(request.hospitalId, request.hospital.code));
 
   await prisma.$transaction([
     prisma.appUser.update({
@@ -97,6 +98,7 @@ export async function approveJoinRequest(params: {
         hospitalId: request.hospitalId,
         role,
         userCode,
+        employeeId,
         isActive: true,
       },
     }),

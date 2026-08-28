@@ -1,3 +1,5 @@
+import { SignatureBlock } from "@/components/signature-block";
+
 type SlipItem = {
   name: string;
   category: string;
@@ -20,6 +22,9 @@ export function InvestigationSlip({
   items,
   printedBy,
   printedAt,
+  signatureImage,
+  signatureName,
+  signatureCredentials,
 }: {
   hospitalName: string;
   hospitalAddress: string | null;
@@ -36,6 +41,9 @@ export function InvestigationSlip({
   items: SlipItem[];
   printedBy: string;
   printedAt: string;
+  signatureImage?: string | null;
+  signatureName?: string | null;
+  signatureCredentials?: string | null;
 }) {
   const outside = items.some((item) => item.outside);
 
@@ -107,6 +115,16 @@ export function InvestigationSlip({
       {outside ? (
         <p className="mt-3 text-xs text-slate-600">Complete outside tests and bring the reports to the hospital.</p>
       ) : null}
+
+      <section className="vs-signoff">
+        <SignatureBlock
+          role="Ordering physician"
+          name={signatureName || doctor}
+          credentials={signatureCredentials}
+          imageData={signatureImage}
+          note="Electronically authorised investigation request"
+        />
+      </section>
 
       <footer className="mt-6 flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-2 text-[11px] text-slate-500">
         <span>Printed by: {printedBy}</span>

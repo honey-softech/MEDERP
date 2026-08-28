@@ -13,6 +13,7 @@ import {
   paymentNote,
   requireHospitalActor,
 } from "@/lib/front-desk";
+import { activeSignatureFor } from "@/lib/signatures";
 
 const METHODS: PaymentMethod[] = ["CASH", "CARD", "UPI"];
 const CARD_BRANDS = ["Visa", "Mastercard", "RuPay", "Amex", "Other"];
@@ -91,6 +92,8 @@ export async function POST(request: Request, context: Ctx) {
     );
   }
 
+  const signature = await activeSignatureFor(scoped.user.id, scoped.user.hospitalId);
+
   try {
     const result = await prisma.$transaction(async (tx) => {
     const invoice =
@@ -124,6 +127,7 @@ export async function POST(request: Request, context: Ctx) {
         amount,
         notes,
         receivedByUserId: scoped.user.id,
+        receivedBySignatureId: signature?.id ?? null,
       },
     });
 

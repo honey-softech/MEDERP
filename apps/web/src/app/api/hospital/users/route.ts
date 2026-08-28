@@ -5,8 +5,8 @@ import { STAFF_ROLES, getCurrentUser, hashPassword, MIN_PASSWORD_LENGTH } from "
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  allocateHospitalUserIdentity,
   generateStaffPassword,
-  nextUserCode,
   parseEmployeeBody,
   suggestedUsername,
   uniqueUsername,
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     const hospital = await prisma.hospital.findUnique({
       where: { id: hospitalId },
-      select: { pharmacyEnabled: true, labEnabled: true },
+      select: { code: true, pharmacyEnabled: true, labEnabled: true },
     });
     if (!hospital) {
       return NextResponse.json({ error: "Hospital not found." }, { status: 404 });
@@ -118,11 +118,7 @@ export async function POST(request: Request) {
     const username = await uniqueUsername(input.username || suggestedUsername(input.firstName, input.lastName));
     const clash = await prisma.appUser.findFirst({
       where: {
-        OR: [
-          { username },
-          { mobile },
-          ...(input.employeeId ? [{ hospitalId, employeeId: input.employeeId }] : []),
-        ],
+        OR: [{ username }, { mobile }],
       },
     });
     if (clash) {
@@ -139,7 +135,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const userCode = await nextUserCode(hospitalId, role);
+    const { userCode, employeeId } = await allocateHospitalUserIdentity(hospitalId, role, hospital.code);
     const user = await prisma.appUser.create({
       data: {
         username,
@@ -153,7 +149,7 @@ export async function POST(request: Request) {
         role,
         hospitalId,
         userCode,
-        employeeId: input.employeeId,
+        employeeId,
         firstName: input.firstName,
         middleName: input.middleName,
         lastName: input.lastName,

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES, getCurrentUser, hashPassword, invalidateUserSessions, passwordValidationError } from "@/lib/auth";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
-import { parseEmployeeBody, suggestedUsername, uniqueUsername, upsertEmployeeStaff } from "@/lib/employee";
+import { parseEmployeeBody, suggestedUsername, uniqueUsername, upsertEmployeeStaff, nextEmployeeId, nextUserCode } from "@/lib/employee";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, context: Ctx) {
         ...body,
         firstName: body?.firstName ?? existing.firstName,
         lastName: body?.lastName ?? existing.lastName,
-        employeeId: body?.employeeId ?? existing.employeeId,
+        employeeId: existing.employeeId,
         email: body?.email ?? existing.email,
       },
       role,
@@ -88,11 +88,7 @@ export async function PATCH(request: Request, context: Ctx) {
     const clash = await prisma.appUser.findFirst({
       where: {
         id: { not: id },
-        OR: [
-          { username },
-          { mobile },
-          ...(input.employeeId ? [{ hospitalId, employeeId: input.employeeId }] : []),
-        ],
+        OR: [{ username }, { mobile }],
       },
       select: { id: true },
     });
@@ -103,6 +99,8 @@ export async function PATCH(request: Request, context: Ctx) {
     const roleChanged = role !== existing.role;
     const deactivated = existing.isActive !== false && input.isActive === false;
     const passwordChanged = Boolean(password);
+    const userCode = existing.userCode ?? (await nextUserCode(hospitalId, role));
+    const employeeId = existing.employeeId ?? (await nextEmployeeId(hospitalId));
 
     const user = await prisma.appUser.update({
       where: { id },
@@ -112,7 +110,8 @@ export async function PATCH(request: Request, context: Ctx) {
         role,
         isVerified: input.isVerified,
         isActive: input.isActive,
-        employeeId: input.employeeId || null,
+        userCode,
+        employeeId,
         firstName: input.firstName,
         middleName: input.middleName,
         lastName: input.lastName,

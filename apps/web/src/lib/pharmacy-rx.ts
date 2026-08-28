@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front-desk";
 import { notifyHospitalRole } from "@/lib/notifications";
 import { parseMedications } from "@/lib/prescription-text";
+import { activeSignatureFor } from "@/lib/signatures";
 
 export const PHARMACY_BILLING_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "PHARMACIST"];
 
@@ -269,6 +270,8 @@ export async function collectAndDispenseRx(params: {
   const total = lines.reduce((sum, line) => sum + Number(line.lineTotal), 0);
   if (total <= 0) throw new Error("Bill total must be greater than zero.");
 
+  const signature = await activeSignatureFor(params.actorUserId, params.hospitalId);
+
   return prisma.$transaction(async (tx) => {
     for (const line of lines) {
       const batch = await tx.pharmacyBatch.findUnique({ where: { id: line.batchId! } });
@@ -326,6 +329,7 @@ export async function collectAndDispenseRx(params: {
         amount: total,
         notes: params.notes?.trim() || "Pharmacy prescription collection",
         receivedByUserId: params.actorUserId,
+        receivedBySignatureId: signature?.id ?? null,
       },
     });
 

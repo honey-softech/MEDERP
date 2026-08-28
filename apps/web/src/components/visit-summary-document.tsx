@@ -1,3 +1,4 @@
+import { SignatureBlock } from "@/components/signature-block";
 import { parseMedications, readableClinicalText } from "@/lib/visit-summary";
 
 export function VisitSummaryDocument({
@@ -27,6 +28,9 @@ export function VisitSummaryDocument({
   printedBy,
   printedAt,
   draft,
+  signatureImage,
+  signatureName,
+  signatureCredentials,
 }: {
   hospitalName: string;
   hospitalAddress?: string | null;
@@ -54,6 +58,9 @@ export function VisitSummaryDocument({
   printedBy: string;
   printedAt: string;
   draft?: boolean;
+  signatureImage?: string | null;
+  signatureName?: string | null;
+  signatureCredentials?: string | null;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
   const vitals =
@@ -194,11 +201,13 @@ export function VisitSummaryDocument({
       </section>
 
       <section className="vs-signoff">
-        <div>
-          <p className="vs-label">Consulting physician</p>
-          <p className="vs-sign-name">{physician}</p>
-          <p className="vs-sign-line">Electronically authorised visit summary</p>
-        </div>
+        <SignatureBlock
+          role="Consulting physician"
+          name={signatureName || physician}
+          credentials={signatureCredentials}
+          imageData={draft ? null : signatureImage}
+          note="Electronically authorised visit summary"
+        />
         <div className="vs-stamp">{draft ? "DRAFT" : "APPROVED"}</div>
       </section>
 

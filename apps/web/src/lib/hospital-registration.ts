@@ -1,9 +1,10 @@
 import type { AppRole, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog } from "@/lib/audit";
 import { hashPassword, MIN_PASSWORD_LENGTH, normalizeHospitalCode, normalizeMobile, passwordValidationError } from "@/lib/auth";
 import { isValidHospitalCode, slugFromHospitalName } from "@/lib/hospital-code";
 import { mobileValidationError } from "@/lib/phone";
-import { writeAuditLog } from "@/lib/audit";
+import { allocateHospitalUserIdentity } from "@/lib/employee";
 import { seedHospitalDepartments } from "@/lib/front-desk";
 import { seedHospitalWards } from "@/lib/wards";
 import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platform-billing";
@@ -245,6 +246,15 @@ export async function registerHospital(input: RegisterHospitalInput) {
   await seedHospitalDepartments(hospital.id);
   await seedHospitalWards(hospital.id);
 
+  const superAdmin = hospital.users[0];
+  if (superAdmin) {
+    const identity = await allocateHospitalUserIdentity(hospital.id, "SUPER_ADMIN", hospital.code);
+    await prisma.appUser.update({
+      where: { id: superAdmin.id },
+      data: identity,
+    });
+  }
+
   const invoice = await createPlatformInvoice({
     hospitalId: hospital.id,
     lines: prepared.quote.lines,
@@ -270,7 +280,6 @@ export async function registerHospital(input: RegisterHospitalInput) {
     });
   }
 
-  const superAdmin = hospital.users[0];
   await writeAuditLog({
     request: input.request,
     hospitalId: hospital.id,

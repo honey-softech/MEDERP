@@ -3,9 +3,20 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { InvoiceActions } from "@/components/billing-forms";
 import { PrintButton } from "@/components/print-button";
+import { SignatureBlock } from "@/components/signature-block";
 import { secondaryButtonClass } from "@/components/auth-shell";
-import { BILLING_ROLES, FRONT_DESK_ROLES, WAIVER_APPROVER_ROLES, doctorName, inr, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import {
+  BILLING_ROLES,
+  FRONT_DESK_ROLES,
+  WAIVER_APPROVER_ROLES,
+  doctorName,
+  inr,
+  patientName,
+  prettyEnum,
+  requireHospitalPage,
+} from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { signatureCredentialsFor, signatureNameFor } from "@/lib/signatures";
 import { redirect } from "next/navigation";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,13 +28,53 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     include: {
       patient: true,
       items: true,
-      payments: { orderBy: { receivedAt: "desc" } },
+      payments: {
+        orderBy: { receivedAt: "desc" },
+        include: {
+          receivedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
+        },
+      },
       appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true } },
     },
   });
   if (!invoice) notFound();
 
   const due = Math.max(0, Number(invoice.netTotal) - Number(invoice.paidAmount));
+
+  // Prefer the signature snapshotted when payment was taken; fall back to the collector's
+  // current active signature so receipts still print after a signature is uploaded later.
+  const latestCollection = invoice.payments.find((payment) => payment.kind === "COLLECTION") ?? null;
+  let collector:
+    | { name: string; credentials: string | null; imageData: string | null }
+    | null = null;
+  if (latestCollection?.receivedBySignature) {
+    collector = {
+      name: latestCollection.receivedBySignature.displayName,
+      credentials: latestCollection.receivedBySignature.credentials,
+      imageData: latestCollection.receivedBySignature.imageData,
+    };
+  } else if (latestCollection?.receivedByUserId) {
+    const receiver = await prisma.appUser.findUnique({
+      where: { id: latestCollection.receivedByUserId },
+      include: {
+        staffProfile: true,
+        signatures: {
+          where: { status: "ACTIVE" },
+          orderBy: { version: "desc" },
+          take: 1,
+          select: { imageData: true, displayName: true, credentials: true },
+        },
+      },
+    });
+    if (receiver) {
+      const live = receiver.signatures[0] ?? null;
+      collector = {
+        name: live?.displayName ?? signatureNameFor(receiver),
+        credentials: live?.credentials ?? signatureCredentialsFor(receiver),
+        imageData: live?.imageData ?? null,
+      };
+    }
+  }
 
   return (
     <AppShell title={invoice.invoiceNo}>
@@ -115,10 +166,22 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             <ul className="mt-2 space-y-1 text-sm text-slate-600">
               {invoice.payments.map((payment) => (
                 <li key={payment.id}>
-                  {payment.receivedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} · {prettyEnum(payment.kind)} · {prettyEnum(payment.method)} · {inr(payment.amount)}
+                  {payment.receivedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
+                  {prettyEnum(payment.kind)} · {prettyEnum(payment.method)} · {inr(payment.amount)}
                 </li>
               ))}
             </ul>
+          </div>
+        ) : null}
+        {collector ? (
+          <div className="vs-signoff">
+            <SignatureBlock
+              role="Received by"
+              name={collector.name}
+              credentials={collector.credentials}
+              imageData={collector.imageData}
+              note="Payment received and receipt issued"
+            />
           </div>
         ) : null}
       </article>

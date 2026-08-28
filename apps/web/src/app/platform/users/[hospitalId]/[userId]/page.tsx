@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import HospitalUserForm from "@/components/hospital-user-form";
+import { UserSignatureManager } from "@/components/user-signature-manager";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { userFormInitial } from "@/lib/user-form-initial";
@@ -46,6 +47,9 @@ export default async function PlatformEditHospitalUserPage({
         updateUrl={`/api/hospital/users/${user.id}`}
         departments={departments.map((row) => ({ id: row.id, label: row.name }))}
       />
+      <div className="mt-6">
+        <UserSignatureManager userId={user.id} roleLabel={user.role.replace(/_/g, " ")} />
+      </div>
     </AppShell>
   );
 }

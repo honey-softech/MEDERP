@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthShell title="Reset password" subtitle="Enter your registered mobile number. We’ll send a one-time code if an account exists.">
+    <AuthShell title="Reset password" subtitle="Enter your registered mobile number. Until SMS is connected, the OTP is 123456 for every account.">
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
           Mobile number

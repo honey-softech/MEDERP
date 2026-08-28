@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front-desk";
 import { ALL_LAB_CATALOG, investigationLineName, type InvestigationPick } from "@/lib/lab-catalog";
 import { notifyHospitalRole, notifyUser } from "@/lib/notifications";
+import { activeSignatureFor } from "@/lib/signatures";
 
 export const LAB_WORK_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH"];
 export const LAB_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH", "DOCTOR", "NURSE", "RECEPTIONIST"];
@@ -100,6 +101,7 @@ export async function upsertVisitLabOrder(params: {
   const initialStatus = inHouseLab ? ("AWAITING_PAYMENT" as const) : ("AWAITING_EXTERNAL_REPORT" as const);
 
   const existing = await findEditableVisitLabOrder(params.appointmentId);
+  const signature = await activeSignatureFor(params.orderedByUserId, params.hospitalId);
 
   const offered = await offeredTestsForHospital(params.hospitalId);
   const byId = new Map(offered.map((test) => [test.id, test]));
@@ -155,6 +157,7 @@ export async function upsertVisitLabOrder(params: {
         totalAmount: total,
         orderedByUserId: params.orderedByUserId,
         orderedByUsername: params.orderedByUsername,
+        orderedBySignatureId: signature?.id ?? null,
         items: { deleteMany: {}, ...items },
       },
     });
@@ -169,6 +172,7 @@ export async function upsertVisitLabOrder(params: {
       patientId: params.patientId,
       orderedByUserId: params.orderedByUserId,
       orderedByUsername: params.orderedByUsername,
+      orderedBySignatureId: signature?.id ?? null,
       fulfillment,
       status: initialStatus,
       totalAmount: total,

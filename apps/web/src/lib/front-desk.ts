@@ -173,6 +173,15 @@ export function sanitizeLogoData(value: unknown) {
   return logo;
 }
 
+/** PNG is allowed here because a signature cleaned to a transparent background cannot be JPEG. */
+export function sanitizeSignatureData(value: unknown) {
+  const data = String(value ?? "").trim();
+  if (!data) return null;
+  if (!/^data:image\/(png|jpe?g|webp);base64,/i.test(data)) return null;
+  if (data.length > 400_000) return null;
+  return data;
+}
+
 export function dayRange(date: Date) {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);

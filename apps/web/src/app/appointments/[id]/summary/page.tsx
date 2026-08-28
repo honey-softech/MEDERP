@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PrintButton } from "@/components/print-button";
 import { VisitSummaryDocument } from "@/components/visit-summary-document";
-import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { secondaryButtonClass } from "@/components/auth-shell";
 import {
   DOCTOR_VISIT_ROLES,
   PRINT_SUMMARY_ROLES,
@@ -25,7 +25,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
       doctor: { include: { appUser: { select: { username: true } } } },
       department: true,
       vitals: true,
-      assessment: true,
+      assessment: { include: { approvedBySignature: { select: { imageData: true } } } },
       hospital: {
         select: { name: true, address: true, phone: true, logoData: true, sealData: true, code: true },
       },
@@ -100,6 +100,9 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
         printedBy={user.username}
         printedAt={printedAt}
         draft={!approved}
+        signatureImage={appointment.assessment.approvedBySignature?.imageData}
+        signatureName={appointment.assessment.approvedByDisplayName}
+        signatureCredentials={appointment.assessment.approvedByCredentials}
       />
       </div>
     </AppShell>

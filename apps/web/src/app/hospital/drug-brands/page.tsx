@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { DrugBrandForm } from "@/components/drug-brand-form";
+import { LoadDrugCatalog } from "@/components/load-drug-catalog";
 import { listManufacturersForPicker } from "@/lib/drug-brands";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,7 @@ export default async function HospitalDrugBrandsPage() {
   const user = await requireHospitalPage();
   if (user.role !== "SUPER_ADMIN") redirect("/");
 
+  const catalogSize = await prisma.drugCatalog.count();
   const manufacturerCount = await prisma.drugManufacturer.count();
   if (manufacturerCount === 0) {
     // First visit: build manufacturer index from catalog (one-time)
@@ -43,6 +45,7 @@ export default async function HospitalDrugBrandsPage() {
         This is available for every hospital super admin and does not require the Pharmacy module.
         Top Indian brands are listed first; search to find others. Leave empty to allow the full catalog.
       </p>
+      <LoadDrugCatalog initialCount={catalogSize} />
       <DrugBrandForm
         initialSelected={selected.map((row) => row.manufacturer)}
         initialSuggestions={suggestions}

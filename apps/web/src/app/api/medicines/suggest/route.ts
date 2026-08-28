@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: [] as DrugSuggestItem[] });
   }
 
-  const pattern = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
-  const prefix = `${q.replace(/[%_\\]/g, "\\$&")}%`;
+  const safe = q.replace(/[%_\\]/g, "");
+  const pattern = `%${safe}%`;
+  const prefix = `${safe}%`;
   const brands = await preferredManufacturerNames(scoped.user.hospitalId);
 
   const brandFilter =
@@ -45,11 +46,10 @@ export async function GET(request: NextRequest) {
     SELECT "id", "name", "saltComposition", "packSize", "manufacturer"
     FROM "DrugCatalog"
     WHERE "isDiscontinued" = false
-      AND "searchText" ILIKE ${pattern} ESCAPE '\\'
+      AND ("searchText" ILIKE ${pattern} OR "name" ILIKE ${pattern})
       ${brandFilter}
     ORDER BY
-      CASE WHEN "name" ILIKE ${prefix} ESCAPE '\\' THEN 0 ELSE 1 END,
-      similarity("searchText", ${q.toLowerCase()}) DESC,
+      CASE WHEN "name" ILIKE ${prefix} THEN 0 ELSE 1 END,
       "name" ASC
     LIMIT ${limit}
   `;

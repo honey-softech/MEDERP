@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import HospitalUserForm from "@/components/hospital-user-form";
+import { UserSignatureManager } from "@/components/user-signature-manager";
 import { userFormInitial } from "@/lib/user-form-initial";
 
 export default async function EditHospitalUserPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +38,9 @@ export default async function EditHospitalUserPage({ params }: { params: Promise
         initial={userFormInitial(user)}
         departments={departments.map((row) => ({ id: row.id, label: row.name }))}
       />
+      <div className="mt-6">
+        <UserSignatureManager userId={user.id} roleLabel={user.role.replace(/_/g, " ")} />
+      </div>
     </AppShell>
   );
 }

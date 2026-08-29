@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { FamilyRelation } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { FRONT_DESK_ROLES, forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 
 const RELATIONS: FamilyRelation[] = ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"];
@@ -36,6 +36,10 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: "Patient not found in this hospital." }, { status: 404 });
   }
 
+  const existingLink = await prisma.patientFamily.findUnique({
+    where: { primaryPatientId_relatedPatientId: { primaryPatientId: id, relatedPatientId } },
+  });
+
   const link = await prisma.patientFamily.upsert({
     where: {
       primaryPatientId_relatedPatientId: { primaryPatientId: id, relatedPatientId },
@@ -59,6 +63,13 @@ export async function POST(request: Request, context: Ctx) {
     entity: "Patient",
     entityId: id,
     summary: `${scoped.user.username} linked ${related.firstName} ${related.lastName} as ${relation.toLowerCase()} of ${primary.firstName} ${primary.lastName}.`,
+    metadata: {
+      changes: diffAuditFields(
+        existingLink ? { relatedPatientId: existingLink.relatedPatientId, relation: existingLink.relation } : null,
+        { relatedPatientId, relation },
+        { fields: ["relatedPatientId", "relation"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true, link });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 import {
   STANDARD_WARD_CODES,
@@ -54,7 +54,11 @@ export async function POST(request: Request) {
       entity: "Ward",
       entityId: scoped.user.hospitalId,
       summary: `${scoped.user.username} updated hospital ward room/bed capacity.`,
-      metadata: { counts, results },
+      metadata: {
+        counts,
+        results,
+        changes: diffAuditFields({ counts: null }, { counts }, { fields: ["counts"] }),
+      },
     });
     return NextResponse.json({ results });
   } catch (error) {

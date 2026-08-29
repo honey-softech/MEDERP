@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type FilterColumn = {
   key: string;
@@ -9,6 +9,7 @@ export type FilterColumn = {
   filter?: boolean;
   hrefKey?: string;
   className?: string;
+  render?: (row: Record<string, string>) => ReactNode;
 };
 
 function FilterIcon({ active }: { active: boolean }) {
@@ -166,7 +167,9 @@ export function FilterableTable({
                     const value = row[column.key] ?? "";
                     return (
                       <td key={column.key} className={column.className ?? ""}>
-                        {href ? (
+                        {column.render ? (
+                          column.render(row)
+                        ) : href ? (
                           <Link className="font-medium text-primary hover:underline" href={href}>
                             {value}
                           </Link>

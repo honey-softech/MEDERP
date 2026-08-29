@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   EXTERNAL_REPORT_UPLOAD_ROLES,
   LAB_REPORT_VIEW_ROLES,
@@ -138,6 +138,13 @@ export async function POST(request: Request, context: Ctx) {
     entity: "LabOrder",
     entityId: order.id,
     summary: `${scoped.user.username} uploaded ${external ? "outside" : "lab"} report ${fileName} for ${patientName(order.patient)}.`,
+    metadata: {
+      changes: diffAuditFields(
+        { reportFileName: order.reportFileName, status: order.status },
+        { reportFileName: updated.reportFileName, status: updated.status },
+        { fields: ["reportFileName", "status"] },
+      ),
+    },
   });
 
   return NextResponse.json({

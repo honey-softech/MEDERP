@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { AppRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { approveJoinRequest, rejectJoinRequest } from "@/lib/join-requests";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -53,6 +53,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "HospitalJoinRequest",
       entityId: result.request.id,
       summary: `${actor.username} approved ${result.request.user.username} to join ${result.request.hospital.name} as ${result.role.replace(/_/g, " ")}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: result.request.status, requestedRole: result.request.requestedRole },
+          { status: "APPROVED", requestedRole: result.role },
+          { fields: ["status", "requestedRole"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true });
   }
@@ -72,6 +79,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "HospitalJoinRequest",
       entityId: result.request.id,
       summary: `${actor.username} declined ${result.request.user.username}'s request to join ${result.request.hospital.name}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: result.request.status, reviewNote: result.request.reviewNote },
+          { status: "REJECTED", reviewNote: reviewNote ?? null },
+          { fields: ["status", "reviewNote"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true });
   }

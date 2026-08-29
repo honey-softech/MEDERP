@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 import { WARD_HOUSEKEEPING_ROLES, assertWardsModuleEnabled, updateBedStatus, wardErrorResponse } from "@/lib/wards";
 
@@ -27,6 +28,10 @@ export async function PATCH(request: Request, context: Ctx) {
   }
 
   try {
+    const existing = await prisma.bed.findFirst({
+      where: { id, hospitalId: scoped.user.hospitalId },
+      select: { status: true, isActive: true },
+    });
     const bed = await updateBedStatus({
       hospitalId: scoped.user.hospitalId,
       bedId: id,
@@ -42,6 +47,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Bed",
       entityId: bed.id,
       summary: `${scoped.user.username} set bed ${bed.number} to ${bed.status.toLowerCase()}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: existing?.status, isActive: existing?.isActive },
+          { status: bed.status, isActive: bed.isActive },
+          { fields: ["status", "isActive"] },
+        ),
+      },
     });
     return NextResponse.json({ bed });
   } catch (error) {

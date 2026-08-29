@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { BILLING_ROLES, forbidUnless, patientName, requireHospitalActor } from "@/lib/front-desk";
 
 const METHODS: PaymentMethod[] = ["CASH", "CARD", "UPI", "INSURANCE"];
@@ -68,6 +68,13 @@ export async function POST(request: Request) {
     entity: "Patient",
     entityId: patient.id,
     summary: `${scoped.user.username} collected advance ${amount} (${method.toLowerCase()}) for ${patientName(patient)}.`,
+    metadata: {
+      changes: diffAuditFields(
+        { advanceBalance: patient.advanceBalance },
+        { advanceBalance: Number(patient.advanceBalance) + amount },
+        { fields: ["advanceBalance"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true });

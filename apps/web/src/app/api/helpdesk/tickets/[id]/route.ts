@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { HelpdeskTicketStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { canHandleHelpdesk, notifyHelpdeskStatusChange, ticketVisibleWhere } from "@/lib/helpdesk";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -95,7 +95,15 @@ export async function PATCH(request: Request, context: Ctx) {
     entity: "HelpdeskTicket",
     entityId: ticket.id,
     summary: `${user.username} updated helpdesk ${ticket.number}.`,
-    metadata: { status: updated.status, assignedToId: updated.assignedToId },
+    metadata: {
+      status: updated.status,
+      assignedToId: updated.assignedToId,
+      changes: diffAuditFields(
+        { status: ticket.status, assignedToId: ticket.assignedToId },
+        { status: updated.status, assignedToId: updated.assignedToId },
+        { fields: ["status", "assignedToId"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true, ticket: updated });

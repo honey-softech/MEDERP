@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   DOCTOR_VISIT_ROLES,
   doctorIsOnLeave,
@@ -18,6 +18,20 @@ import { syncPharmacyRxFromAssessment } from "@/lib/pharmacy-rx";
 import { activeSignatureFor } from "@/lib/signatures";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+const ASSESSMENT_AUDIT_FIELDS = [
+  "chiefComplaint",
+  "examination",
+  "diagnosis",
+  "summary",
+  "prescription",
+  "advice",
+  "visitOutcome",
+  "followUpAt",
+  "status",
+  "approvedByDisplayName",
+  "approvedByCredentials",
+] as const;
 
 function text(value: unknown) {
   const raw = String(value ?? "").trim();
@@ -88,6 +102,25 @@ export async function POST(request: Request, context: Ctx) {
         where: { id: appointment.assessment.id },
         data: { followUpAt },
       });
+      const changes = diffAuditFields(
+        { followUpAt: appointment.assessment.followUpAt },
+        { followUpAt: assessment.followUpAt },
+        { fields: ["followUpAt"] },
+      );
+      if (changes.length > 0) {
+        await writeAuditLog({
+          request,
+          hospitalId: scoped.user.hospitalId,
+          actorUserId: scoped.user.id,
+          actorUsername: scoped.user.username,
+          actorRole: scoped.user.role,
+          action: "VISIT_SUMMARY_REVISED",
+          entity: "VisitAssessment",
+          entityId: assessment.id,
+          summary: `${scoped.user.username} updated the follow-up date for ${patientName(appointment.patient)}.`,
+          metadata: { changes },
+        });
+      }
       return NextResponse.json({ ok: true, assessment });
     }
 
@@ -187,7 +220,12 @@ export async function POST(request: Request, context: Ctx) {
       investigations,
     });
 
-    if (approve || created) {
+    const changes = diffAuditFields(
+      appointment.assessment as Record<string, unknown> | undefined,
+      assessment as Record<string, unknown>,
+      { fields: [...ASSESSMENT_AUDIT_FIELDS] },
+    );
+    if (created || approve || changes.length > 0) {
       await writeAuditLog({
         request,
         hospitalId: scoped.user.hospitalId,
@@ -198,14 +236,19 @@ export async function POST(request: Request, context: Ctx) {
           ? wasApproved
             ? "VISIT_SUMMARY_REPUBLISHED"
             : "VISIT_SUMMARY_APPROVED"
-          : "VISIT_SUMMARY_SAVED",
+          : created
+            ? "VISIT_SUMMARY_SAVED"
+            : "VISIT_SUMMARY_REVISED",
         entity: "VisitAssessment",
         entityId: assessment.id,
         summary: approve
           ? wasApproved
             ? `${scoped.user.username} published a new visit summary version for ${patientName(appointment.patient)}.`
             : `${scoped.user.username} approved the visit summary for ${patientName(appointment.patient)}.`
-          : `${scoped.user.username} saved a draft visit summary for ${patientName(appointment.patient)}.`,
+          : created
+            ? `${scoped.user.username} saved a draft visit summary for ${patientName(appointment.patient)}.`
+            : `${scoped.user.username} revised the visit summary for ${patientName(appointment.patient)}.`,
+        metadata: { changes },
       });
     }
 

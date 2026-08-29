@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { forbidUnless, patientName, requireHospitalActor } from "@/lib/front-desk";
 import { notifyHospitalRole } from "@/lib/notifications";
 import {
@@ -86,6 +86,13 @@ export async function PATCH(request: Request, context: Ctx) {
         entity: "Admission",
         entityId: admission.id,
         summary: `${scoped.user.username} transferred ${patientName(admission.patient)} (${admission.ipNumber}).`,
+        metadata: {
+          changes: diffAuditFields(
+            { bedId: admission.bedId },
+            { bedId: String(body?.toBedId ?? "") },
+            { fields: ["bedId"] },
+          ),
+        },
       });
       return NextResponse.json({ ok: true });
     }
@@ -115,6 +122,13 @@ export async function PATCH(request: Request, context: Ctx) {
         entity: "Admission",
         entityId: admission.id,
         summary: `${scoped.user.username} advised discharge for ${admission.ipNumber}.`,
+        metadata: {
+          changes: diffAuditFields(
+            { status: admission.status },
+            { status: "DISCHARGE_ADVISED" },
+            { fields: ["status"] },
+          ),
+        },
       });
       return NextResponse.json({ ok: true });
     }
@@ -144,6 +158,13 @@ export async function PATCH(request: Request, context: Ctx) {
         entity: "Admission",
         entityId: admission.id,
         summary: `${scoped.user.username} discharged ${patientName(admission.patient)} (${admission.ipNumber}).`,
+        metadata: {
+          changes: diffAuditFields(
+            { status: admission.status, dischargeType: admission.dischargeType },
+            { status: "DISCHARGED", dischargeType },
+            { fields: ["status", "dischargeType"] },
+          ),
+        },
       });
       return NextResponse.json(result);
     }
@@ -185,6 +206,13 @@ export async function PATCH(request: Request, context: Ctx) {
         entity: "Admission",
         entityId: admission.id,
         summary: `${scoped.user.username} cancelled admission ${admission.ipNumber}.`,
+        metadata: {
+          changes: diffAuditFields(
+            { status: admission.status },
+            { status: "CANCELLED" },
+            { fields: ["status"] },
+          ),
+        },
       });
       return NextResponse.json({ ok: true });
     }

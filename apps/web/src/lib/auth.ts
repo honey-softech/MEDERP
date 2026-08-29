@@ -76,7 +76,7 @@ export function sessionCookieOptions(expiresAt: Date) {
   };
 }
 
-export async function createSession(userId: string) {
+export async function createSession(userId: string, options?: { setCookie?: boolean }) {
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = hashSessionToken(rawToken);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
@@ -85,9 +85,11 @@ export async function createSession(userId: string) {
     data: { token: tokenHash, userId, expiresAt },
   });
 
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, rawToken, sessionCookieOptions(expiresAt));
-  return rawToken;
+  if (options?.setCookie !== false) {
+    const jar = await cookies();
+    jar.set(SESSION_COOKIE, rawToken, sessionCookieOptions(expiresAt));
+  }
+  return { token: rawToken, expiresAt };
 }
 
 export async function clearSession() {

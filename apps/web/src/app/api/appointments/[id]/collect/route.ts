@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   BILLING_ROLES,
   amountsMatch,
@@ -153,6 +153,16 @@ export async function POST(request: Request, context: Ctx) {
       entity: "Invoice",
       entityId: result.id,
       summary: `${scoped.user.username} recorded ${method.toLowerCase()} ${amount} for ${patientName(appointment.patient)} (${doctorName(appointment.doctor)}).`,
+      metadata: {
+        changes: diffAuditFields(
+          {
+            paidAmount: existing?.paidAmount ?? 0,
+            status: existing?.status ?? null,
+          },
+          { paidAmount: result.paidAmount, status: result.status },
+          { fields: ["paidAmount", "status"] },
+        ),
+      },
     });
 
     return NextResponse.json({ ok: true, invoice: result });

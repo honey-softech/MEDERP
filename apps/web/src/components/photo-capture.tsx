@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { secondaryButtonClass } from "@/components/auth-shell";
 
 export function PhotoCapture({
@@ -19,6 +19,26 @@ export function PhotoCapture({
   const [cameraOn, setCameraOn] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!cameraOn) return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    void video.play().catch(() => {});
+    return () => {
+      video.srcObject = null;
+    };
+  }, [cameraOn]);
+
+  useEffect(
+    () => () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    },
+    [],
+  );
+
   async function startCamera() {
     setError("");
     try {
@@ -28,10 +48,9 @@ export function PhotoCapture({
       });
       streamRef.current = stream;
       setCameraOn(true);
-      requestAnimationFrame(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      });
     } catch {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setError("Camera permission was denied. You can upload a photo instead.");
     }
   }
@@ -39,6 +58,7 @@ export function PhotoCapture({
   function stopCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
   }
 

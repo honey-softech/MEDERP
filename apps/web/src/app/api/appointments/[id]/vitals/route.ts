@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { NURSE_VITALS_ROLES, canNurseRecordVitals, forbidUnless, patientName, requireHospitalActor, tokenLabel } from "@/lib/front-desk";
 import { notifyDoctorVitalsReady } from "@/lib/notifications";
 import { bmiLabel, calculateBmi, parseOptionalNumber, parseRequiredNumber } from "@/lib/vitals";
@@ -101,6 +101,28 @@ export async function POST(request: Request, context: Ctx) {
       entity: "VisitVitals",
       entityId: vitals.id,
       summary: `${scoped.user.username} recorded vitals for ${patientName(appointment.patient)} (BMI ${bmi}, ${bmiLabel(bmi)}).`,
+      metadata: {
+        changes: diffAuditFields(
+          appointment.vitals as unknown as Record<string, unknown> | undefined,
+          vitals as unknown as Record<string, unknown>,
+          {
+            fields: [
+              "heightCm",
+              "weightKg",
+              "bmi",
+              "temperatureC",
+              "hasFever",
+              "spo2Percent",
+              "pulseBpm",
+              "respiratoryRate",
+              "bpSystolic",
+              "bpDiastolic",
+              "bloodSugarMgDl",
+              "notes",
+            ],
+          },
+        ),
+      },
     });
 
     if (!appointment.vitals) {

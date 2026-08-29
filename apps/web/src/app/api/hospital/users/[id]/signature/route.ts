@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { sanitizeSignatureData } from "@/lib/front-desk";
 import { signatureCredentialsFor, signatureNameFor } from "@/lib/signatures";
 
@@ -92,6 +92,11 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: "Enter the name to print under the signature." }, { status: 400 });
   }
 
+  const previous = await prisma.userSignature.findFirst({
+    where: { userId: id, hospitalId, status: "ACTIVE" },
+    orderBy: { version: "desc" },
+    select: { displayName: true, credentials: true, version: true, imageData: true, status: true },
+  });
   const latest = await prisma.userSignature.findFirst({
     where: { userId: id, hospitalId },
     orderBy: { version: "desc" },
@@ -123,6 +128,25 @@ export async function POST(request: Request, context: Ctx) {
     });
   });
 
+  const changes = diffAuditFields(
+    previous
+      ? {
+          displayName: previous.displayName,
+          credentials: previous.credentials,
+          version: previous.version,
+          status: previous.status,
+          imageData: previous.imageData,
+        }
+      : null,
+    {
+      displayName: signature.displayName,
+      credentials: signature.credentials,
+      version: signature.version,
+      status: signature.status,
+      imageData,
+    },
+    { fields: ["displayName", "credentials", "version", "status", "imageData"] },
+  );
   await writeAuditLog({
     request,
     hospitalId,
@@ -133,7 +157,7 @@ export async function POST(request: Request, context: Ctx) {
     entity: "UserSignature",
     entityId: signature.id,
     summary: `${actor.username} uploaded signature v${signature.version} for ${displayName}.`,
-    metadata: { targetUserId: id, version: signature.version },
+    metadata: { targetUserId: id, version: signature.version, changes },
   });
 
   return NextResponse.json({ ok: true, signature });
@@ -153,7 +177,7 @@ export async function PATCH(request: Request, context: Ctx) {
   const active = await prisma.userSignature.findFirst({
     where: { userId: id, hospitalId, status: "ACTIVE" },
     orderBy: { version: "desc" },
-    select: { id: true, displayName: true, version: true },
+    select: { id: true, displayName: true, version: true, credentials: true, status: true },
   });
   if (!active) {
     return NextResponse.json({ error: "There is no signature on file to revoke." }, { status: 404 });
@@ -164,6 +188,11 @@ export async function PATCH(request: Request, context: Ctx) {
     data: { status: "REVOKED", revokedAt: new Date() },
   });
 
+  const changes = diffAuditFields(
+    { status: active.status, displayName: active.displayName, credentials: active.credentials, version: active.version },
+    { status: "REVOKED", displayName: active.displayName, credentials: active.credentials, version: active.version },
+    { fields: ["status", "displayName", "credentials", "version"] },
+  );
   await writeAuditLog({
     request,
     hospitalId,
@@ -174,7 +203,7 @@ export async function PATCH(request: Request, context: Ctx) {
     entity: "UserSignature",
     entityId: active.id,
     summary: `${actor.username} revoked signature v${active.version} for ${active.displayName}.`,
-    metadata: { targetUserId: id, version: active.version },
+    metadata: { targetUserId: id, version: active.version, changes },
   });
 
   return NextResponse.json({ ok: true });

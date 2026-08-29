@@ -23,7 +23,7 @@ export default async function HospitalAuditLogPage() {
   return (
     <AppShell title={`${hospitalName} audit log`}>
       <p className="mb-6 text-sm text-slate-500">
-        Filter by date, user, or role, then search to view the log.
+        Today's log is shown first. Filter by date, user, or role to search further.
       </p>
       <AuditLogTable logs={logs} users={users} />
     </AppShell>

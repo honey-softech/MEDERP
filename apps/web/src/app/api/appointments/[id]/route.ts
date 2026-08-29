@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ReminderChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   DOCTOR_VISIT_ROLES,
   FRONT_DESK_ROLES,
@@ -82,6 +82,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Appointment",
       entityId: id,
       summary: `${user.username} rescheduled ${patientName(appointment.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { scheduledAt: appointment.scheduledAt, status: appointment.status },
+          { scheduledAt: updated.scheduledAt, status: updated.status },
+          { fields: ["scheduledAt", "status"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, appointment: updated });
   }
@@ -103,6 +110,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Appointment",
       entityId: id,
       summary: `${user.username} cancelled appointment for ${patientName(appointment.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: appointment.status, cancelledAt: appointment.cancelledAt },
+          { status: updated.status, cancelledAt: updated.cancelledAt },
+          { fields: ["status", "cancelledAt"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, appointment: updated });
   }
@@ -134,6 +148,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Appointment",
       entityId: id,
       summary: `${user.username} checked in ${patientName(appointment.patient)} (${tokenLabel(tokenNumber)}).`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: appointment.status, checkInAt: appointment.checkInAt, tokenNumber: appointment.tokenNumber },
+          { status: updated.status, checkInAt: updated.checkInAt, tokenNumber: updated.tokenNumber },
+          { fields: ["status", "checkInAt", "tokenNumber"] },
+        ),
+      },
     });
     const alreadyRecorded = await prisma.visitVitals.findUnique({
       where: { appointmentId: id },
@@ -178,6 +199,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Appointment",
       entityId: id,
       summary: `${user.username} started consult for ${patientName(appointment.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: appointment.status, checkInAt: appointment.checkInAt },
+          { status: updated.status, checkInAt: updated.checkInAt },
+          { fields: ["status", "checkInAt"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, appointment: updated });
   }
@@ -225,6 +253,13 @@ export async function PATCH(request: Request, context: Ctx) {
         action === "complete"
           ? `${user.username} marked visit done for ${patientName(appointment.patient)}.`
           : `${user.username} checked out ${patientName(appointment.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: appointment.status, checkOutAt: appointment.checkOutAt },
+          { status: updated.status, checkOutAt: updated.checkOutAt },
+          { fields: ["status", "checkOutAt"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, appointment: updated });
   }
@@ -339,6 +374,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Appointment",
       entityId: id,
       summary: `${user.username} captured a visit photo for ${patientName(appointment.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { photoData: appointment.photoData },
+          { photoData: updated.photoData },
+          { fields: ["photoData"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, appointment: updated });
   }

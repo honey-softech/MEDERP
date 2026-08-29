@@ -3,7 +3,7 @@ import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES, getCurrentUser, hashPassword, invalidateUserSessions, passwordValidationError } from "@/lib/auth";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { parseEmployeeBody, suggestedUsername, uniqueUsername, upsertEmployeeStaff, nextEmployeeId, nextUserCode } from "@/lib/employee";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -140,6 +140,47 @@ export async function PATCH(request: Request, context: Ctx) {
       });
     }
 
+    const after = {
+      username,
+      mobile,
+      role,
+      isVerified: input.isVerified,
+      isActive: input.isActive,
+      firstName: input.firstName,
+      middleName: input.middleName,
+      lastName: input.lastName,
+      photoData: input.photoData,
+      dateOfBirth: input.dateOfBirth,
+      gender: input.gender,
+      email: input.email,
+      dateJoined: input.dateJoined,
+      employmentType: input.employmentType,
+      preferredLanguage: input.preferredLanguage,
+      timezone: input.timezone,
+      passwordHash: passwordChanged ? "updated" : existing.passwordHash,
+    };
+    const changes = diffAuditFields(existing as unknown as Record<string, unknown>, after, {
+      fields: [
+        "username",
+        "mobile",
+        "role",
+        "isVerified",
+        "isActive",
+        "firstName",
+        "middleName",
+        "lastName",
+        "photoData",
+        "dateOfBirth",
+        "gender",
+        "email",
+        "dateJoined",
+        "employmentType",
+        "preferredLanguage",
+        "timezone",
+        "passwordHash",
+      ],
+    });
+
     await writeAuditLog({
       request,
       hospitalId,
@@ -150,7 +191,7 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "AppUser",
       entityId: user.id,
       summary: `${actor.username} updated hospital user ${input.firstName} ${input.lastName} (${user.role.replace(/_/g, " ")}).`,
-      metadata: { mobile: user.mobile, role: user.role, passwordReset: Boolean(password) },
+      metadata: { mobile: user.mobile, role: user.role, passwordReset: Boolean(password), changes },
     });
 
     return NextResponse.json({ ok: true, user });

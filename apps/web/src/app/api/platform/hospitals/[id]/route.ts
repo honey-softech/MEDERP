@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -110,7 +110,14 @@ export async function PATCH(request: Request, context: Ctx) {
         : data.isActive === true
           ? `${actor.username} enabled access for hospital ${hospital.code}.`
           : `${actor.username} updated hospital ${hospital.code} details.`,
-    metadata: data,
+    metadata: {
+      ...data,
+      changes: diffAuditFields(
+        existing as unknown as Record<string, unknown>,
+        hospital as unknown as Record<string, unknown>,
+        { fields: Object.keys(data) },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true, hospital });

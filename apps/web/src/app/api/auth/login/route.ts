@@ -33,12 +33,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid 10-digit mobile number and password." }, { status: 400 });
   }
 
-  const user = await prisma.appUser.findUnique({ where: { mobile } });
+  const user = await prisma.appUser.findUnique({
+    where: { mobile },
+    include: { hospital: { select: { isActive: true } } },
+  });
   // Always run bcrypt when user missing to reduce timing enumeration.
   const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
 
   if (!user || !passwordOk) {
-    await writeAuditLog({
+    void writeAuditLog({
       request,
       hospitalId: user?.hospitalId,
       actorUserId: user?.id,
@@ -62,21 +65,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This account is inactive. Contact hospital admin." }, { status: 403 });
   }
 
-  if (user.hospitalId) {
-    const hospital = await prisma.hospital.findUnique({
-      where: { id: user.hospitalId },
-      select: { isActive: true },
-    });
-    if (hospital && hospital.isActive === false) {
-      return NextResponse.json(
-        { error: "This hospital's access has been stopped. Contact MedERP support." },
-        { status: 403 },
-      );
-    }
+  if (user.hospitalId && user.hospital && user.hospital.isActive === false) {
+    return NextResponse.json(
+      { error: "This hospital's access has been stopped. Contact MedERP support." },
+      { status: 403 },
+    );
   }
 
-  const sessionToken = await createSession(user.id);
-  await writeAuditLog({
+  const session = await createSession(user.id, { setCookie: false });
+  void writeAuditLog({
     request,
     hospitalId: user.hospitalId,
     actorUserId: user.id,
@@ -88,15 +85,14 @@ export async function POST(request: Request) {
     summary: `${user.username} signed in as ${user.role.replace(/_/g, " ")}.`,
   });
 
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const response = NextResponse.json({
     ok: true,
     username: user.username,
     mobile: user.mobile,
     role: user.role,
-    sessionToken,
+    sessionToken: session.token,
     redirectTo: homeForRole(user.role, user.hospitalId),
   });
-  response.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions(expiresAt));
+  response.cookies.set(SESSION_COOKIE, session.token, sessionCookieOptions(session.expiresAt));
   return response;
 }

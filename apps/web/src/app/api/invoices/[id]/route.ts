@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   BILLING_ROLES,
   FRONT_DESK_ROLES,
@@ -124,6 +124,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Invoice",
       entityId: invoice.id,
       summary: `${actor.username} collected ${method.toLowerCase()} ${amount} on ${invoice.invoiceNo} for ${patientName(invoice.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { paidAmount: invoice.paidAmount, status: invoice.status },
+          { paidAmount, status: invoiceStatusFromTotals(Number(invoice.netTotal), paidAmount) },
+          { fields: ["paidAmount", "status"] },
+        ),
+      },
     });
     await syncLabOrderPaymentFromInvoice(invoice.id);
     return NextResponse.json({ ok: true });
@@ -159,6 +166,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Invoice",
       entityId: invoice.id,
       summary: `${actor.username} applied discount ${discountAmount} on ${invoice.invoiceNo}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { discountAmount: invoice.discountAmount, netTotal: invoice.netTotal, status: invoice.status },
+          { discountAmount, netTotal, status: invoiceStatusFromTotals(netTotal, Number(invoice.paidAmount)) },
+          { fields: ["discountAmount", "netTotal", "status"] },
+        ),
+      },
     });
     await syncLabOrderPaymentFromInvoice(invoice.id);
     return NextResponse.json({ ok: true });
@@ -204,6 +218,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Invoice",
       entityId: invoice.id,
       summary: `${actor.username} requested waiver ${waiverAmount} on ${invoice.invoiceNo}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { waiverAmount: invoice.waiverAmount, waiverReason: invoice.waiverReason, waiverStatus: invoice.waiverStatus },
+          { waiverAmount, waiverReason, waiverStatus: "PENDING" },
+          { fields: ["waiverAmount", "waiverReason", "waiverStatus"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true });
   }
@@ -220,16 +241,15 @@ export async function PATCH(request: Request, context: Ctx) {
     if (approve && netTotal < Number(invoice.paidAmount)) {
       return NextResponse.json({ error: "Approved waiver would put the invoice below amount already paid." }, { status: 409 });
     }
+    const nextNet = approve ? netTotal : Number(invoice.subtotal) - Number(invoice.discountAmount);
+    const nextStatus = invoiceStatusFromTotals(nextNet, Number(invoice.paidAmount));
     await prisma.invoice.update({
       where: { id: invoice.id },
       data: {
         waiverStatus: approve ? "APPROVED" : "REJECTED",
         waiverAmount: approve ? invoice.waiverAmount : 0,
-        netTotal: approve ? netTotal : Number(invoice.subtotal) - Number(invoice.discountAmount),
-        status: invoiceStatusFromTotals(
-          approve ? netTotal : Number(invoice.subtotal) - Number(invoice.discountAmount),
-          Number(invoice.paidAmount),
-        ),
+        netTotal: nextNet,
+        status: nextStatus,
       },
     });
     await writeAuditLog({
@@ -242,6 +262,23 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Invoice",
       entityId: invoice.id,
       summary: `${actor.username} ${approve ? "approved" : "rejected"} waiver on ${invoice.invoiceNo}.`,
+      metadata: {
+        changes: diffAuditFields(
+          {
+            waiverStatus: invoice.waiverStatus,
+            waiverAmount: invoice.waiverAmount,
+            netTotal: invoice.netTotal,
+            status: invoice.status,
+          },
+          {
+            waiverStatus: approve ? "APPROVED" : "REJECTED",
+            waiverAmount: approve ? invoice.waiverAmount : 0,
+            netTotal: nextNet,
+            status: nextStatus,
+          },
+          { fields: ["waiverStatus", "waiverAmount", "netTotal", "status"] },
+        ),
+      },
     });
     await syncLabOrderPaymentFromInvoice(invoice.id);
     return NextResponse.json({ ok: true });
@@ -291,6 +328,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Invoice",
       entityId: invoice.id,
       summary: `${actor.username} refunded ${amount} on ${invoice.invoiceNo} for ${patientName(invoice.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { paidAmount: invoice.paidAmount, status: invoice.status },
+          { paidAmount, status: invoiceStatusFromTotals(Number(invoice.netTotal), paidAmount) },
+          { fields: ["paidAmount", "status"] },
+        ),
+      },
     });
     await syncLabOrderPaymentFromInvoice(invoice.id);
     return NextResponse.json({ ok: true });

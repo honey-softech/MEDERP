@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FilterableTable } from "@/components/filterable-table";
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { parseAuditChanges, type AuditChange } from "@/lib/audit-changes";
 
 export type AuditLogRow = {
   id: string;
@@ -11,6 +12,7 @@ export type AuditLogRow = {
   actorUsername: string;
   actorRole: string | null;
   createdAt: Date | string;
+  metadata?: unknown;
   hospital?: { name: string; code: string } | null;
 };
 
@@ -37,6 +39,117 @@ function dayKey(value: Date | string) {
   return `${year}-${month}-${day}`;
 }
 
+function todayKey() {
+  return dayKey(new Date());
+}
+
+function humanField(field: string) {
+  const labels: Record<string, string> = {
+    passwordHash: "Password",
+    imageData: "Signature image",
+    photoData: "Photo",
+    logoData: "Logo",
+    sealData: "Seal",
+    manufacturerIds: "Medicine brands",
+  };
+  if (labels[field]) return labels[field];
+  return field
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function displayValue(value: string | null) {
+  if (value == null || value === "") return "—";
+  if (value === "updated") return "Updated";
+  return value;
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function AuditRevisionPanel({
+  action,
+  time,
+  summary,
+  changes,
+  onClose,
+}: {
+  action: string;
+  time: string;
+  summary: string;
+  changes: AuditChange[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50" onClick={onClose}>
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="audit-revision-title"
+        className="flex h-full w-full max-w-xl flex-col bg-white shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div>
+            <h3 id="audit-revision-title" className="text-lg font-semibold text-slate-900">
+              Revision
+            </h3>
+            <p className="mt-1 font-mono text-xs text-slate-500">{action}</p>
+            <p className="mt-1 text-sm text-slate-500">{time}</p>
+          </div>
+          <button type="button" className={secondaryButtonClass} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <p className="mb-4 text-sm text-slate-600">{summary}</p>
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                <th className="py-2 pr-3 font-medium">Field</th>
+                <th className="py-2 pr-3 font-medium">Previous</th>
+                <th className="py-2 font-medium">New</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changes.map((change) => (
+                <tr key={change.field} className="border-b border-slate-100 align-top">
+                  <td className="py-2.5 pr-3 font-medium text-slate-800">{humanField(change.field)}</td>
+                  <td className="max-w-[10rem] whitespace-pre-wrap break-words py-2.5 pr-3 text-slate-500">
+                    {displayValue(change.previous)}
+                  </td>
+                  <td className="max-w-[10rem] whitespace-pre-wrap break-words py-2.5 text-slate-800">
+                    {displayValue(change.next)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 export function AuditLogTable({
   logs,
   showHospital = false,
@@ -46,11 +159,11 @@ export function AuditLogTable({
   showHospital?: boolean;
   users?: { username: string; role: string }[];
 }) {
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(todayKey);
   const [user, setUser] = useState("");
   const [role, setRole] = useState("");
-  const [searched, setSearched] = useState(false);
-  const [applied, setApplied] = useState({ date: "", user: "", role: "" });
+  const [applied, setApplied] = useState({ date: todayKey(), user: "", role: "" });
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const userOptions = useMemo(() => {
     const names = new Set<string>();
@@ -72,6 +185,15 @@ export function AuditLogTable({
     });
   }, [applied, logs]);
 
+  const byId = useMemo(() => {
+    const map = new Map<string, AuditLogRow>();
+    for (const log of filtered) map.set(log.id, log);
+    return map;
+  }, [filtered]);
+
+  const openLog = openId ? byId.get(openId) : undefined;
+  const openChanges = openLog ? parseAuditChanges(openLog.metadata) : [];
+
   const columns = [
     { key: "time", header: "Time", className: "whitespace-nowrap", filter: false as const },
     ...(showHospital ? [{ key: "hospital", header: "Hospital", filter: false as const }] : []),
@@ -79,6 +201,29 @@ export function AuditLogTable({
     { key: "role", header: "Role", filter: false as const },
     { key: "action", header: "Action", className: "font-mono text-xs", filter: false as const },
     { key: "details", header: "Details", className: "text-slate-600", filter: false as const },
+    {
+      key: "view",
+      header: "View",
+      filter: false as const,
+      className: "w-14 text-center",
+      render: (row: Record<string, string>) => {
+        const log = byId.get(row.id);
+        const changes = parseAuditChanges(log?.metadata);
+        if (changes.length === 0) {
+          return <span className="text-slate-300">—</span>;
+        }
+        return (
+          <button
+            type="button"
+            aria-label="View revision"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-teal-700 hover:bg-teal-50"
+            onClick={() => setOpenId(row.id)}
+          >
+            <EyeIcon />
+          </button>
+        );
+      },
+    },
   ];
 
   const rows = useMemo(
@@ -91,6 +236,7 @@ export function AuditLogTable({
         role: log.actorRole?.replace(/_/g, " ") ?? "—",
         action: log.action,
         details: log.summary,
+        view: "",
       })),
     [filtered],
   );
@@ -98,15 +244,16 @@ export function AuditLogTable({
   function search(event: React.FormEvent) {
     event.preventDefault();
     setApplied({ date, user, role });
-    setSearched(true);
+    setOpenId(null);
   }
 
   function reset() {
-    setDate("");
+    const today = todayKey();
+    setDate(today);
     setUser("");
     setRole("");
-    setApplied({ date: "", user: "", role: "" });
-    setSearched(false);
+    setApplied({ date: today, user: "", role: "" });
+    setOpenId(null);
   }
 
   return (
@@ -148,19 +295,23 @@ export function AuditLogTable({
         </div>
       </form>
 
-      {searched ? (
-        <FilterableTable
-          columns={columns}
-          rows={rows}
-          empty="No audit logs match these filters."
-          minWidthClass="min-w-[800px]"
-          showColumnFilters={false}
+      <FilterableTable
+        columns={columns}
+        rows={rows}
+        empty="No audit logs match these filters."
+        minWidthClass="min-w-[800px]"
+        showColumnFilters={false}
+      />
+
+      {openLog && openChanges.length > 0 ? (
+        <AuditRevisionPanel
+          action={openLog.action}
+          time={formatDate(openLog.createdAt)}
+          summary={openLog.summary}
+          changes={openChanges}
+          onClose={() => setOpenId(null)}
         />
-      ) : (
-        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-500">
-          Choose date, user, and/or role, then click Search to load the audit log.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

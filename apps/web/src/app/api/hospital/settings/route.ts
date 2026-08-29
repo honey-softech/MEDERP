@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { requireHospitalActor, sanitizeLogoData } from "@/lib/front-desk";
 
 export async function PATCH(request: Request) {
@@ -46,10 +46,21 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
+  const existing = await prisma.hospital.findUnique({ where: { id: scoped.user.hospitalId } });
+  if (!existing) {
+    return NextResponse.json({ error: "Hospital not found." }, { status: 404 });
+  }
+
   const hospital = await prisma.hospital.update({
     where: { id: scoped.user.hospitalId },
     data,
   });
+
+  const changes = diffAuditFields(
+    existing as unknown as Record<string, unknown>,
+    hospital as unknown as Record<string, unknown>,
+    { fields: ["address", "phone", "opdFee", "logoData", "sealData", "requireSignatureForApproval"] },
+  );
 
   await writeAuditLog({
     request,
@@ -64,6 +75,7 @@ export async function PATCH(request: Request) {
       policySent && !brandingSent
         ? `${scoped.user.username} ${data.requireSignatureForApproval ? "required" : "stopped requiring"} signatures for visit summary approval.`
         : `${scoped.user.username} updated hospital print branding.`,
+    metadata: { changes },
   });
 
   return NextResponse.json({ ok: true });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Gender, IdProofType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   CLINICAL_VIEW_ROLES,
   DOCTOR_VISIT_ROLES,
@@ -145,6 +145,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Patient",
       entityId: patient.id,
       summary: `${scoped.user.username} updated patient ${patient.firstName} ${patient.lastName} (${patient.mrn}).`,
+      metadata: {
+        changes: diffAuditFields(
+          existing as unknown as Record<string, unknown>,
+          patient as unknown as Record<string, unknown>,
+          { fields: Object.keys(data) },
+        ),
+      },
     });
 
     return NextResponse.json({

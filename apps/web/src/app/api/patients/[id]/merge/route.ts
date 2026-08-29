@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { FRONT_DESK_ROLES, forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -85,7 +85,26 @@ export async function POST(request: Request, context: Ctx) {
     entity: "Patient",
     entityId: survivor.id,
     summary: `${scoped.user.username} merged ${duplicate.firstName} ${duplicate.lastName} (${duplicate.mrn}) into ${survivor.firstName} ${survivor.lastName} (${survivor.mrn}).`,
-    metadata: { duplicateId: duplicate.id },
+    metadata: {
+      duplicateId: duplicate.id,
+      changes: diffAuditFields(
+        {
+          mergedIntoId: duplicate.mergedIntoId,
+          phone: survivor.phone,
+          email: survivor.email,
+          address: survivor.address,
+          advanceBalance: survivor.advanceBalance,
+        },
+        {
+          mergedIntoId: survivor.id,
+          phone: survivor.phone || duplicate.phone,
+          email: survivor.email || duplicate.email,
+          address: survivor.address || duplicate.address,
+          advanceBalance: Number(survivor.advanceBalance) + Number(duplicate.advanceBalance),
+        },
+        { fields: ["mergedIntoId", "phone", "email", "address", "advanceBalance"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true });

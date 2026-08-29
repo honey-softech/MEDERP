@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { addHospitalSeatsAndInvoice } from "@/lib/platform-billing";
 import { prisma } from "@/lib/prisma";
 import { isSubscriptionTierId } from "@/lib/subscription-tiers";
@@ -53,7 +53,15 @@ export async function POST(request: Request, context: Ctx) {
       entity: "Hospital",
       entityId: hospital.id,
       summary: `${actor.username} changed plan for ${hospital.code} to ${tierId} — invoice ${invoice.invoiceNo}.`,
-      metadata: { tierId, invoiceNo: invoice.invoiceNo },
+      metadata: {
+        tierId,
+        invoiceNo: invoice.invoiceNo,
+        changes: diffAuditFields(
+          { subscriptionTier: hospital.subscriptionTier },
+          { subscriptionTier: tierId },
+          { fields: ["subscriptionTier"] },
+        ),
+      },
     });
 
     return NextResponse.json({ ok: true, invoice });

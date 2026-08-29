@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { LAB_VIEW_ROLES, LAB_WORK_ROLES, forbidUnless, patientName, requireHospitalActor } from "@/lib/front-desk";
 import { notifyLabResults } from "@/lib/lab";
 
@@ -74,6 +74,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "LabOrder",
       entityId: order.id,
       summary: `${scoped.user.username} collected lab samples for ${patientName(order.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: order.status, sampleCollectedBy: order.sampleCollectedBy, notes: order.notes },
+          { status: updated.status, sampleCollectedBy: updated.sampleCollectedBy, notes: updated.notes },
+          { fields: ["status", "sampleCollectedBy", "notes"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, order: updated });
   }
@@ -118,6 +125,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "LabOrder",
       entityId: order.id,
       summary: `${scoped.user.username} marked lab work done for ${patientName(order.patient)}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: order.status, notes: order.notes },
+          { status: updated.status, notes: updated.notes },
+          { fields: ["status", "notes"] },
+        ),
+      },
     });
     return NextResponse.json({ ok: true, order: updated });
   }

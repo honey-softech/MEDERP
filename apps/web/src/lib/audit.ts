@@ -1,5 +1,10 @@
 import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { AuditChange } from "@/lib/audit-changes";
+import { diffAuditFields, parseAuditChanges } from "@/lib/audit-changes";
+
+export type { AuditChange };
+export { diffAuditFields, parseAuditChanges };
 
 export function clientIp(request?: Request) {
   if (!request) return null;

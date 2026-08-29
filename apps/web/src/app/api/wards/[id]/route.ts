@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 import {
   WARD_MASTER_ROLES,
@@ -38,6 +39,9 @@ export async function PATCH(request: Request, context: Ctx) {
   const genderPolicy = genderRaw && isGenderPolicy(genderRaw) ? genderRaw : undefined;
 
   try {
+    const existing = await prisma.ward.findFirst({
+      where: { id, hospitalId: scoped.user.hospitalId },
+    });
     const ward = await updateWard({
       hospitalId: scoped.user.hospitalId,
       wardId: id,
@@ -61,6 +65,13 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Ward",
       entityId: ward.id,
       summary: `${scoped.user.username} updated ward ${ward.name}.`,
+      metadata: {
+        changes: diffAuditFields(
+          existing as unknown as Record<string, unknown> | undefined,
+          ward as unknown as Record<string, unknown>,
+          { fields: ["name", "departmentId", "type", "genderPolicy", "floor", "dailyRate", "nursingRate", "isActive", "notes"] },
+        ),
+      },
     });
     return NextResponse.json({ ward });
   } catch (error) {

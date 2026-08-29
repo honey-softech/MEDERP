@@ -299,7 +299,7 @@ export async function reviewStaffLeave(params: {
         reviewedAt: new Date(),
       },
     });
-    return { leave: updated };
+    return { leave: updated, previous: { status: leave.status, reviewNote: leave.reviewNote } };
   }
 
   if (!canReviewLeave(params.actorRole)) {
@@ -346,7 +346,7 @@ export async function reviewStaffLeave(params: {
     });
   }
 
-  return { leave: updated };
+  return { leave: updated, previous: { status: leave.status, reviewNote: leave.reviewNote } };
 }
 
 export function staffInclude() {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   BILLING_ROLES,
   forbidUnless,
@@ -130,6 +130,20 @@ export async function POST(request: Request, context: Ctx) {
     entity: "LabOrder",
     entityId: order.id,
     summary: `${scoped.user.username} collected lab payment ${invoice.invoiceNo} for ${patientName(order.patient)}.`,
+    metadata: {
+      changes: diffAuditFields(
+        { paidAmount: invoice.paidAmount, status: invoice.status, orderStatus: order.status },
+        {
+          paidAmount: Number(invoice.paidAmount) + (due > 0.05 ? amount : 0),
+          status: invoiceStatusFromTotals(
+            Number(invoice.netTotal),
+            Number(invoice.paidAmount) + (due > 0.05 ? amount : 0),
+          ),
+          orderStatus: "PAID",
+        },
+        { fields: ["paidAmount", "status", "orderStatus"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true, invoice: { id: invoice.id }, orderId: order.id });

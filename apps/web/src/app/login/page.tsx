@@ -1,15 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthShell, buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 import { isValidIndianMobile, mobileValidationError, normalizeMobile } from "@/lib/phone";
 
 const LOGIN_MOBILE_KEY = "mederp.login.mobile";
 
+function safeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
+    return null;
+  }
+  return value;
+}
+
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +58,7 @@ function LoginForm() {
       const data = await response.json().catch(() => ({}));
 
       if (data.needsOtp && data.mobile) {
-        router.push(`/signup/verify?mobile=${encodeURIComponent(data.mobile)}`);
+        window.location.replace(`/signup/verify?mobile=${encodeURIComponent(data.mobile)}`);
         return;
       }
 
@@ -62,8 +68,8 @@ function LoginForm() {
         return;
       }
 
-      router.push(searchParams.get("next") || data.redirectTo || "/");
-      router.refresh();
+      const next = safeNextPath(searchParams.get("next")) || data.redirectTo || "/";
+      window.location.replace(next);
     } catch {
       setError("Could not reach the server. Check that the app is running, then try again.");
       setPending(false);

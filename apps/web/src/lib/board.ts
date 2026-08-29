@@ -191,7 +191,7 @@ export async function setAnnouncementPinned(params: {
       _count: { select: { replies: true } },
     },
   });
-  return { post: toPost(post) };
+  return { post: toPost(post), previousPinned: existing.pinned };
 }
 
 export async function deleteAnnouncement(params: { id: string; hospitalId: string }) {

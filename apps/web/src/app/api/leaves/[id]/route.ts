@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { requireHospitalActor } from "@/lib/front-desk";
 import { reviewStaffLeave } from "@/lib/staff-leave";
 
@@ -39,6 +39,13 @@ export async function POST(
     entity: "StaffLeave",
     entityId: result.leave.id,
     summary: `${scoped.user.username} ${action}d leave ${result.leave.id}.`,
+    metadata: {
+      changes: diffAuditFields(
+        { status: result.previous.status, reviewNote: result.previous.reviewNote },
+        { status: result.leave.status, reviewNote: result.leave.reviewNote },
+        { fields: ["status", "reviewNote"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true, leave: result.leave });

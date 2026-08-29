@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { listManufacturersForPicker } from "@/lib/drug-brands";
 import { requireHospitalActor, forbidUnless } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
@@ -48,6 +48,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const hospitalId = scoped.user.hospitalId;
+  const previous = await prisma.hospitalDrugManufacturer.findMany({
+    where: { hospitalId },
+    select: { manufacturerId: true },
+  });
+  const previousIds = previous.map((row) => row.manufacturerId).sort();
+  const nextIds = [...ids].sort();
 
   await prisma.$transaction(async (tx) => {
     await tx.hospitalDrugManufacturer.deleteMany({ where: { hospitalId } });
@@ -68,7 +74,14 @@ export async function PUT(request: NextRequest) {
     entity: "Hospital",
     entityId: hospitalId,
     summary: `${scoped.user.username} updated preferred medicine brands (${ids.length} selected).`,
-    metadata: { manufacturerIds: ids },
+    metadata: {
+      manufacturerIds: ids,
+      changes: diffAuditFields(
+        { manufacturerIds: previousIds },
+        { manufacturerIds: nextIds },
+        { fields: ["manufacturerIds"] },
+      ),
+    },
   });
 
   return NextResponse.json({ ok: true, count: ids.length });

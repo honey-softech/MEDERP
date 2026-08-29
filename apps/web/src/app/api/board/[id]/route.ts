@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { canManageAnnouncement, deleteAnnouncement, getAnnouncementInHospital, setAnnouncementPinned } from "@/lib/board";
 import { requireHospitalActor } from "@/lib/front-desk";
 
@@ -35,6 +35,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     entity: "HospitalAnnouncement",
     entityId: result.post.id,
     summary: `${scoped.user.username} ${payload.pinned ? "pinned" : "unpinned"} “${result.post.title}” on the hospital board.`,
+    metadata: {
+      changes: diffAuditFields(
+        { pinned: result.previousPinned },
+        { pinned: payload.pinned },
+        { fields: ["pinned"] },
+      ),
+    },
   });
 
   return NextResponse.json({ post: result.post });

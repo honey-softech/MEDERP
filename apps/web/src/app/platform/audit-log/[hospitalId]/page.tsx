@@ -37,7 +37,7 @@ export default async function HospitalAuditLogForSaasPage({
           Select hospital
         </Link>
         {" · "}
-        Filter by date, user, or role, then search. Logs are for {hospital.name} ({hospital.code}) only.
+        Today's log is shown first. Filter by date, user, or role to search further. Logs are for {hospital.name} ({hospital.code}) only.
       </p>
       <AuditLogTable logs={logs} users={users} />
     </AppShell>

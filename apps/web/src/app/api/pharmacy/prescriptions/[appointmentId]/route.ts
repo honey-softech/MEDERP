@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 import {
   collectAndDispenseRx,
@@ -90,6 +90,13 @@ export async function POST(request: NextRequest, context: Ctx) {
       entity: "PharmacyRxOrder",
       entityId: order.id,
       summary: `${scoped.user.username} collected pharmacy bill and dispensed stock for visit ${appointmentId}.`,
+      metadata: {
+        changes: diffAuditFields(
+          { status: order.status, invoiceId: order.invoiceId },
+          { status: result.status, invoiceId: result.invoiceId },
+          { fields: ["status", "invoiceId"] },
+        ),
+      },
     });
 
     return NextResponse.json({ ok: true, order: result, invoiceId: result.invoiceId });

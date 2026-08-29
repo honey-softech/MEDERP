@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { writeAuditLog } from "@/lib/audit";
+import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import {
   cancelHospitalSubscription,
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
 
   try {
     if (action === "cancel") {
+      const before = await prisma.hospitalSubscription.findUnique({ where: { hospitalId: actor.hospitalId } });
       const subscription = await cancelHospitalSubscription({
         hospitalId: actor.hospitalId,
         atCycleEnd: body?.atCycleEnd !== false,
@@ -70,10 +71,21 @@ export async function POST(request: Request) {
         entity: "HospitalSubscription",
         entityId: subscription.id,
         summary: `${actor.username} requested subscription cancellation (${subscription.cancelAtPeriodEnd ? "end of cycle" : "immediate"}).`,
+        metadata: {
+          changes: diffAuditFields(
+            { status: before?.status, cancelAtPeriodEnd: before?.cancelAtPeriodEnd },
+            { status: subscription.status, cancelAtPeriodEnd: subscription.cancelAtPeriodEnd },
+            { fields: ["status", "cancelAtPeriodEnd"] },
+          ),
+        },
       });
       return NextResponse.json({ ok: true, subscription });
     }
 
+    const current = await prisma.hospital.findUnique({
+      where: { id: actor.hospitalId },
+      select: { subscriptionTier: true, subscription: { select: { pendingSubscriptionTier: true, pendingMonthlyAmount: true } } },
+    });
     const result = await scheduleNextCyclePackageChange({
       hospitalId: actor.hospitalId,
       tierId: String(body?.tierId ?? ""),
@@ -93,6 +105,17 @@ export async function POST(request: Request) {
       metadata: {
         nextMonthly: result.nextMonthly,
         pendingSubscriptionTier: result.pendingSubscriptionTier,
+        changes: diffAuditFields(
+          {
+            pendingSubscriptionTier: current?.subscription?.pendingSubscriptionTier ?? current?.subscriptionTier,
+            pendingMonthlyAmount: current?.subscription?.pendingMonthlyAmount ?? null,
+          },
+          {
+            pendingSubscriptionTier: result.pendingSubscriptionTier,
+            pendingMonthlyAmount: result.nextMonthly,
+          },
+          { fields: ["pendingSubscriptionTier", "pendingMonthlyAmount"] },
+        ),
       },
     });
 

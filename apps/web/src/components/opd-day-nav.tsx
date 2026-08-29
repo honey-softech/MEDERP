@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { compactButtonClass, compactFieldClass } from "@/components/auth-shell";
 import { addCalendarDays, localDayKey, parseLocalDay } from "@/lib/front-desk";
-import { secondaryButtonClass } from "@/components/auth-shell";
 
 export function OpdDayNav({
   dateValue,
@@ -16,29 +16,27 @@ export function OpdDayNav({
   const isToday = dateValue === today;
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <Link href={`${action}?date=${prev}`} className={secondaryButtonClass}>
-        Previous day
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <Link href={`${action}?date=${prev}`} className={compactButtonClass} title="Previous day">
+        Prev
       </Link>
-      <form className="flex items-end gap-2" action={action}>
-        <label className="text-sm font-medium text-slate-700">
-          Queue date
-          <input
-            className="mt-1 h-9 rounded-lg border border-slate-200 px-3 text-sm"
-            type="date"
-            name="date"
-            defaultValue={dateValue}
-          />
-        </label>
-        <button className={secondaryButtonClass} type="submit">
+      <form className="flex min-w-0 items-center gap-1.5" action={action}>
+        <input
+          className={`${compactFieldClass} mt-0 w-auto`}
+          type="date"
+          name="date"
+          defaultValue={dateValue}
+          aria-label="Queue date"
+        />
+        <button className={compactButtonClass} type="submit">
           View
         </button>
       </form>
-      <Link href={`${action}?date=${next}`} className={secondaryButtonClass}>
-        Next day
+      <Link href={`${action}?date=${next}`} className={compactButtonClass} title="Next day">
+        Next
       </Link>
       {!isToday ? (
-        <Link href={action} className="text-sm font-medium text-teal-700 hover:underline">
+        <Link href={action} className={compactButtonClass}>
           Today
         </Link>
       ) : null}

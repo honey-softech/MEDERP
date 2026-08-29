@@ -62,6 +62,43 @@ export async function notifyHospitalRole(params: {
   return created.length;
 }
 
+export async function notifyHospitalStaffExcept(params: {
+  hospitalId: string;
+  exceptUserId: string;
+  title: string;
+  body: string;
+  href?: string | null;
+}) {
+  const users = await prisma.appUser.findMany({
+    where: {
+      hospitalId: params.hospitalId,
+      id: { not: params.exceptUserId },
+      isVerified: true,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  if (users.length === 0) return 0;
+
+  const created = await prisma.$transaction(
+    users.map((user) =>
+      prisma.staffNotification.create({
+        data: {
+          hospitalId: params.hospitalId,
+          userId: user.id,
+          title: params.title,
+          body: params.body,
+          href: params.href ?? null,
+        },
+      }),
+    ),
+  );
+  for (const row of created) {
+    pushNotificationToUser(row.userId, toNotice(row));
+  }
+  return created.length;
+}
+
 export async function notifyUser(params: {
   hospitalId?: string | null;
   userId: string;

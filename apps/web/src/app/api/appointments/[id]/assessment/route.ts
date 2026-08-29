@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import {
   DOCTOR_VISIT_ROLES,
+  doctorIsOnLeave,
   doctorName,
   forbidUnless,
   patientName,
@@ -67,6 +68,15 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Follow-up date is not valid." }, { status: 400 });
     }
 
+    if (followUpAt && (await doctorIsOnLeave(scoped.user.hospitalId, appointment.doctorId, followUpAt))) {
+      return NextResponse.json(
+        {
+          error: `${doctorName(appointment.doctor)} is on leave that day. Choose another follow-up date.`,
+        },
+        { status: 409 },
+      );
+    }
+
     if (action === "followup") {
       if (!appointment.assessment) {
         return NextResponse.json({ error: "Save the assessment before adding a follow-up." }, { status: 400 });
@@ -111,11 +121,8 @@ export async function POST(request: Request, context: Ctx) {
     const approve = action === "approve";
     const signature = approve ? await activeSignatureFor(scoped.user.id, scoped.user.hospitalId) : null;
     if (approve) {
-      if (!summary) {
-        return NextResponse.json({ error: "Add a visit summary before approving." }, { status: 400 });
-      }
-      if (!prescription) {
-        return NextResponse.json({ error: "Add a prescription before approving." }, { status: 400 });
+      if (!diagnosis) {
+        return NextResponse.json({ error: "Add a diagnosis before approving." }, { status: 400 });
       }
       if (!signature && appointment.hospital.requireSignatureForApproval) {
         return NextResponse.json(

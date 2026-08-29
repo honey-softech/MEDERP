@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
 import { mobileValidationError } from "@/lib/phone";
 
 type TierInfo = {
@@ -28,14 +28,13 @@ export function AddHospitalForm() {
   const [adminUsername, setAdminUsername] = useState("");
   const [adminMobile, setAdminMobile] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [tierId, setTierId] = useState("STARTER");
+  const [tierId, setTierId] = useState("CLINIC");
   const paymentMethod: "UPI" = "UPI";
   const [paymentNotes, setPaymentNotes] = useState("");
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  const [codeBusy, setCodeBusy] = useState(false);
   const lastFetchedName = useRef("");
 
   useEffect(() => {
@@ -49,14 +48,9 @@ export function AddHospitalForm() {
 
   async function assignHospitalCode(hospitalName: string) {
     if (hospitalName.trim().length < 2) return;
-    setCodeBusy(true);
-    try {
-      const response = await fetch(`/api/public/hospital-code?name=${encodeURIComponent(hospitalName.trim())}`);
-      const data = await response.json().catch(() => ({}));
-      if (data.code) setCode(String(data.code));
-    } finally {
-      setCodeBusy(false);
-    }
+    const response = await fetch(`/api/public/hospital-code?name=${encodeURIComponent(hospitalName.trim())}`);
+    const data = await response.json().catch(() => ({}));
+    if (data.code) setCode(String(data.code));
   }
 
   useEffect(() => {
@@ -135,18 +129,15 @@ export function AddHospitalForm() {
       <label className="text-sm font-medium text-slate-700">
         Hospital code
         <input className={`${fieldClass} bg-slate-50`} value={code} readOnly required />
-        <button
-          className={`${secondaryButtonClass} mt-2`}
-          type="button"
-          disabled={codeBusy || name.trim().length < 2}
-          onClick={() => void assignHospitalCode(name)}
-        >
-          {codeBusy ? "Assigning…" : "Generate another code"}
-        </button>
       </label>
-      <label className="text-sm font-medium text-slate-700">
+      <label className="md:col-span-2 text-sm font-medium text-slate-700">
         Address
-        <input className={fieldClass} value={address} onChange={(event) => setAddress(event.target.value)} />
+        <textarea
+          className={`${textareaClass} resize-none`}
+          rows={2}
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+        />
       </label>
       <label className="text-sm font-medium text-slate-700">
         Hospital mobile

@@ -8,6 +8,7 @@ import { monthlyAmountForHospital } from "@/lib/hospital-subscription";
 import { razorpayConfigured } from "@/lib/razorpay";
 import { prisma } from "@/lib/prisma";
 import { getSubscriptionTier, publicSubscriptionTiers } from "@/lib/subscription-tiers";
+import { hospitalAccessBlocked } from "@/lib/hospital-access";
 
 export default async function HospitalSubscriptionPage() {
   const user = await getCurrentUser();
@@ -38,6 +39,17 @@ export default async function HospitalSubscriptionPage() {
         Manage the monthly MedERP plan for {hospital.name} ({hospital.code}). Auto-debit runs every billing cycle until
         you cancel. Plan changes you schedule here apply from the next cycle.
       </p>
+      {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) ? (
+        <p className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Pay here to keep
+          the clinic open after that date.
+        </p>
+      ) : null}
+      {hospitalAccessBlocked(hospital) ? (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          The free trial has ended. Start a paid subscription below to restore access for your staff.
+        </p>
+      ) : null}
       <HospitalSeatSubscriptionForm
         currentUsed={usedSeats}
         currentLimit={seatLimit}

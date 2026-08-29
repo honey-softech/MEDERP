@@ -30,7 +30,7 @@ export function HospitalSubscriptionForm({
 }) {
   const router = useRouter();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
-  const [tierId, setTierId] = useState(currentTierId ?? "STARTER");
+  const [tierId, setTierId] = useState(currentTierId ?? "CLINIC");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "UPI" | "CARD">("CASH");
   const [notes, setNotes] = useState("");
   const [pending, setPending] = useState(false);

@@ -3,6 +3,15 @@
 export const fieldClass =
   "mt-1 h-10 w-full rounded-lg border border-border px-3 text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light sm:text-sm";
 
+export const textareaClass =
+  "mt-1 w-full min-h-[4.5rem] rounded-lg border border-border px-3 py-2 text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light sm:text-sm";
+
+export const compactFieldClass =
+  "mt-1 h-8 w-full min-w-0 rounded-md border border-border px-2 text-xs text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light xl:h-9 xl:rounded-lg xl:px-2.5 xl:text-[13px] 2xl:h-10 2xl:px-3 2xl:text-sm";
+
+export const compactTextareaClass =
+  "mt-1 w-full min-w-0 min-h-[2.75rem] rounded-md border border-border px-2 py-1.5 text-xs text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light xl:min-h-[3.25rem] xl:rounded-lg xl:px-2.5 xl:text-[13px] 2xl:min-h-[4.5rem] 2xl:px-3 2xl:py-2 2xl:text-sm";
+
 export const buttonClass =
   "h-10 w-full rounded-lg bg-primary px-4 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60";
 

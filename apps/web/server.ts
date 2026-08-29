@@ -22,6 +22,9 @@ app.prepare().then(() => {
     })
     .listen(port, "0.0.0.0", () => {
       console.log(`> Ready on http://0.0.0.0:${port}`);
+      void import("./src/lib/messaging").then(({ startOutboundMessageWorker }) => {
+        startOutboundMessageWorker();
+      });
       if (process.env.NODE_ENV === "production" && process.env.SKIP_DRUG_IMPORT !== "1") {
         void import("./src/lib/drug-catalog-import")
           .then(async ({ ensureDrugCatalog }) => {

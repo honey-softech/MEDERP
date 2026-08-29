@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { SignatureBlock } from "@/components/signature-block";
 import { parseMedications, readableClinicalText } from "@/lib/visit-summary";
 
@@ -25,7 +26,6 @@ export function VisitSummaryDocument({
   followUpAt,
   visitOutcome,
   prescription,
-  printedBy,
   printedAt,
   draft,
   signatureImage,
@@ -55,7 +55,6 @@ export function VisitSummaryDocument({
   followUpAt?: string | null;
   visitOutcome?: string | null;
   prescription?: string | null;
-  printedBy: string;
   printedAt: string;
   draft?: boolean;
   signatureImage?: string | null;
@@ -63,201 +62,200 @@ export function VisitSummaryDocument({
   signatureCredentials?: string | null;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
-  const vitals =
-    vitalsRows && vitalsRows.length > 0
-      ? vitalsRows
-      : labeledLines(generalExamination).length
-        ? labeledLines(generalExamination)
-        : emptyVitalRows();
+  const vitals = examinationVitals(vitalsRows, generalExamination);
+  const diagnosisText = readableClinicalText(diagnosis);
+  const complaintText = readableClinicalText(chiefComplaint);
+  const historyText = readableClinicalText(history);
+  const systemicText = readableClinicalText(systemicExamination);
+  const adviceText = readableClinicalText(advice);
+  const outcomeText =
+    visitOutcome === "DISCHARGE"
+      ? "Discharged"
+      : followUpAt
+        ? `Follow-up on ${followUpAt}`
+        : visitOutcome === "FOLLOW_UP"
+          ? "Follow up"
+          : "";
 
   return (
     <article className="visit-summary-print">
-      {draft ? (
-        <p className="vs-draft">Draft preview — approve to release for reception print</p>
-      ) : null}
+      <div className="vs-sheet">
+        {draft ? (
+          <p className="vs-draft">Draft preview — approve to release for reception print</p>
+        ) : null}
 
-      <header className="vs-letterhead">
-        <div className="vs-letterhead-left">
-          {sealData ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={sealData} alt="" className="vs-mark" />
-          ) : (
-            <div className="vs-mark vs-mark-fallback" aria-hidden>
-              +
-            </div>
-          )}
-          <div>
-            <p className="vs-kicker">Outpatient record</p>
-            <h1>Visit summary</h1>
+        <header className="vs-letterhead">
+          <div className="vs-letterhead-left">
+            {sealData ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={sealData} alt="" className="vs-mark" />
+            ) : (
+              <div className="vs-mark vs-mark-fallback" aria-hidden>
+                +
+              </div>
+            )}
           </div>
-        </div>
-        <div className="vs-letterhead-right">
-          <div>
+          <div className="vs-letterhead-center">
             <p className="vs-hospital">{hospitalName}</p>
             {hospitalAddress ? <p className="vs-meta">{hospitalAddress}</p> : null}
             {hospitalPhone ? <p className="vs-meta">{hospitalPhone}</p> : null}
           </div>
-          {logoData ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoData} alt={hospitalName} className="vs-mark" />
-          ) : null}
+          <div className="vs-letterhead-right">
+            {logoData ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoData} alt={hospitalName} className="vs-logo" />
+            ) : null}
+          </div>
+        </header>
+
+        <h1 className="vs-title">Visit summary</h1>
+
+        <section className="vs-identity">
+          <div className="vs-identity-main">
+            <p className="vs-patient-name">{patientName}</p>
+            <p className="vs-patient-age">{ageGender}</p>
+          </div>
+          <div className="vs-identity-ids">
+            <p className="vs-field">
+              <span className="vs-label">Encounter no.</span>
+              <span className="vs-mono">{encounterNo}</span>
+            </p>
+            <p className="vs-field">
+              <span className="vs-label">UHID</span>
+              <span className="vs-mono">{mrn}</span>
+            </p>
+          </div>
+          <div className="vs-identity-meta">
+            <p className="vs-field">
+              <span className="vs-label">Appointment type</span>
+              <span>{appointmentType}</span>
+            </p>
+            <p className="vs-field">
+              <span className="vs-label">Date</span>
+              <span>{visitDate}</span>
+            </p>
+            <p className="vs-field vs-wide">
+              <span className="vs-label">Consulting physician</span>
+              <span>{physician}</span>
+            </p>
+            <p className="vs-field vs-wide">
+              <span className="vs-label">Department</span>
+              <span>{departmentName}</span>
+            </p>
+          </div>
+        </section>
+
+        <div className="vs-clinical">
+          <ClinicalRow label="Diagnosis">
+            <p className="vs-diagnosis-value">
+              Final Diagnosis: {diagnosisText || "—"}
+            </p>
+          </ClinicalRow>
+
+          <ClinicalRow label="Presenting complaints">
+            <p className="vs-body">{complaintText || "—"}</p>
+          </ClinicalRow>
+
+          <ClinicalRow label="History of present illness">
+            <p className="vs-body">{historyText || "—"}</p>
+          </ClinicalRow>
+
+          <ClinicalRow label="General examination">
+            <ul className="vs-vitals-list">
+              {vitals.map((row) => (
+                <li key={row.label || row.value}>
+                  {row.label ? <span className="vs-vital-label">{row.label}</span> : null}
+                  <span className={row.value === "—" ? "vs-vital-empty" : "vs-vital-value"}>
+                    {row.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ClinicalRow>
+
+          <ClinicalRow label="Systemic examination">
+            <p className="vs-body">{systemicText || "—"}</p>
+          </ClinicalRow>
+
+          <ClinicalRow label="Advice">
+            <p className="vs-body">{adviceText || "—"}</p>
+          </ClinicalRow>
+
+          <ClinicalRow label={followUpAt ? "Follow-up" : "Outcome"}>
+            <p className="vs-body vs-followup">{outcomeText || "—"}</p>
+          </ClinicalRow>
         </div>
-      </header>
 
-      <section className="vs-identity">
-        <div className="vs-identity-top">
-          <Field label="Name" value={patientName} strong />
-          <Field label="Age / gender" value={ageGender} />
-          <Field label="Encounter no." value={encounterNo} mono />
-          <Field label="UHID" value={mrn} mono />
-        </div>
-        <div className="vs-identity-bottom">
-          <Field label="Appointment type" value={appointmentType} />
-          <Field label="Date" value={visitDate} />
-          <Field label="Consulting physician" value={physician} wide />
-          <Field label="Department" value={departmentName} wide />
-        </div>
-      </section>
-
-      <section className="vs-diagnosis">
-        <p className="vs-label">Final diagnosis</p>
-        <p className="vs-diagnosis-value">{readableClinicalText(diagnosis) || "—"}</p>
-      </section>
-
-      <Section title="Presenting complaints" body={chiefComplaint} />
-      <Section title="History of present illness" body={history} />
-
-      <section className="vs-section">
-        <h2>General examination</h2>
-        {vitalBands(vitals).map((band, index) => (
-          <table key={index} className="vs-vitals-strip">
+        <section className="vs-meds">
+          <table className="vs-table">
             <thead>
               <tr>
-                {band.map((row) => (
-                  <th key={row.label}>{row.label}</th>
-                ))}
+                <th>Drug name</th>
+                <th>Notes</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                {band.map((row) => (
-                  <td key={row.label} className={row.value === "—" ? "vs-empty-value" : undefined}>
-                    {row.value}
-                  </td>
-                ))}
-              </tr>
+              {medicines.length > 0 ? (
+                medicines.map((row, index) => (
+                  <tr key={`${row.name}-${row.notes}-${index}`}>
+                    <td className="vs-drug">{row.name}</td>
+                    <td>{row.notes || "—"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="vs-drug">—</td>
+                  <td>—</td>
+                </tr>
+              )}
             </tbody>
           </table>
-        ))}
-        {vitals
-          .filter((row) => row.label === "Vital remarks")
-          .map((row) => (
-            <p key={row.label} className="vs-remarks">
-              <span className="vs-label">Vital remarks</span>
-              <span className={row.value === "—" ? "vs-empty" : "vs-body"}>{row.value}</span>
-            </p>
-          ))}
-      </section>
+        </section>
 
-      <Section title="Systemic examination" body={systemicExamination} />
-      <Section title="Advice" body={advice} accent />
-      {visitOutcome === "DISCHARGE" ? (
-        <Section title="Outcome" body="Discharged" />
-      ) : followUpAt ? (
-        <Section title="Follow-up" body={followUpAt} />
-      ) : visitOutcome === "FOLLOW_UP" ? (
-        <Section title="Outcome" body="Follow up" />
-      ) : null}
-      <Section title="Lab report" body="" />
-
-      <section className="vs-section">
-        <h2>Medications</h2>
-        <table className="vs-table">
-          <thead>
-            <tr>
-              <th className="vs-num">#</th>
-              <th>Drug name</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {medicines.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="vs-empty">
-                  No medicines recorded.
-                </td>
-              </tr>
-            ) : (
-              medicines.map((row, index) => (
-                <tr key={`${row.name}-${row.notes}-${index}`}>
-                  <td className="vs-num">{index + 1}</td>
-                  <td className="vs-drug">{row.name}</td>
-                  <td>{row.notes || "—"}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="vs-signoff">
-        <SignatureBlock
-          role="Consulting physician"
-          name={signatureName || physician}
-          credentials={signatureCredentials}
-          imageData={draft ? null : signatureImage}
-          note="Electronically authorised visit summary"
-        />
-        <div className="vs-stamp">{draft ? "DRAFT" : "APPROVED"}</div>
-      </section>
+        <section className="vs-signoff">
+          <div className="vs-signoff-spacer" />
+          <SignatureBlock
+            role=""
+            name={signatureName || physician}
+            credentials={
+              [signatureCredentials, departmentName].filter(Boolean).join("\n") || departmentName
+            }
+            imageData={draft ? null : signatureImage}
+          />
+        </section>
+      </div>
 
       <footer className="vs-footer">
-        <span>Printed by: {printedBy}</span>
-        <span>Page 1/1</span>
-        <span>Printed on: {printedAt}</span>
+        <p className="vs-confidential">
+          This document contains confidential information about your health. It is provided directly
+          to you for your personal use only.
+        </p>
+        <p className="vs-eoe">E &amp; OE</p>
+        <div className="vs-footer-meta">
+          <span>Page 1/1</span>
+          <span>Printed on: {printedAt}</span>
+        </div>
       </footer>
     </article>
   );
 }
 
-function Field({
-  label,
-  value,
-  strong,
-  mono,
-  wide,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  mono?: boolean;
-  wide?: boolean;
-}) {
+function ClinicalRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <p className={wide ? "vs-field vs-wide" : "vs-field"}>
-      <span className="vs-label">{label}</span>
-      <span className={`${strong ? "vs-strong" : ""} ${mono ? "vs-mono" : ""}`.trim()}>{value}</span>
-    </p>
+    <div className="vs-row">
+      <p className="vs-row-label">{label}</p>
+      <div className="vs-row-body">{children}</div>
+    </div>
   );
 }
 
-function Section({ title, body, accent }: { title: string; body?: string | null; accent?: boolean }) {
-  const text = readableClinicalText(body);
-  return (
-    <section className={accent ? "vs-section vs-advice" : "vs-section"}>
-      <h2>{title}</h2>
-      <p className={text ? "vs-body" : "vs-empty"}>{text || "—"}</p>
-    </section>
-  );
-}
-
-function vitalBands(rows: { label: string; value: string }[]) {
-  const compact = rows.filter((row) => row.label !== "Vital remarks");
-  const mid = Math.ceil(compact.length / 2);
-  return [compact.slice(0, mid), compact.slice(mid)].filter((band) => band.length > 0);
-}
-
-function emptyVitalRows() {
+function examinationVitals(
+  vitalsRows?: { label: string; value: string }[],
+  generalExamination?: string | null,
+) {
+  if (vitalsRows && vitalsRows.length > 0) return vitalsRows;
+  const fromText = labeledLines(generalExamination);
+  if (fromText.length > 0) return fromText;
   return [
     "Temperature",
     "Height",

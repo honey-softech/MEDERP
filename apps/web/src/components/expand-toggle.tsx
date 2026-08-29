@@ -7,6 +7,7 @@ export function ExpandToggle({
   labelOpen = "Collapse",
   labelClosed = "Expand",
   count,
+  iconOnly = false,
   className = "",
 }: {
   open: boolean;
@@ -14,6 +15,8 @@ export function ExpandToggle({
   labelOpen?: string;
   labelClosed?: string;
   count?: number;
+  /** Arrow only — use in narrow rails where the Expand/Collapse label would overflow. */
+  iconOnly?: boolean;
   className?: string;
 }) {
   const label = open ? labelOpen : labelClosed;
@@ -24,7 +27,11 @@ export function ExpandToggle({
       aria-label={count != null ? `${label} (${count})` : label}
       title={label}
       onClick={onToggle}
-      className={`inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-text-secondary hover:bg-app-bg hover:text-text-primary ${className}`}
+      className={
+        iconOnly
+          ? `inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-text-secondary hover:bg-app-bg hover:text-text-primary ${className}`
+          : `inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-text-secondary hover:bg-app-bg hover:text-text-primary ${className}`
+      }
     >
       <svg
         viewBox="0 0 24 24"
@@ -36,8 +43,12 @@ export function ExpandToggle({
       >
         <path d="M6 9l6 6 6-6" />
       </svg>
-      <span>{label}</span>
-      {count != null ? <span className="tabular-nums text-text-disabled">({count})</span> : null}
+      {!iconOnly ? (
+        <>
+          <span>{label}</span>
+          {count != null ? <span className="tabular-nums text-text-disabled">({count})</span> : null}
+        </>
+      ) : null}
     </button>
   );
 }

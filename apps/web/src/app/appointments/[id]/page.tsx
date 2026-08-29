@@ -8,7 +8,7 @@ import { ConsultAssessmentForm } from "@/components/consult-assessment-form";
 import { ConsultQueueNav } from "@/components/consult-queue-nav";
 import { PatientContextPanel } from "@/components/patient-context-panel";
 import { LabOrderPanel } from "@/components/lab-order-panel";
-import { PharmacyRxPanel } from "@/components/pharmacy-rx-panel";
+import { VisitAssessmentReadonly } from "@/components/visit-assessment-readonly";
 import { VisitLabTestsForm } from "@/components/visit-lab-tests-form";
 import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell";
 import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
@@ -36,12 +36,19 @@ import { siteFromSnapshot } from "@/lib/lab-catalog";
 import { investigationsEditable } from "@/lib/lab";
 import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
-import { getPharmacyRxForAppointment, PHARMACY_BILLING_ROLES } from "@/lib/pharmacy-rx";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 
-export default async function AppointmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppointmentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ edit?: string }>;
+}) {
   const user = await requireHospitalPage();
   const { id } = await params;
+  const { edit } = await searchParams;
+  const editing = edit === "1" || edit === "true";
   const appointment = await prisma.appointment.findFirst({
     where: { id, hospitalId: user.hospitalId },
     include: {
@@ -164,18 +171,17 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
   const outsideReportReady = appointment.labOrders.some(
     (order) => order.fulfillment === "EXTERNAL" && order.status === "RESULTED",
   );
-  const canCollectPharmacy = PHARMACY_BILLING_ROLES.includes(user.role);
   const assessment = appointment.assessment;
   const summaryApproved = assessment?.status === "APPROVED";
+  const visitClosed =
+    appointment.status === "COMPLETED" || appointment.status === "NO_SHOW" || summaryApproved;
+  const showEditableAssessment =
+    canAssess && appointment.status !== "CANCELLED" && (!visitClosed || editing);
+  const useCockpit = showEditableAssessment || (canAssess && visitClosed && !editing);
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
-  const pharmacyRx =
-    summaryApproved && assessment?.prescription?.trim()
-      ? await getPharmacyRxForAppointment(user.hospitalId, appointment.id)
-      : null;
   const photo = appointment.patient.photoData || "";
-  const useCockpit = canAssess && appointment.status !== "CANCELLED";
 
   return (
     <AppShell title="Visit details" dense={useCockpit}>
@@ -285,7 +291,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
         </div>
       </div>
 
-      <div className={`print:hidden ${useCockpit ? "grid min-w-0 gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)]" : "mx-auto max-w-5xl space-y-4"}`}>
+      <div className={`print:hidden ${useCockpit ? "grid min-w-0 gap-2 overflow-x-hidden lg:grid-cols-[minmax(0,170px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,190px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,220px)_minmax(0,1fr)] 2xl:gap-3" : "mx-auto max-w-5xl space-y-4"}`}>
         <div className={useCockpit ? "min-w-0 lg:sticky lg:top-3" : undefined}>
         <PatientContextPanel
           patient={{
@@ -305,15 +311,19 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
           }}
           vitals={vitals}
           canEditHistory={canAssess || canManage}
-          canPrintSummary={canPrintSummary}
-          canViewLabReports={canViewLabReport}
-          pastVisits={pastVisits}
-          priorVisit={priorVisit}
         />
         </div>
 
-        {useCockpit ? (
-          <div className="min-w-0">
+        {showEditableAssessment ? (
+          <div className="min-w-0 space-y-3">
+          {editing && visitClosed ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-sm text-amber-900">Editing approved visit — publish again when finished.</p>
+              <Link href={`/appointments/${appointment.id}`} className={compactButtonClass}>
+                Cancel edit
+              </Link>
+            </div>
+          ) : null}
           <ConsultAssessmentForm
             appointmentId={appointment.id}
             canPreview={Boolean(assessment)}
@@ -326,6 +336,15 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
             priorOrderCount={lockedLabOrders.length}
             initialInvestigations={draftInvestigations}
             visitReason={appointment.reason || appointment.notes || ""}
+            priorVisit={
+              priorVisit
+                ? {
+                    diagnosis: priorVisit.diagnosis,
+                    prescription: priorVisit.prescription,
+                    chiefComplaint: priorVisit.chiefComplaint,
+                  }
+                : null
+            }
             cockpit
             initial={{
               chiefComplaint: assessment?.chiefComplaint ?? "",
@@ -368,22 +387,43 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
                 patientPhone={appointment.patient.phone}
               />
             ) : null}
-            {pharmacyRx && pharmacyRx.status !== "CANCELLED" ? (
-              <PharmacyRxPanel
-                order={{
-                  id: pharmacyRx.id,
-                  appointmentId: pharmacyRx.appointmentId,
-                  status: pharmacyRx.status,
-                  totalAmount: Number(pharmacyRx.totalAmount),
-                  invoiceId: pharmacyRx.invoiceId,
-                  lines: pharmacyRx.lines.map((line) => ({
-                    medicineName: line.medicineName,
-                    quantity: line.quantity,
-                    inStock: line.inStock,
-                    doseNotes: line.doseNotes,
-                  })),
-                }}
-                canBill={canCollectPharmacy}
+            {canManage ? (
+              <div className="print:hidden">
+                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                  Record payment
+                </Link>
+                <AppointmentActions id={appointment.id} status={appointment.status} />
+              </div>
+            ) : null}
+          </ConsultAssessmentForm>
+          </div>
+        ) : canAssess && visitClosed ? (
+          <div className="min-w-0 space-y-3">
+            <VisitAssessmentReadonly
+              appointmentId={appointment.id}
+              statusLabel={prettyEnum(appointment.status)}
+              summaryApproved={summaryApproved}
+              canEdit={canAssess}
+              canPrint={canPrintSummary}
+              chiefComplaint={assessment?.chiefComplaint}
+              examination={assessment?.examination}
+              diagnosis={assessment?.diagnosis}
+              summary={assessment?.summary}
+              prescription={assessment?.prescription}
+              advice={assessment?.advice}
+              visitOutcome={assessment?.visitOutcome}
+              followUpAt={assessment?.followUpAt}
+            />
+            {canViewLab ? (
+              <LabOrderPanel
+                orders={appointment.labOrders}
+                canCollect={canCollectLab && labEnabled}
+                canWork={canWorkLab && labEnabled}
+                canViewReport={canViewLabReport}
+                canAttachExternal={canAttachExternal}
+                canPrint={canPrintSummary}
+                appointmentId={appointment.id}
+                patientPhone={appointment.patient.phone}
               />
             ) : null}
             {canManage ? (
@@ -394,7 +434,6 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
                 <AppointmentActions id={appointment.id} status={appointment.status} />
               </div>
             ) : null}
-          </ConsultAssessmentForm>
           </div>
         ) : (
         <div className="min-w-0 space-y-4">
@@ -443,25 +482,6 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
               canPrint={canPrintSummary}
               appointmentId={appointment.id}
               patientPhone={appointment.patient.phone}
-            />
-          ) : null}
-
-          {pharmacyRx && pharmacyRx.status !== "CANCELLED" ? (
-            <PharmacyRxPanel
-              order={{
-                id: pharmacyRx.id,
-                appointmentId: pharmacyRx.appointmentId,
-                status: pharmacyRx.status,
-                totalAmount: Number(pharmacyRx.totalAmount),
-                invoiceId: pharmacyRx.invoiceId,
-                lines: pharmacyRx.lines.map((line) => ({
-                  medicineName: line.medicineName,
-                  quantity: line.quantity,
-                  inStock: line.inStock,
-                  doseNotes: line.doseNotes,
-                })),
-              }}
-              canBill={canCollectPharmacy}
             />
           ) : null}
 

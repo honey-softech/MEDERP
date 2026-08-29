@@ -1,5 +1,8 @@
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { deliverMessage } from "@/lib/messaging/providers";
+import { enqueueMessage } from "@/lib/messaging/queue";
+import { renderTemplate } from "@/lib/messaging/templates";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -20,9 +23,23 @@ export function generateOtp() {
   return String(randomInt(100_000, 1_000_000));
 }
 
-/** Deliver OTP. Until an SMS provider is wired, logs server-side only (never in API responses). */
-export function deliverOtp(mobile: string, otp: string, purpose: string) {
-  console.info(`[otp] ${purpose} for ******${mobile.slice(-4)}: ${otp}`);
+/** Deliver OTP via the messaging queue when the user belongs to a hospital; otherwise send immediately. */
+export async function deliverOtp(mobile: string, otp: string, purpose: string, hospitalId?: string | null) {
+  const body = renderTemplate("otp", { otp });
+  if (hospitalId) {
+    const queued = await enqueueMessage({
+      hospitalId,
+      channel: "SMS",
+      templateKey: "otp",
+      variables: { otp, purpose },
+      toPhone: mobile,
+    });
+    if ("error" in queued) {
+      await deliverMessage({ toPhone: mobile, channel: "SMS", body, templateKey: "otp" });
+    }
+    return;
+  }
+  await deliverMessage({ toPhone: mobile, channel: "SMS", body, templateKey: "otp" });
 }
 
 export async function issueOtp(userId: string, mobile: string, purpose: string) {
@@ -36,7 +53,11 @@ export async function issueOtp(userId: string, mobile: string, purpose: string) 
       otpAttempts: 0,
     },
   });
-  deliverOtp(mobile, otp, purpose);
+  const user = await prisma.appUser.findUnique({
+    where: { id: userId },
+    select: { hospitalId: true },
+  });
+  await deliverOtp(mobile, otp, purpose, user?.hospitalId);
   return { expiresAt };
 }
 

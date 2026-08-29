@@ -338,14 +338,15 @@ model Hospital {
   sealData      String?                @db.Text
   opdFee        Decimal                @default(500) @db.Decimal(12, 2)
   isActive      Boolean                @default(true)
-  subscriptionTier   String            @default("STARTER")
-  includedStaffSlots Int               @default(6)
+  subscriptionTier   String            @default("CLINIC")
+  includedStaffSlots Int               @default(3)
   extraStaffSlots    Int               @default(0)
   unlimitedStaffSeats Boolean          @default(false)
   pharmacyEnabled    Boolean           @default(false)
   labEnabled         Boolean           @default(false)
   inventoryEnabled   Boolean           @default(false)
   requireSignatureForApproval Boolean  @default(false)
+  trialEndsAt        DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   users         AppUser[]
@@ -381,6 +382,8 @@ model Hospital {
   admissions        Admission[]
   bedTransfers      BedTransfer[]
   staffSignatures   UserSignature[]
+  announcements     HospitalAnnouncement[]
+  outboundMessages  OutboundMessage[]
 }
 
 model HospitalSubscription {
@@ -449,6 +452,8 @@ model AppUser {
   leaveRequests        StaffLeave[]          @relation("LeaveRequester")
   reviewedLeaves       StaffLeave[]          @relation("LeaveReviewer")
   signatures           UserSignature[]       @relation("UserSignatures")
+  announcements        HospitalAnnouncement[] @relation("AnnouncementAuthor")
+  announcementReplies  HospitalAnnouncementReply[] @relation("AnnouncementReplyAuthor")
 
   @@unique([hospitalId, userCode])
   @@unique([hospitalId, employeeId])
@@ -645,6 +650,8 @@ model Patient {
   familyGroupId       String?
   familyGroupCode     String?
   advanceBalance      Decimal          @default(0) @db.Decimal(12, 2)
+  smsOptIn            Boolean          @default(true)
+  whatsappOptIn       Boolean          @default(true)
   mergedIntoId        String?
   mergedInto          Patient?         @relation("PatientMerge", fields: [mergedIntoId], references: [id])
   mergedFrom          Patient[]        @relation("PatientMerge")
@@ -662,6 +669,7 @@ model Patient {
   visitVitals         VisitVitals[]
   visitAssessments    VisitAssessment[]
   pharmacyRxOrders    PharmacyRxOrder[]
+  outboundMessages    OutboundMessage[]
 
   @@unique([hospitalId, mrn])
   @@index([hospitalId, phone])
@@ -711,6 +719,7 @@ model Appointment {
   updatedAt         DateTime               @updatedAt
   invoices          Invoice[]
   reminders         AppointmentReminder[]
+  outboundMessages  OutboundMessage[]
   vitals            VisitVitals?
   assessment        VisitAssessment?
   labOrders         LabOrder[]
@@ -818,6 +827,35 @@ model HospitalJoinRequest {
   @@index([userId, status])
 }
 
+model HospitalAnnouncement {
+  id         String                      @id @default(cuid())
+  hospitalId String
+  hospital   Hospital                    @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     AppUser                     @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  title      String
+  body       String                      @db.Text
+  pinned     Boolean                     @default(false)
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime                    @updatedAt
+  replies    HospitalAnnouncementReply[]
+
+  @@index([hospitalId, createdAt])
+  @@index([hospitalId, pinned])
+}
+
+model HospitalAnnouncementReply {
+  id             String               @id @default(cuid())
+  announcementId String
+  announcement   HospitalAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         AppUser              @relation("AnnouncementReplyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body           String               @db.Text
+  createdAt      DateTime             @default(now())
+
+  @@index([announcementId, createdAt])
+}
+
 model HelpdeskTicket {
   id           String                 @id @default(cuid())
   number       String                 @unique
@@ -886,6 +924,32 @@ model AppointmentReminder {
   message        String
   sentAt         DateTime?
   createdAt      DateTime        @default(now())
+}
+
+model OutboundMessage {
+  id                String          @id @default(cuid())
+  hospitalId        String
+  hospital          Hospital        @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  patientId         String?
+  patient           Patient?        @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  appointmentId     String?
+  appointment       Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  reminderId        String?
+  channel           ReminderChannel
+  templateKey       String
+  variables         Json
+  toPhone           String
+  body              String          @db.Text
+  status            ReminderStatus  @default(PENDING)
+  attempts          Int             @default(0)
+  providerMessageId String?
+  error             String?
+  sentAt            DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([status, createdAt])
+  @@index([hospitalId, createdAt])
 }
 
 model Ward {

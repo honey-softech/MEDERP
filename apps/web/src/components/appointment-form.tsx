@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass, primaryButtonClass } from "@/components/auth-shell";
@@ -30,12 +30,37 @@ export function AppointmentForm({
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [doctorId, setDoctorId] = useState(defaultDoctorId ?? "");
+  const [onLeaveIds, setOnLeaveIds] = useState<string[]>([]);
   const walkInDefault = defaultQueueType === "WALK_IN";
   const lockedDoctor = lockDoctor ? doctors.find((row) => row.id === defaultDoctorId) : null;
+  const selectedOnLeave = Boolean(doctorId && onLeaveIds.includes(doctorId));
+
+  useEffect(() => {
+    const at = scheduledAt || (walkInDefault ? new Date().toISOString() : "");
+    if (!at) {
+      setOnLeaveIds([]);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void fetch(`/api/appointments?leaveAt=${encodeURIComponent(at)}`)
+        .then((response) => response.json())
+        .then((data) => {
+          setOnLeaveIds(Array.isArray(data.onLeaveDoctorIds) ? data.onLeaveDoctorIds : []);
+        })
+        .catch(() => setOnLeaveIds([]));
+    }, 200);
+    return () => window.clearTimeout(handle);
+  }, [scheduledAt, walkInDefault]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (selectedOnLeave) {
+      setError("This doctor is on leave that day. Choose another doctor or another date.");
+      return;
+    }
     setPending(true);
     const form = new FormData(event.currentTarget);
     const payload = Object.fromEntries(form.entries());
@@ -89,15 +114,25 @@ export function AppointmentForm({
           Doctor
           <input type="hidden" name="doctorId" value={defaultDoctorId} />
           <input className={`${fieldClass} bg-slate-50`} value={lockedDoctor?.label ?? "You"} readOnly />
+          {selectedOnLeave ? (
+            <span className="mt-1 block text-xs font-normal text-amber-700">You are on leave this day.</span>
+          ) : null}
         </label>
       ) : (
         <label className="text-sm font-medium text-slate-700">
           Doctor
-          <select className={fieldClass} name="doctorId" required defaultValue={defaultDoctorId ?? ""}>
+          <select
+            className={fieldClass}
+            name="doctorId"
+            required
+            value={doctorId}
+            onChange={(event) => setDoctorId(event.target.value)}
+          >
             <option value="">Select doctor</option>
             {doctors.map((item) => (
-              <option key={item.id} value={item.id}>
+              <option key={item.id} value={item.id} disabled={onLeaveIds.includes(item.id)}>
                 {item.label}
+                {onLeaveIds.includes(item.id) ? " (on leave)" : ""}
               </option>
             ))}
           </select>
@@ -121,7 +156,14 @@ export function AppointmentForm({
       </label>
       <label className="text-sm font-medium text-slate-700">
         Date and time
-        <input className={fieldClass} type="datetime-local" name="scheduledAt" required={!walkInDefault} />
+        <input
+          className={fieldClass}
+          type="datetime-local"
+          name="scheduledAt"
+          required={!walkInDefault}
+          value={scheduledAt}
+          onChange={(event) => setScheduledAt(event.target.value)}
+        />
       </label>
       {walkInDefault && lockDoctor ? (
         <input type="hidden" name="queueType" value="WALK_IN" />
@@ -164,7 +206,7 @@ export function AppointmentForm({
       </label>
       {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
       <div className="md:col-span-2">
-        <button className={buttonClass} type="submit" disabled={pending}>
+        <button className={buttonClass} type="submit" disabled={pending || selectedOnLeave}>
           {pending ? "Saving…" : walkInDefault ? "Add walk-in" : "Book appointment"}
         </button>
       </div>

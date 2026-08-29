@@ -2,7 +2,10 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
 import { WelcomeBanner } from "@/components/welcome-banner";
+import { BoardChat } from "@/components/board-chat";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
+import { listAnnouncements } from "@/lib/board";
+import { hospitalHasActivePaidSubscription, trialDaysRemaining } from "@/lib/hospital-access";
 import { OpdDayNav } from "@/components/opd-day-nav";
 import {
   addCalendarDays,
@@ -132,6 +135,10 @@ export default async function Home({
           where: { hospitalId: user.hospitalId, status: "PENDING" },
         })
       : 0;
+  const boardPosts =
+    user?.hospitalId && !isPlatformRole(user.role)
+      ? await listAnnouncements(user.hospitalId, { take: 40, includeReplies: false })
+      : [];
   const myDoctorId =
     user?.role === "DOCTOR" && user.hospitalId
       ? await staffIdForAppUser(user.id, user.hospitalId)
@@ -278,15 +285,54 @@ export default async function Home({
           }));
   const doctorQueues = isToday ? [...grouped, ...emptyDoctors] : grouped;
 
+  const showBoard = Boolean(user?.hospitalId && !isPlatformRole(user.role));
+
   return (
     <AppShell title="Dashboard">
-      {user ? (
-        <WelcomeBanner
-          displayName={prettyName(user.username, user.role)}
-          tagline={copy.tagline}
-          locationTitle={copy.locationTitle}
-          locationSubtitle={copy.locationSubtitle}
-        />
+      <div
+        className={
+          showBoard
+            ? "mb-6 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:grid-cols-[minmax(0,1fr)_28rem]"
+            : undefined
+        }
+      >
+        {user ? (
+          <WelcomeBanner
+            displayName={prettyName(user.username, user.role)}
+            tagline={copy.tagline}
+            locationTitle={copy.locationTitle}
+            locationSubtitle={copy.locationSubtitle}
+            compact={showBoard}
+            className={showBoard ? "h-full" : undefined}
+          />
+        ) : null}
+
+        {showBoard && user ? (
+          <BoardChat posts={boardPosts} currentUserId={user.id} />
+        ) : null}
+      </div>
+
+      {user?.hospitalId &&
+      user.hospital?.trialEndsAt &&
+      !isPlatformRole(user.role) &&
+      !hospitalHasActivePaidSubscription(user.hospital.subscription) ? (
+        <section className="mb-6 rounded-2xl border border-teal-200 bg-teal-50 p-5">
+          <h3 className="font-semibold text-teal-950">
+            {trialDaysRemaining(user.hospital.trialEndsAt) === 0
+              ? "Free trial ended"
+              : `${trialDaysRemaining(user.hospital.trialEndsAt)} day${trialDaysRemaining(user.hospital.trialEndsAt) === 1 ? "" : "s"} left on your free trial`}
+          </h3>
+          <p className="mt-1 text-sm text-teal-900">
+            Your clinic can use the selected plan until{" "}
+            {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Pay from Subscription to
+            keep working after that.
+          </p>
+          {user.role === "SUPER_ADMIN" ? (
+            <Link href="/hospital/subscription" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
+              Subscribe now →
+            </Link>
+          ) : null}
+        </section>
       ) : null}
 
       {openHelpdeskTickets.length > 0 && (user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK") ? (

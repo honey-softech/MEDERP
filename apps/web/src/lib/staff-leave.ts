@@ -77,12 +77,34 @@ export async function ensureStaffForUser(params: {
 }
 
 export function parseLeaveWindow(startRaw: unknown, endRaw: unknown) {
-  const startAt = new Date(String(startRaw ?? ""));
-  const endAt = new Date(String(endRaw ?? ""));
+  const startStr = String(startRaw ?? "").trim();
+  const endStr = String(endRaw ?? "").trim();
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (dateOnly.test(startStr) && dateOnly.test(endStr)) {
+    const startAt = new Date(`${startStr}T00:00:00`);
+    const endAt = new Date(`${endStr}T00:00:00`);
+    endAt.setDate(endAt.getDate() + 1);
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) {
+      return { error: "Leave must have a valid start and end date." };
+    }
+    return { startAt, endAt };
+  }
+
+  const startAt = new Date(startStr);
+  const endAt = new Date(endStr);
   if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) {
     return { error: "Leave must have a valid start and end." };
   }
   return { startAt, endAt };
+}
+
+function localDayBounds(at: Date) {
+  const start = new Date(at);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
 }
 
 export async function overlappingLeave(params: {
@@ -103,17 +125,36 @@ export async function overlappingLeave(params: {
   });
 }
 
+/** True if pending or approved leave overlaps the local calendar day of `at`. Rejected leave does not block. */
 export async function staffIsOnApprovedLeave(hospitalId: string, staffId: string, at: Date) {
+  const { start, end } = localDayBounds(at);
   const leave = await prisma.staffLeave.findFirst({
     where: {
       hospitalId,
       staffId,
-      status: "APPROVED",
-      startAt: { lte: at },
-      endAt: { gte: at },
+      status: { in: ["PENDING", "APPROVED"] },
+      startAt: { lt: end },
+      endAt: { gt: start },
     },
+    select: { id: true },
   });
   return Boolean(leave);
+}
+
+export async function staffIdsOnApprovedLeave(hospitalId: string, staffIds: string[], at: Date) {
+  if (staffIds.length === 0) return [];
+  const { start, end } = localDayBounds(at);
+  const rows = await prisma.staffLeave.findMany({
+    where: {
+      hospitalId,
+      staffId: { in: staffIds },
+      status: { in: ["PENDING", "APPROVED"] },
+      startAt: { lt: end },
+      endAt: { gt: start },
+    },
+    select: { staffId: true },
+  });
+  return [...new Set(rows.map((row) => row.staffId))];
 }
 
 export async function applyStaffLeave(params: {

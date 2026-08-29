@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExternalReportForm } from "@/components/external-report-form";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
 import { inr } from "@/lib/front-desk";
 import { labStatusClass, prettyLabStatus } from "@/lib/lab-catalog";
@@ -28,6 +29,7 @@ export function LabOrderPanel({
   canAttachExternal = false,
   canPrint = false,
   appointmentId = "",
+  patientPhone = null,
 }: {
   orders: LabOrder[];
   canCollect?: boolean;
@@ -46,9 +48,7 @@ export function LabOrderPanel({
         <h4 className="text-sm font-semibold text-text-primary">Investigations</h4>
         {canPrint && appointmentId ? (
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" className={compactButtonClass} disabled title="WhatsApp and SMS will be added later">
-              Send
-            </button>
+            <SendPatientMessageButton appointmentId={appointmentId} patientPhone={patientPhone} compact />
             <Link href={`/appointments/${appointmentId}/investigations`} className={compactButtonClass}>
               Print
             </Link>

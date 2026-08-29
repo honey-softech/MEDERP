@@ -21,6 +21,16 @@ function normalizeNav(nav: NavLink[] | NavSection[]): NavSection[] {
 
 function linkActive(pathname: string, href: string, allHrefs: string[]) {
   if (href === "/") return pathname === "/";
+
+  // Visit workspace (/appointments/:id…) is opened from OPD queue for doctors/nurses —
+  // keep Queue highlighted instead of Appointments.
+  const isVisitWorkspace =
+    /^\/appointments\/[^/]+/.test(pathname) && !pathname.startsWith("/appointments/new");
+  if (isVisitWorkspace && allHrefs.includes("/queue")) {
+    if (href === "/queue") return true;
+    if (href === "/appointments") return false;
+  }
+
   const matches = allHrefs.filter(
     (candidate) => candidate !== "/" && (pathname === candidate || pathname.startsWith(`${candidate}/`)),
   );
@@ -81,7 +91,7 @@ function NavGlyph({ href }: { href: string }) {
       </svg>
     );
   }
-  if (href.startsWith("/pharmacy") || href.startsWith("/hospital/drug-brands")) {
+  if (href.startsWith("/pharmacy") || href.startsWith("/hospital/drug-brands") || href.startsWith("/drug-brands")) {
     return (
       <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
         <rect x="7" y="3" width="10" height="18" rx="5" />

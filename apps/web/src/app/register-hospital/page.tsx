@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AuthShell, buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { AuthShell, buttonClass, fieldClass, secondaryButtonClass, textareaClass } from "@/components/auth-shell";
 import { mobileValidationError } from "@/lib/phone";
 import {
   clearRegisterHospitalDraft,
@@ -55,14 +55,13 @@ export default function RegisterHospitalPage() {
   const [adminMobile, setAdminMobile] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [tierId, setTierId] = useState("STARTER");
+  const [tierId, setTierId] = useState("CLINIC");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const skipCodeFetch = useRef(true);
   const lastFetchedName = useRef("");
-  const [codeBusy, setCodeBusy] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
 
   useEffect(() => {
@@ -75,9 +74,9 @@ export default function RegisterHospitalPage() {
       setAdminUsername(draft.adminUsername);
       setAdminMobile(draft.adminMobile);
       setAdminEmail(draft.adminEmail || "");
-      setTierId(draft.tierId || "STARTER");
+      setTierId(draft.tierId || "CLINIC");
       setTermsAccepted(draft.termsAccepted);
-      skipCodeFetch.current = Boolean(draft.code);
+      skipCodeFetch.current = /^[A-Z0-9]{8}$/i.test(draft.code || "");
       lastFetchedName.current = draft.name.trim();
     }
     setDraftReady(true);
@@ -106,16 +105,11 @@ export default function RegisterHospitalPage() {
 
   async function assignHospitalCode(hospitalName: string, keep?: string) {
     if (hospitalName.trim().length < 2) return;
-    setCodeBusy(true);
     const query = new URLSearchParams({ name: hospitalName.trim() });
     if (keep) query.set("code", keep);
-    try {
-      const response = await fetch(`/api/public/hospital-code?${query.toString()}`);
-      const data = await response.json().catch(() => ({}));
-      if (data.code) setCode(String(data.code));
-    } finally {
-      setCodeBusy(false);
-    }
+    const response = await fetch(`/api/public/hospital-code?${query.toString()}`);
+    const data = await response.json().catch(() => ({}));
+    if (data.code) setCode(String(data.code));
   }
 
   useEffect(() => {
@@ -200,33 +194,64 @@ export default function RegisterHospitalPage() {
     router.refresh();
   }
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError("");
-    setNotice("");
+  function validateForm() {
     if (!termsAccepted) {
       setError("Accept the Terms & Conditions to continue.");
-      return;
+      return false;
     }
     const hospitalMobileError = mobileValidationError(phone, "Hospital mobile");
     if (hospitalMobileError) {
       setError(hospitalMobileError);
-      return;
+      return false;
     }
     const adminMobileError = mobileValidationError(adminMobile, "Super admin mobile");
     if (adminMobileError) {
       setError(adminMobileError);
-      return;
+      return false;
     }
     const email = adminEmail.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError("Enter a valid super admin email for payment receipts.");
-      return;
+      return false;
     }
     if (!adminPassword || adminPassword.length < 8) {
       setError("Super admin password must be at least 8 characters.");
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function startTrial() {
+    setError("");
+    setNotice("");
+    if (!validateForm()) return;
+    setPending(true);
+    try {
+      const response = await fetch("/api/public/register-hospital/trial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registrationPayload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setPending(false);
+        setError(data.error ?? "Could not start the free trial.");
+        return;
+      }
+      clearRegisterHospitalDraft();
+      router.push(data.redirectTo || "/");
+      router.refresh();
+    } catch (err) {
+      setPending(false);
+      setError(err instanceof Error ? err.message : "Could not start the free trial.");
+    }
+  }
+
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    if (!validateForm()) return;
     setPending(true);
 
     try {
@@ -318,149 +343,152 @@ export default function RegisterHospitalPage() {
       title="Register hospital"
       subtitle="A unique hospital code is assigned automatically. Sign in later with the super admin mobile. Your form draft is kept if you refresh."
     >
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-medium text-slate-700">
-          Hospital name
-          <input className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} required />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Hospital code
-          <input className={`${fieldClass} bg-slate-50`} value={code} readOnly required />
-          <span className="mt-1 block text-xs font-normal text-slate-500">
-            Assigned uniquely from the hospital name.
-          </span>
-          <button
-            className={`${secondaryButtonClass} mt-2`}
-            type="button"
-            disabled={codeBusy || name.trim().length < 2}
-            onClick={() => void assignHospitalCode(name)}
-          >
-            {codeBusy ? "Assigning…" : "Generate another code"}
-          </button>
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Address
-          <input className={fieldClass} value={address} onChange={(event) => setAddress(event.target.value)} />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Hospital mobile
-          <input
-            className={fieldClass}
-            inputMode="numeric"
-            autoComplete="tel"
-            maxLength={13}
-            value={phone}
-            onChange={(event) => setPhone(event.target.value.replace(/[^\d+]/g, ""))}
-            placeholder="10-digit mobile"
-            required
-          />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Super admin username
-          <input
-            className={fieldClass}
-            value={adminUsername}
-            onChange={(event) => setAdminUsername(event.target.value)}
-            autoComplete="username"
-            required
-          />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Super admin mobile
-          <input
-            className={fieldClass}
-            inputMode="numeric"
-            autoComplete="tel"
-            maxLength={13}
-            value={adminMobile}
-            onChange={(event) => setAdminMobile(event.target.value.replace(/[^\d+]/g, ""))}
-            placeholder="10-digit mobile — used to sign in"
-            required
-          />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Super admin email
-          <input
-            className={fieldClass}
-            type="email"
-            autoComplete="email"
-            value={adminEmail}
-            onChange={(event) => setAdminEmail(event.target.value)}
-            placeholder="Used for Razorpay payment receipts"
-            required
-          />
-        </label>
-        <label className="sm:col-span-2 text-sm font-medium text-slate-700">
-          Super admin password
-          <input
-            className={fieldClass}
-            type="password"
-            value={adminPassword}
-            onChange={(event) => setAdminPassword(event.target.value)}
-            autoComplete="new-password"
-            required
-          />
-        </label>
-
-        <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Choose one fixed plan. Seat counts are suggestions — you can assign any mix of doctors, nurses,
-            receptionists, or other staff roles within the plan limit. Super admin is free and does not use a seat.
-            Amount is auto-debited every month until you cancel.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {(pkg?.tiers ?? []).map((tier) => {
-              const selected = tierId === tier.id;
-              return (
-                <button
-                  key={tier.id}
-                  type="button"
-                  onClick={() => setTierId(tier.id)}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    selected
-                      ? "border-teal-600 bg-white ring-2 ring-teal-600/30"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-slate-900">{tier.name}</p>
-                      <p className="text-xs text-slate-500">{tier.tagline}</p>
-                    </div>
-                    <p className="shrink-0 text-sm font-semibold text-teal-800">{inr(tier.monthlyFee)}/mo</p>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-600">{tier.roleSuggestion}</p>
-                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                    {tier.features.map((feature) => (
-                      <li key={feature}>· {feature}</li>
-                    ))}
-                  </ul>
-                </button>
-              );
-            })}
+      <form onSubmit={onSubmit} className="space-y-6">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700">
+              Hospital name
+              <input className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} required />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Hospital code
+              <input className={`${fieldClass} bg-slate-50`} value={code} readOnly required />
+              <span className="mt-1 block text-xs font-normal text-slate-500">
+                8-letter code from the hospital name.
+              </span>
+            </label>
+            <label className="sm:col-span-2 text-sm font-medium text-slate-700">
+              Address
+              <textarea
+                className={`${textareaClass} resize-none`}
+                rows={2}
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Hospital mobile
+              <input
+                className={fieldClass}
+                inputMode="numeric"
+                autoComplete="tel"
+                maxLength={13}
+                value={phone}
+                onChange={(event) => setPhone(event.target.value.replace(/[^\d+]/g, ""))}
+                placeholder="10-digit mobile"
+                required
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Super admin username
+              <input
+                className={fieldClass}
+                value={adminUsername}
+                onChange={(event) => setAdminUsername(event.target.value)}
+                autoComplete="username"
+                required
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Super admin mobile
+              <input
+                className={fieldClass}
+                inputMode="numeric"
+                autoComplete="tel"
+                maxLength={13}
+                value={adminMobile}
+                onChange={(event) => setAdminMobile(event.target.value.replace(/[^\d+]/g, ""))}
+                placeholder="10-digit mobile — used to sign in"
+                required
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Super admin email
+              <input
+                className={fieldClass}
+                type="email"
+                autoComplete="email"
+                value={adminEmail}
+                onChange={(event) => setAdminEmail(event.target.value)}
+                required
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Super admin password
+              <input
+                className={fieldClass}
+                type="password"
+                value={adminPassword}
+                onChange={(event) => setAdminPassword(event.target.value)}
+                autoComplete="new-password"
+                required
+              />
+            </label>
           </div>
-          {quote && selectedTier ? (
-            <ul className="mt-4 space-y-1 border-t border-slate-200 pt-3 text-sm">
-              {quote.lines.map((line) => (
-                <li key={line.description} className="flex justify-between gap-3">
-                  <span className="text-slate-700">{line.description}</span>
-                  <span className="font-medium">{inr(line.amount)}</span>
+
+          <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6">
+            <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              1-month trial with no card on every plan. Super admin is free and does not use a seat.
+            </p>
+            <div className="mt-3 grid gap-2">
+              {(pkg?.tiers ?? []).map((tier) => {
+                const selected = tierId === tier.id;
+                return (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => setTierId(tier.id)}
+                    className={`rounded-lg border p-3 text-left transition ${
+                      selected
+                        ? "border-teal-600 bg-white ring-2 ring-teal-600/20"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900">{tier.name}</p>
+                        <p className="text-xs text-slate-500">{tier.tagline}</p>
+                      </div>
+                      <p className="shrink-0 text-sm font-semibold text-teal-800">{inr(tier.monthlyFee)}/mo</p>
+                    </div>
+                    {selected ? (
+                      <>
+                        <p className="mt-2 text-xs text-slate-600">{tier.roleSuggestion}</p>
+                        <ul className="mt-1.5 space-y-0.5 text-xs text-slate-600">
+                          {tier.features.map((feature) => (
+                            <li key={feature}>· {feature}</li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-xs text-slate-500">{tier.roleSuggestion}</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {quote && selectedTier ? (
+              <ul className="mt-3 space-y-1 border-t border-slate-200 pt-3 text-sm">
+                {quote.lines.map((line) => (
+                  <li key={line.description} className="flex justify-between gap-3">
+                    <span className="text-slate-700">{line.description}</span>
+                    <span className="font-medium">{inr(line.amount)}</span>
+                  </li>
+                ))}
+                <li className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
+                  <span>Monthly total</span>
+                  <span>{inr(quote.total)}</span>
                 </li>
-              ))}
-              <li className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
-                <span>Monthly total (auto-debit)</span>
-                <span>{inr(quote.total)}</span>
-              </li>
-            </ul>
-          ) : null}
-          <p className="mt-3 text-xs text-slate-600">
-            After registration you can upgrade to a higher plan from Subscription; the new amount applies from the next
-            billing cycle.
-          </p>
+              </ul>
+            ) : null}
+            <p className="mt-3 text-xs text-slate-600">
+              You can upgrade later from Subscription; the new amount applies from the next billing cycle.
+            </p>
+          </aside>
         </div>
 
-        <label className="sm:col-span-2 flex items-start gap-2 text-sm text-slate-700">
+        <label className="flex items-start gap-2 text-sm text-slate-700">
           <input
             className="mt-1"
             type="checkbox"
@@ -472,24 +500,32 @@ export default function RegisterHospitalPage() {
             I agree to the{" "}
             <Link href="/terms" target="_blank" className="font-medium text-teal-700 underline">
               Terms &amp; Conditions
-            </Link>{" "}
-            and authorise monthly auto-debit of the package amount until I cancel.
+            </Link>
+            . A 1-month trial includes the selected plan. After that, pay monthly to keep using MedERP.
           </span>
         </label>
 
-        {notice ? <p className="sm:col-span-2 text-sm text-amber-800">{notice}</p> : null}
-        {error ? <p className="sm:col-span-2 text-sm text-red-600">{error}</p> : null}
-        <div className="sm:col-span-2">
+        {notice ? <p className="text-sm text-amber-800">{notice}</p> : null}
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button
-            className={buttonClass}
+            className={`${buttonClass} sm:w-auto sm:min-w-56`}
+            type="button"
+            disabled={pending || !termsAccepted}
+            onClick={() => void startTrial()}
+          >
+            {pending ? "Starting trial…" : "Start 1-month free trial"}
+          </button>
+          <button
+            className={`${secondaryButtonClass} sm:w-auto sm:min-w-40`}
             type="submit"
             disabled={pending || !termsAccepted || (pkg != null && !pkg.razorpayEnabled)}
           >
             {pending
               ? "Opening payment…"
               : quote
-                ? `Pay ${inr(quote.total)} and register`
-                : "Pay and register"}
+                ? `Pay ${inr(quote.total)} now`
+                : "Pay now"}
           </button>
         </div>
       </form>

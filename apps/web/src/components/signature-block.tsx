@@ -20,7 +20,7 @@ export function SignatureBlock({
 }) {
   return (
     <div className={compact ? "vs-sign-compact" : undefined}>
-      <p className="vs-label">{role}</p>
+      {role ? <p className="vs-label">{role}</p> : null}
       {imageData ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={imageData} alt="" className="vs-sign-img" />

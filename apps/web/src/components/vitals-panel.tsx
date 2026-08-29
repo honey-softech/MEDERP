@@ -10,31 +10,40 @@ export function VitalsPanel({
   vitals,
   compact = false,
 }: {
-  vitals: VitalsValues;
+  vitals: VitalsValues | null;
   compact?: boolean;
 }) {
-  const bmi = Number(vitals.bmi);
-  const bmiAlert = Number.isFinite(bmi) && (bmi < 18.5 || bmi >= 25);
-  const alerts = [
-    vitals.hasFever ? "Fever" : null,
-    vitalAlert(vitals.temperatureC, VITAL_RANGES.temperatureC) ? `Temp ${num(vitals.temperatureC)}°C` : null,
-    vitalAlert(vitals.spo2Percent, VITAL_RANGES.spo2Percent) ? `SpO2 ${vitals.spo2Percent}%` : null,
-    vitalAlert(vitals.pulseBpm, VITAL_RANGES.pulseBpm) ? `Pulse ${vitals.pulseBpm}` : null,
-    vitalAlert(vitals.respiratoryRate, VITAL_RANGES.respiratoryRate) ? `RR ${vitals.respiratoryRate}` : null,
-    vitalAlert(vitals.bpSystolic, VITAL_RANGES.bpSystolic) || vitalAlert(vitals.bpDiastolic, VITAL_RANGES.bpDiastolic)
-      ? `BP ${bpDisplay(vitals.bpSystolic, vitals.bpDiastolic)}`
-      : null,
-    vitalAlert(vitals.bloodSugarMgDl, VITAL_RANGES.bloodSugarMgDl) ? `Sugar ${num(vitals.bloodSugarMgDl)}` : null,
-  ].filter((row): row is string => Boolean(row));
+  const recorded = Boolean(vitals);
+  const bmi = vitals != null ? Number(vitals.bmi) : NaN;
+  const bmiAlert = recorded && Number.isFinite(bmi) && (bmi < 18.5 || bmi >= 25);
+  const alerts = vitals
+    ? [
+        vitals.hasFever ? "Fever" : null,
+        vitalAlert(vitals.temperatureC, VITAL_RANGES.temperatureC) ? `Temp ${num(vitals.temperatureC)}°C` : null,
+        vitalAlert(vitals.spo2Percent, VITAL_RANGES.spo2Percent) ? `SpO2 ${vitals.spo2Percent}%` : null,
+        vitalAlert(vitals.pulseBpm, VITAL_RANGES.pulseBpm) ? `Pulse ${vitals.pulseBpm}` : null,
+        vitalAlert(vitals.respiratoryRate, VITAL_RANGES.respiratoryRate) ? `RR ${vitals.respiratoryRate}` : null,
+        vitalAlert(vitals.bpSystolic, VITAL_RANGES.bpSystolic) || vitalAlert(vitals.bpDiastolic, VITAL_RANGES.bpDiastolic)
+          ? `BP ${bpDisplay(vitals.bpSystolic, vitals.bpDiastolic)}`
+          : null,
+        vitalAlert(vitals.bloodSugarMgDl, VITAL_RANGES.bloodSugarMgDl) ? `Sugar ${num(vitals.bloodSugarMgDl)}` : null,
+      ].filter((row): row is string => Boolean(row))
+    : [];
 
   if (compact) {
     return (
-      <section className="rounded-xl border border-teal-200 bg-teal-50/70 p-2.5">
+      <section
+        className={`rounded-xl border p-2.5 ${
+          recorded ? "border-teal-200 bg-teal-50/70" : "border-warning-bg bg-warning-bg"
+        }`}
+      >
         <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-1">
-          <h3 className="text-sm font-semibold text-teal-950">Vitals</h3>
-          {vitals.recordedByUsername ? (
+          <h3 className={`text-sm font-semibold ${recorded ? "text-teal-950" : "text-text-primary"}`}>Vitals</h3>
+          {vitals?.recordedByUsername ? (
             <p className="text-[10px] text-teal-800">{vitals.recordedByUsername}</p>
-          ) : null}
+          ) : (
+            <p className="text-[10px] font-medium text-warning">Not recorded</p>
+          )}
         </div>
         {alerts.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1">
@@ -45,36 +54,70 @@ export function VitalsPanel({
             ))}
           </div>
         ) : null}
-        <dl className="grid grid-cols-3 gap-x-2 gap-y-1 text-xs">
-          <Item compact label="Ht/Wt" value={`${num(vitals.heightCm)}/${num(vitals.weightKg)}`} />
-          <Item compact label="BMI" value={`${num(vitals.bmi)} · ${bmiLabel(bmi)}`} alert={bmiAlert} />
+        <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs 2xl:grid-cols-3">
+          <Item
+            compact
+            label="Ht/Wt"
+            value={vitals ? `${num(vitals.heightCm)}/${num(vitals.weightKg)}` : "—/—"}
+          />
+          <Item
+            compact
+            label="BMI"
+            value={vitals ? `${num(vitals.bmi)} · ${bmiLabel(bmi)}` : "—"}
+            alert={bmiAlert}
+          />
           <Item
             compact
             label="Temp"
-            value={`${num(vitals.temperatureC)}°C`}
-            alert={Boolean(vitalAlert(vitals.temperatureC, VITAL_RANGES.temperatureC))}
+            value={vitals ? `${num(vitals.temperatureC)}°C` : "—"}
+            alert={Boolean(vitals && vitalAlert(vitals.temperatureC, VITAL_RANGES.temperatureC))}
           />
           <Item
             compact
             label="SpO2"
-            value={vitals.spo2Percent != null ? `${vitals.spo2Percent}%` : "—"}
-            alert={Boolean(vitalAlert(vitals.spo2Percent, VITAL_RANGES.spo2Percent))}
+            value={vitals?.spo2Percent != null ? `${vitals.spo2Percent}%` : "—"}
+            alert={Boolean(vitals && vitalAlert(vitals.spo2Percent, VITAL_RANGES.spo2Percent))}
           />
           <Item
             compact
             label="Pulse"
-            value={vitals.pulseBpm != null ? `${vitals.pulseBpm}` : "—"}
-            alert={Boolean(vitalAlert(vitals.pulseBpm, VITAL_RANGES.pulseBpm))}
+            value={vitals?.pulseBpm != null ? `${vitals.pulseBpm}` : "—"}
+            alert={Boolean(vitals && vitalAlert(vitals.pulseBpm, VITAL_RANGES.pulseBpm))}
           />
           <Item
             compact
             label="BP"
-            value={bpDisplay(vitals.bpSystolic, vitals.bpDiastolic)}
+            value={vitals ? bpDisplay(vitals.bpSystolic, vitals.bpDiastolic) : "—/—"}
             alert={Boolean(
-              vitalAlert(vitals.bpSystolic, VITAL_RANGES.bpSystolic) ||
-                vitalAlert(vitals.bpDiastolic, VITAL_RANGES.bpDiastolic),
+              vitals &&
+                (vitalAlert(vitals.bpSystolic, VITAL_RANGES.bpSystolic) ||
+                  vitalAlert(vitals.bpDiastolic, VITAL_RANGES.bpDiastolic)),
             )}
           />
+        </dl>
+      </section>
+    );
+  }
+
+  if (!vitals) {
+    return (
+      <section className="rounded-2xl border border-warning-bg bg-warning-bg p-5">
+        <h3 className="font-semibold text-text-primary">Nurse vitals for this consult</h3>
+        <p className="mt-1 text-sm text-text-secondary">Not recorded yet</p>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+          <Item label="Height" value="—" />
+          <Item label="Weight" value="—" />
+          <Item label="BMI · ideal 18.5–24.9" value="—" />
+          <Item label={`Temperature · ideal ${formatIdealRange(VITAL_RANGES.temperatureC)}`} value="—" />
+          <Item label="Fever" value="—" />
+          <Item label={`SpO2 · ideal ${formatIdealRange(VITAL_RANGES.spo2Percent)}`} value="—" />
+          <Item label={`Pulse · ideal ${formatIdealRange(VITAL_RANGES.pulseBpm)}`} value="—" />
+          <Item label={`Respiratory rate · ideal ${formatIdealRange(VITAL_RANGES.respiratoryRate)}`} value="—" />
+          <Item
+            label={`Blood pressure · ideal ${VITAL_RANGES.bpSystolic.min}–${VITAL_RANGES.bpSystolic.max}/${VITAL_RANGES.bpDiastolic.min}–${VITAL_RANGES.bpDiastolic.max} mmHg`}
+            value="—/—"
+          />
+          <Item label={`Blood sugar · ideal ${formatIdealRange(VITAL_RANGES.bloodSugarMgDl)}`} value="—" />
         </dl>
       </section>
     );

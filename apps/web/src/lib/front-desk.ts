@@ -4,6 +4,7 @@ import type { AppRole, Prisma } from "@prisma/client";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { staffIsOnApprovedLeave } from "@/lib/staff-leave";
+import { hospitalAccessBlocked } from "@/lib/hospital-access";
 
 export const FRONT_DESK_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST"];
 export const WALK_IN_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "DOCTOR"];
@@ -12,7 +13,7 @@ export const CLINICAL_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "D
 export const NURSE_VITALS_ROLES: AppRole[] = ["SUPER_ADMIN", "NURSE"];
 export const DOCTOR_VISIT_ROLES: AppRole[] = ["SUPER_ADMIN", "DOCTOR"];
 export const PRINT_SUMMARY_ROLES: AppRole[] = ["SUPER_ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"];
-export const BILLING_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "ACCOUNTANT"];
+export const BILLING_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "ACCOUNTANT", "DOCTOR"];
 export const WAIVER_APPROVER_ROLES: AppRole[] = ["SUPER_ADMIN", "ACCOUNTANT"];
 export const LAB_WORK_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH"];
 export const LAB_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH", "DOCTOR", "NURSE", "RECEPTIONIST"];
@@ -28,7 +29,9 @@ export type HospitalActorResult =
   | { error: NextResponse; user?: undefined }
   | { user: HospitalActor; error?: undefined };
 
-export async function requireHospitalActor(): Promise<HospitalActorResult> {
+export async function requireHospitalActor(options?: {
+  allowExpiredTrial?: boolean;
+}): Promise<HospitalActorResult> {
   const user = await getCurrentUser();
   if (!user) {
     return { error: NextResponse.json({ error: "Sign in required." }, { status: 401 }) };
@@ -36,14 +39,25 @@ export async function requireHospitalActor(): Promise<HospitalActorResult> {
   if (!user.hospitalId || isPlatformRole(user.role)) {
     return { error: NextResponse.json({ error: "Hospital access required." }, { status: 403 }) };
   }
+  if (!options?.allowExpiredTrial && hospitalAccessBlocked(user.hospital)) {
+    return {
+      error: NextResponse.json(
+        { error: "Your free trial has ended. Ask the hospital admin to subscribe.", code: "TRIAL_ENDED" },
+        { status: 402 },
+      ),
+    };
+  }
   return { user: user as HospitalActor };
 }
 
-export async function requireHospitalPage() {
+export async function requireHospitalPage(options?: { allowExpiredTrial?: boolean }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (isPlatformRole(user.role)) redirect("/");
   if (!user.hospitalId) redirect("/join");
+  if (!options?.allowExpiredTrial && hospitalAccessBlocked(user.hospital)) {
+    redirect(user.role === "SUPER_ADMIN" ? "/hospital/subscription" : "/subscribe");
+  }
   return user as HospitalActor;
 }
 

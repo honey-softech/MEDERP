@@ -25,7 +25,7 @@ function resolveTierId(body: Record<string, unknown> | null, hospitalTier: strin
   const fromBody = String(body?.tierId ?? "").trim();
   if (fromBody && isSubscriptionTierId(fromBody)) return fromBody;
   if (isSubscriptionTierId(hospitalTier)) return hospitalTier;
-  return "STARTER";
+  return "CLINIC";
 }
 
 /** Start Razorpay Checkout for an existing hospital that has no auto-debit yet. */

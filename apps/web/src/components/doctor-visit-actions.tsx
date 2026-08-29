@@ -53,9 +53,22 @@ export function DoctorVisitActions({
 
   const closed = ["CANCELLED", "COMPLETED", "NO_SHOW"].includes(status);
   if (closed) {
-    return status === "COMPLETED" ? (
-      <p className="text-xs font-medium text-teal-800">Visit marked done.</p>
-    ) : null;
+    if (status !== "COMPLETED") return null;
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <p className="text-xs font-medium text-teal-800">Visit marked done.</p>
+        {assessmentHref ? (
+          <Link href={assessmentHref} className={compactButtonClass}>
+            {assessmentLabel ?? "View visit"}
+          </Link>
+        ) : null}
+        {summaryHref ? (
+          <Link href={summaryHref} className={compactButtonClass}>
+            {summaryLabel ?? "Print record"}
+          </Link>
+        ) : null}
+      </div>
+    );
   }
 
   const showStart = status !== "IN_PROGRESS";
@@ -72,15 +85,6 @@ export function DoctorVisitActions({
           {pending === "start" ? "Starting…" : "Start consult"}
         </button>
       ) : null}
-      <button
-        className={compactPrimaryButtonClass}
-        type="button"
-        disabled={Boolean(pending) || !summaryApproved}
-        title={!summaryApproved ? "Approve the summary before marking done" : undefined}
-        onClick={() => void run("complete")}
-      >
-        {pending === "complete" ? "Saving…" : "Done"}
-      </button>
       {assessmentHref ? (
         <Link href={assessmentHref} className={compactButtonClass}>
           {assessmentLabel ?? "Doctor assessment"}
@@ -91,6 +95,15 @@ export function DoctorVisitActions({
           {summaryLabel ?? "Preview summary"}
         </Link>
       ) : null}
+      <button
+        className={compactPrimaryButtonClass}
+        type="button"
+        disabled={Boolean(pending) || !summaryApproved}
+        title={!summaryApproved ? "Approve the summary before marking done" : undefined}
+        onClick={() => void run("complete")}
+      >
+        {pending === "complete" ? "Saving…" : "Done"}
+      </button>
       {showHint && !summaryApproved ? (
         <p className="w-full text-xs text-text-secondary sm:w-auto">Approve the summary before marking done.</p>
       ) : null}

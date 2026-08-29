@@ -28,6 +28,9 @@ export default async function BillingPage() {
         <Link href="/billing/collections" className={secondaryButtonClass}>
           Daily collections
         </Link>
+        <Link href="/billing/reports" className={secondaryButtonClass}>
+          Monthly reports
+        </Link>
       </div>
       <FilterableTable
         rows={invoices.map((row) => ({

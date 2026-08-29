@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/audit";
 import { listManufacturersForPicker } from "@/lib/drug-brands";
-import { requireHospitalActor } from "@/lib/front-desk";
+import { requireHospitalActor, forbidUnless } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  if (scoped.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Super Admin only." }, { status: 403 });
-  }
+  const denied = forbidUnless(scoped.user.role, ["SUPER_ADMIN"]);
+  if (denied) return denied;
 
   const q = request.nextUrl.searchParams.get("q") ?? "";
   const selected = await prisma.hospitalDrugManufacturer.findMany({
@@ -29,9 +28,8 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  if (scoped.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Super Admin only." }, { status: 403 });
-  }
+  const denied = forbidUnless(scoped.user.role, ["SUPER_ADMIN"]);
+  if (denied) return denied;
 
   const body = (await request.json().catch(() => null)) as { manufacturerIds?: unknown } | null;
   const ids = Array.isArray(body?.manufacturerIds)

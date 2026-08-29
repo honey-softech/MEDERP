@@ -20,7 +20,7 @@ const empty: RegisterHospitalDraft = {
   adminUsername: "",
   adminMobile: "",
   adminEmail: "",
-  tierId: "STARTER",
+  tierId: "CLINIC",
   termsAccepted: false,
 };
 

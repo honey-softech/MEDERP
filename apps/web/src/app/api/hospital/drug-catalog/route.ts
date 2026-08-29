@@ -5,7 +5,7 @@ import {
   resolveCatalogSource,
   syncDrugManufacturers,
 } from "@/lib/drug-catalog-import";
-import { requireHospitalActor } from "@/lib/front-desk";
+import { forbidUnless, requireHospitalActor } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 300;
@@ -13,9 +13,8 @@ export const maxDuration = 300;
 export async function GET() {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  if (scoped.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Super Admin only." }, { status: 403 });
-  }
+  const denied = forbidUnless(scoped.user.role, ["SUPER_ADMIN"]);
+  if (denied) return denied;
 
   const catalogSize = await prisma.drugCatalog.count();
   return NextResponse.json({ catalogSize, job: catalogImportStatus() });
@@ -24,9 +23,8 @@ export async function GET() {
 export async function POST() {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  if (scoped.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Super Admin only." }, { status: 403 });
-  }
+  const denied = forbidUnless(scoped.user.role, ["SUPER_ADMIN"]);
+  if (denied) return denied;
 
   const current = catalogImportStatus();
   if (current?.running) {

@@ -97,7 +97,6 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
         }
         visitOutcome={appointment.assessment.visitOutcome}
         prescription={appointment.assessment.prescription}
-        printedBy={user.username}
         printedAt={printedAt}
         draft={!approved}
         signatureImage={appointment.assessment.approvedBySignature?.imageData}

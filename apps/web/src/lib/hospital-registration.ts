@@ -2,7 +2,12 @@ import type { AppRole, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { hashPassword, MIN_PASSWORD_LENGTH, normalizeHospitalCode, normalizeMobile, passwordValidationError } from "@/lib/auth";
-import { isValidHospitalCode, slugFromHospitalName } from "@/lib/hospital-code";
+import {
+  HOSPITAL_CODE_LENGTH,
+  isCanonicalHospitalCode,
+  isValidHospitalCode,
+  slugFromHospitalName,
+} from "@/lib/hospital-code";
 import { mobileValidationError } from "@/lib/phone";
 import { allocateHospitalUserIdentity } from "@/lib/employee";
 import { seedHospitalDepartments } from "@/lib/front-desk";
@@ -38,6 +43,7 @@ export type RegisterHospitalInput = {
   /** @deprecated use tierId */
   labEnabled?: boolean;
   invoiceStatus?: "PAID" | "ISSUED";
+  trialEndsAt?: Date | null;
   paymentMethod?: PaymentMethod | null;
   paymentNotes?: string | null;
   termsAccepted?: boolean;
@@ -58,20 +64,20 @@ export type RegisterHospitalInput = {
 export async function allocateUniqueHospitalCode(name: string, requested?: string | null) {
   const preferred = requested ? normalizeHospitalCode(requested) : "";
   const base =
-    (isValidHospitalCode(preferred) ? preferred : slugFromHospitalName(name)) || "HSP";
+    (isCanonicalHospitalCode(preferred) ? preferred : slugFromHospitalName(name)) || "HOSPITAL";
   const candidates = [base];
   for (let i = 2; i <= 99; i++) {
     const suffix = String(i);
-    candidates.push(`${base.slice(0, Math.max(3, 12 - suffix.length))}${suffix}`);
+    candidates.push(`${base.slice(0, HOSPITAL_CODE_LENGTH - suffix.length)}${suffix}`);
   }
-  candidates.push(`${base.slice(0, 8)}${Date.now().toString(36).toUpperCase().slice(-4)}`.slice(0, 12));
+  candidates.push(`HSP${Date.now().toString(36).toUpperCase()}`.replace(/[^A-Z0-9]/g, "").slice(0, HOSPITAL_CODE_LENGTH));
 
   for (const code of candidates) {
     if (!isValidHospitalCode(code)) continue;
     const taken = await prisma.hospital.findUnique({ where: { code } });
     if (!taken) return code;
   }
-  return `${"HSP"}${Date.now().toString(36).toUpperCase()}`.slice(0, 12);
+  return `HSP${Date.now().toString(36).toUpperCase()}`.replace(/[^A-Z0-9]/g, "").slice(0, HOSPITAL_CODE_LENGTH);
 }
 
 export type PreparedRegistration = {
@@ -224,6 +230,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
       pharmacyEnabled: tier.pharmacyEnabled,
       labEnabled: tier.labEnabled,
       inventoryEnabled: tier.inventoryEnabled,
+      trialEndsAt: input.trialEndsAt ?? null,
       users: {
         create: {
           username: prepared.adminUsername,

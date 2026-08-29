@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PrintButton } from "@/components/print-button";
 import { InvestigationSlip } from "@/components/investigation-slip";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
   PRINT_SUMMARY_ROLES,
@@ -63,15 +64,13 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
       <div className="visit-summary-frame mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 print:hidden">
         <div>
           <p className="text-sm font-semibold text-slate-900">Investigation list</p>
-          <p className="mt-0.5 text-xs text-slate-500">Print for the patient. WhatsApp / SMS send will be added later.</p>
+          <p className="mt-0.5 text-xs text-slate-500">Print for the patient or queue an SMS to their mobile.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/appointments/${appointment.id}`} className={secondaryButtonClass}>
             Back to visit
           </Link>
-          <button type="button" className={secondaryButtonClass} disabled title="WhatsApp and SMS will be added later">
-            Send
-          </button>
+          <SendPatientMessageButton appointmentId={appointment.id} patientPhone={appointment.patient.phone} />
           <PrintButton label="Print list" variant="primary" />
         </div>
       </div>

@@ -46,7 +46,7 @@ export async function monthlyAmountForHospital(
     return pricingFromTier(hospital.subscriptionTier);
   }
   const fallback: SubscriptionTierId =
-    hospital.pharmacyEnabled || hospital.labEnabled ? "GROWTH" : "STARTER";
+    hospital.pharmacyEnabled || hospital.labEnabled ? "GROWTH" : "CLINIC";
   return pricingFromTier(fallback);
 }
 

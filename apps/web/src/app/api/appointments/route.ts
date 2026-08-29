@@ -16,6 +16,7 @@ import {
   staffIdForAppUser,
   tokenLabel,
 } from "@/lib/front-desk";
+import { staffIdsOnApprovedLeave } from "@/lib/staff-leave";
 import { notifyNursesOfConsult } from "@/lib/notifications";
 
 const QUEUE_TYPES: QueueType[] = ["SCHEDULED", "WALK_IN"];
@@ -29,6 +30,24 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   const { searchParams } = new URL(request.url);
+  const leaveAtRaw = searchParams.get("leaveAt");
+  if (leaveAtRaw) {
+    const at = new Date(leaveAtRaw);
+    if (Number.isNaN(at.getTime())) {
+      return NextResponse.json({ error: "Choose a valid appointment date." }, { status: 400 });
+    }
+    const doctors = await prisma.staff.findMany({
+      where: { hospitalId: scoped.user.hospitalId, role: "DOCTOR" },
+      select: { id: true },
+    });
+    const onLeaveDoctorIds = await staffIdsOnApprovedLeave(
+      scoped.user.hospitalId,
+      doctors.map((row) => row.id),
+      at,
+    );
+    return NextResponse.json({ onLeaveDoctorIds });
+  }
+
   const doctorId = searchParams.get("doctorId") ?? undefined;
   const departmentId = searchParams.get("departmentId") ?? undefined;
   const from = searchParams.get("from");
@@ -121,7 +140,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Patient, doctor, and department must belong to this hospital." }, { status: 400 });
   }
   if (await doctorIsOnLeave(scoped.user.hospitalId, doctor.id, scheduledAt)) {
-    return NextResponse.json({ error: `${doctorName(doctor)} is on leave at the selected time.` }, { status: 409 });
+    return NextResponse.json(
+      { error: `${doctorName(doctor)} is on leave that day. Choose another doctor or another date.` },
+      { status: 409 },
+    );
   }
 
   const walkIn = queueType === "WALK_IN";

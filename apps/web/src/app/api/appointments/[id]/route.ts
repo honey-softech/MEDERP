@@ -63,7 +63,10 @@ export async function PATCH(request: Request, context: Ctx) {
       return NextResponse.json({ error: "This appointment cannot be rescheduled." }, { status: 409 });
     }
     if (await doctorIsOnLeave(user.hospitalId, appointment.doctorId, scheduledAt)) {
-      return NextResponse.json({ error: `${doctorName(appointment.doctor)} is on leave at the selected time.` }, { status: 409 });
+      return NextResponse.json(
+        { error: `${doctorName(appointment.doctor)} is on leave that day. Choose another date.` },
+        { status: 409 },
+      );
     }
     const updated = await prisma.appointment.update({
       where: { id },
@@ -246,6 +249,10 @@ export async function PATCH(request: Request, context: Ctx) {
     if (channels.length === 0) {
       return NextResponse.json({ error: "Select at least one reminder channel." }, { status: 400 });
     }
+    const phone = appointment.patient.phone?.replace(/\D/g, "") ?? "";
+    if (phone.length < 10) {
+      return NextResponse.json({ error: "Add a 10-digit mobile number on the patient record first." }, { status: 400 });
+    }
     const message = reminderMessage({
       patient: patientName(appointment.patient),
       doctor: doctorName(appointment.doctor),
@@ -253,20 +260,46 @@ export async function PATCH(request: Request, context: Ctx) {
       when: appointment.scheduledAt,
       token: appointment.tokenNumber ? tokenLabel(appointment.tokenNumber) : undefined,
     });
-    await prisma.appointmentReminder.createMany({
-      data: channels.map((channel) => ({
+    const created = await prisma.$transaction(
+      channels.map((channel) =>
+        prisma.appointmentReminder.create({
+          data: {
+            hospitalId: user.hospitalId,
+            appointmentId: appointment.id,
+            channel,
+            status: "PENDING",
+            message,
+          },
+        }),
+      ),
+    );
+    const { enqueueMessage } = await import("@/lib/messaging");
+    const variables = {
+      patient: patientName(appointment.patient),
+      doctor: doctorName(appointment.doctor),
+      hospital: hospitalName,
+      when: appointment.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+      token: appointment.tokenNumber ? tokenLabel(appointment.tokenNumber) : "",
+    };
+    for (const reminder of created) {
+      const queued = await enqueueMessage({
         hospitalId: user.hospitalId,
+        patientId: appointment.patientId,
         appointmentId: appointment.id,
-        channel,
-        status: "SENT",
-        message,
-        sentAt: new Date(),
-      })),
-    });
-    await prisma.appointment.update({
-      where: { id },
-      data: { reminderSentAt: new Date() },
-    });
+        reminderId: reminder.id,
+        channel: reminder.channel,
+        templateKey: "appointment_reminder",
+        variables,
+        toPhone: phone,
+        patient: appointment.patient,
+      });
+      if ("error" in queued) {
+        await prisma.appointmentReminder.update({
+          where: { id: reminder.id },
+          data: { status: "FAILED" },
+        });
+      }
+    }
     await writeAuditLog({
       request,
       hospitalId: user.hospitalId,
@@ -277,9 +310,9 @@ export async function PATCH(request: Request, context: Ctx) {
       entity: "Appointment",
       entityId: id,
       summary: `${user.username} queued ${channels.join(", ")} reminders for ${patientName(appointment.patient)}.`,
-      metadata: { channels, note: "Logged in MedERP. Connect an SMS/WhatsApp/email gateway to deliver." },
+      metadata: { channels },
     });
-    return NextResponse.json({ ok: true, message, channels });
+    return NextResponse.json({ ok: true, message, channels, status: "PENDING" });
   }
 
   if (action === "photo") {

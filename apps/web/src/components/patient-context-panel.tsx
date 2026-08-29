@@ -4,9 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
-import type { VitalsValues } from "@/lib/vitals";
 import { VitalsPanel } from "@/components/vitals-panel";
-import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
+import type { VitalsValues } from "@/lib/vitals";
 
 export type PatientContextData = {
   id: string;
@@ -33,23 +32,15 @@ export type PriorVisitSummary = {
 
 export function PatientContextPanel({
   patient,
-  vitals,
-  priorVisit,
-  pastVisits = [],
+  vitals = null,
   canEditHistory,
-  canPrintSummary = false,
-  canViewLabReports = false,
 }: {
   patient: PatientContextData;
-  vitals: VitalsValues | null;
-  priorVisit: PriorVisitSummary;
-  pastVisits?: PastVisitItem[];
+  vitals?: VitalsValues | null;
   canEditHistory: boolean;
-  canPrintSummary?: boolean;
-  canViewLabReports?: boolean;
 }) {
   const router = useRouter();
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -116,13 +107,7 @@ export function PatientContextPanel({
         </div>
       </section>
 
-      {vitals ? (
-        <VitalsPanel vitals={vitals} compact />
-      ) : (
-        <p className="rounded-xl border border-warning-bg bg-warning-bg px-3 py-2 text-xs text-text-secondary">
-          Nurse vitals not recorded yet.
-        </p>
-      )}
+      <VitalsPanel vitals={vitals} compact />
 
       <section className="rounded-xl border border-border bg-surface px-2.5 py-2 shadow-card">
         <div className="flex items-center justify-between gap-2">
@@ -142,7 +127,11 @@ export function PatientContextPanel({
                 {editing ? "Cancel" : "Edit"}
               </button>
             ) : null}
-            <ExpandToggle open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
+            <ExpandToggle
+              open={historyOpen}
+              onToggle={() => setHistoryOpen((v) => !v)}
+              iconOnly
+            />
           </div>
         </div>
 
@@ -171,37 +160,6 @@ export function PatientContextPanel({
           )
         ) : allergies.trim() ? (
           <p className="mt-1 text-[11px] font-medium text-critical">Allergy · {allergies}</p>
-        ) : null}
-      </section>
-
-      <section className="rounded-xl border border-border bg-surface px-2.5 py-2 shadow-card">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary">Last visit</h3>
-            <p className="mt-0.5 truncate text-[11px] text-text-secondary">
-              {priorVisit ? priorVisit.scheduledAtLabel : "No earlier visit"}
-            </p>
-          </div>
-          <VisitHistorySheet
-            visits={pastVisits}
-            patientHref={`/patients/${patient.id}`}
-            canPrintSummary={canPrintSummary}
-            canViewLabReports={canViewLabReports}
-            label="All visits"
-            variant="link"
-          />
-        </div>
-        {priorVisit?.chiefComplaint ? (
-          <p className="mt-1 truncate text-xs">
-            <span className="text-text-secondary">Complaint · </span>
-            {priorVisit.chiefComplaint}
-          </p>
-        ) : null}
-        {priorVisit?.diagnosis ? (
-          <p className="mt-0.5 truncate text-xs">
-            <span className="text-text-secondary">Dx · </span>
-            {priorVisit.diagnosis}
-          </p>
         ) : null}
       </section>
     </aside>

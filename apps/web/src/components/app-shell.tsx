@@ -1,6 +1,9 @@
 import { AppShellFrame, type NavSection } from "@/components/app-shell-frame";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
+import { hospitalAccessBlocked, isExpiredTrialAllowedPath } from "@/lib/hospital-access";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 const staffNav: NavSection[] = [
   {
@@ -21,7 +24,10 @@ const staffNav: NavSection[] = [
   },
   {
     title: "Billing",
-    items: [{ href: "/billing", label: "Billing" }],
+    items: [
+      { href: "/billing", label: "Billing" },
+      { href: "/billing/reports", label: "Reports" },
+    ],
   },
   {
     title: "Support",
@@ -63,6 +69,7 @@ const nurseNav: NavSection[] = [
     items: [
       { href: "/", label: "Dashboard" },
       { href: "/nurse", label: "Nurse station" },
+      { href: "/staff", label: "Staff" },
       { href: "/wards", label: "Wards" },
       { href: "/patients", label: "Patients" },
       { href: "/appointments", label: "Appointments" },
@@ -82,6 +89,7 @@ const receptionistNav: NavSection[] = [
   {
     items: [
       { href: "/", label: "Dashboard" },
+      { href: "/staff", label: "Staff" },
       { href: "/patients", label: "Patients" },
       { href: "/appointments", label: "Appointments" },
       { href: "/queue", label: "OPD queue" },
@@ -93,6 +101,7 @@ const receptionistNav: NavSection[] = [
     items: [
       { href: "/billing", label: "Billing" },
       { href: "/billing/collections", label: "Collections" },
+      { href: "/billing/reports", label: "Reports" },
       { href: "/billing/lab", label: "Lab collections" },
       { href: "/pharmacy/prescriptions", label: "Pharmacy bills" },
     ],
@@ -110,6 +119,7 @@ const accountantNav: NavSection[] = [
   {
     items: [
       { href: "/", label: "Dashboard" },
+      { href: "/staff", label: "Staff" },
       { href: "/patients", label: "Patients" },
       { href: "/wards", label: "Wards" },
     ],
@@ -119,6 +129,7 @@ const accountantNav: NavSection[] = [
     items: [
       { href: "/billing", label: "Billing" },
       { href: "/billing/collections", label: "Collections" },
+      { href: "/billing/reports", label: "Reports" },
       { href: "/billing/lab", label: "Lab collections" },
     ],
   },
@@ -176,13 +187,15 @@ const softwareAdminNav: NavSection[] = [
 
 const superAdminNav: NavSection[] = [
   {
-    items: [{ href: "/", label: "Dashboard" }],
+    items: [
+      { href: "/", label: "Dashboard" },
+    ],
   },
   {
     title: "Administration",
     items: [
       { href: "/hospital/settings", label: "Hospital branding" },
-      { href: "/hospital/drug-brands", label: "Medicine brands" },
+      { href: "/drug-brands", label: "Medicine brands" },
       { href: "/hospital/users", label: "Hospital users" },
       { href: "/hospital/subscription", label: "Subscription" },
       { href: "/hospital/join-requests", label: "Join requests" },
@@ -221,6 +234,7 @@ const superAdminNav: NavSection[] = [
     items: [
       { href: "/billing", label: "Billing" },
       { href: "/billing/collections", label: "Collections" },
+      { href: "/billing/reports", label: "Reports" },
       { href: "/billing/lab", label: "Lab collections" },
     ],
   },
@@ -234,6 +248,7 @@ const pharmacistNav: NavSection[] = [
   {
     items: [
       { href: "/", label: "Dashboard" },
+      { href: "/staff", label: "Staff" },
       { href: "/pharmacy/prescriptions", label: "Prescription billing" },
       { href: "/pharmacy", label: "Inventory" },
       { href: "/pharmacy/stock-in", label: "Stock in (GRN)" },
@@ -252,6 +267,7 @@ const labTechNav: NavSection[] = [
   {
     items: [
       { href: "/", label: "Dashboard" },
+      { href: "/staff", label: "Staff" },
       { href: "/lab", label: "Laboratory" },
       { href: "/leave", label: "Leave" },
       { href: "/helpdesk", label: "Helpdesk" },
@@ -317,6 +333,16 @@ export async function AppShell({
   dense?: boolean;
 }) {
   const user = await getCurrentUser();
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  if (
+    user?.hospitalId &&
+    !isPlatformRole(user.role) &&
+    hospitalAccessBlocked(user.hospital) &&
+    pathname &&
+    !isExpiredTrialAllowedPath(pathname)
+  ) {
+    redirect(user.role === "SUPER_ADMIN" ? "/hospital/subscription" : "/subscribe");
+  }
   const modules = {
     pharmacyEnabled: user?.hospital?.pharmacyEnabled ?? true,
     labEnabled: user?.hospital?.labEnabled ?? true,

@@ -51,10 +51,11 @@ export function pricingFromSettings(
   const seats = 3 + Math.max(0, Math.trunc(Number((selection as { extraStaffSlots?: number }).extraStaffSlots ?? 0)));
   const pharmacy = Boolean((selection as { pharmacyEnabled?: boolean }).pharmacyEnabled);
   const lab = Boolean((selection as { labEnabled?: boolean }).labEnabled);
-  let tierId: SubscriptionTierId = "STARTER";
+  let tierId: SubscriptionTierId = "CLINIC";
   if (seats >= 50 && pharmacy && lab) tierId = "ENTERPRISE";
   else if (seats >= 15 && pharmacy && lab) tierId = "PROFESSIONAL";
   else if (pharmacy || lab) tierId = "GROWTH";
+  else if (seats >= 6) tierId = "STARTER";
   return pricingFromTier(tierId);
 }
 

@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { BILLING_ROLES, dayRange, doctorName, inr, localDayKey, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function CollectionsPage({
@@ -65,6 +66,11 @@ export default async function CollectionsPage({
 
   return (
     <AppShell title="Daily collections">
+      <div className="mb-4">
+        <Link href="/billing/reports" className="text-sm font-medium text-teal-800 hover:underline">
+          Monthly reports →
+        </Link>
+      </div>
       <form className="mb-6 flex max-w-sm items-end gap-3" action="/billing/collections">
         <label className="text-sm font-medium text-slate-700">
           Date

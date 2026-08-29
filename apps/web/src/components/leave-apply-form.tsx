@@ -55,11 +55,11 @@ export function LeaveApplyForm() {
       </label>
       <label className="text-sm font-medium text-slate-700">
         From
-        <input className={fieldClass} type="datetime-local" name="startAt" required />
+        <input className={fieldClass} type="date" name="startAt" required />
       </label>
       <label className="text-sm font-medium text-slate-700">
         To
-        <input className={fieldClass} type="datetime-local" name="endAt" required />
+        <input className={fieldClass} type="date" name="endAt" required />
       </label>
       <div className="sm:col-span-2">
         <button className={buttonClass} type="submit" disabled={pending}>

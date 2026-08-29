@@ -23,8 +23,8 @@ export default async function HospitalLeavesPage() {
   return (
     <AppShell title="Staff leave">
       <p className="mb-6 text-sm text-slate-500">
-        Doctors, nurses, receptionists, and other hospital staff apply from Leave. Approve here. Approved doctor leave
-        blocks new OPD appointments for that window.
+        Doctors, nurses, receptionists, and other hospital staff apply from Leave. A requested or approved doctor leave
+        blocks walk-in and pre-booked appointments for those days. If you reject the request, booking opens again.
       </p>
       {pending.length === 0 ? (
         <p className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No pending leave requests.</p>

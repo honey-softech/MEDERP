@@ -60,11 +60,15 @@ export function WelcomeBanner({
   tagline,
   locationTitle,
   locationSubtitle,
+  className = "",
+  compact = false,
 }: {
   displayName: string;
   tagline: string;
   locationTitle: string;
   locationSubtitle: string;
+  className?: string;
+  compact?: boolean;
 }) {
   const [now, setNow] = useState(() => new Date());
 
@@ -77,13 +81,17 @@ export function WelcomeBanner({
   const greeting = greetingForHour(now.getHours());
 
   return (
-    <section className="relative mb-6 overflow-hidden rounded-xl border border-primary-light bg-gradient-to-r from-surface via-primary-light/40 to-primary-light px-5 py-6 sm:mb-8 sm:px-8 sm:py-7">
-      <div className="pointer-events-none absolute -right-6 top-0 hidden h-full w-[42%] md:block">
+    <section
+      className={`relative overflow-hidden rounded-xl border border-primary-light bg-gradient-to-r from-surface via-primary-light/40 to-primary-light px-5 py-6 sm:px-8 sm:py-7 ${
+        compact ? "" : "mb-6 sm:mb-8"
+      } ${className}`}
+    >
+      <div className={`pointer-events-none absolute -right-6 top-0 hidden h-full w-[42%] ${compact ? "" : "md:block"}`}>
         <div className="absolute right-8 top-6 h-40 w-40 rounded-full bg-primary-light/60" />
         <div className="absolute bottom-6 right-24 h-24 w-24 rounded-full bg-primary/10" />
       </div>
-      <div className="relative z-10 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
-        <div className="max-w-xl">
+      <div className="relative z-10 flex h-full flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
+        <div className={compact ? "max-w-lg" : "max-w-xl"}>
           <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
             {greeting}
             <span className="mt-1 block text-primary">
@@ -118,9 +126,11 @@ export function WelcomeBanner({
             </div>
           </div>
         </div>
-        <div className="relative mx-auto lg:mx-0">
-          <DoctorIllustration />
-        </div>
+        {compact ? null : (
+          <div className="relative mx-auto lg:mx-0">
+            <DoctorIllustration />
+          </div>
+        )}
       </div>
     </section>
   );

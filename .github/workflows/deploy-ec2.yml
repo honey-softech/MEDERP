@@ -1,0 +1,47 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          command_timeout: 40m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd ~/mederp
+
+            if [ ! -d .git ]; then
+              echo "ERROR: ~/mederp is not a git repo yet. Run the one-time EC2 git setup first."
+              exit 1
+            fi
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            if [ ! -f apps/web/.env ]; then
+              echo "ERROR: apps/web/.env missing on server. Copy it once and keep it only on EC2."
+              exit 1
+            fi
+
+            sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml up -d --build
+            sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml ps
+            curl -fsS -m 20 http://127.0.0.1/api/health
+            echo
+            echo "Deploy finished."

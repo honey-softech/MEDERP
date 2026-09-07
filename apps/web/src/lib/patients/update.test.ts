@@ -22,6 +22,17 @@ describe("patient update payload", () => {
     expect(result.data).not.toHaveProperty("hospitalId");
   });
 
+  it("lets front desk clear an optional last name", () => {
+    const result = buildPatientUpdatePayload({
+      isFrontDesk: true,
+      existing: { firstName: "Ravi", lastName: "Kumar" },
+      body: { lastName: "  " },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.lastName).toBe("");
+  });
+
   it("lets a clinician change only clinical history", () => {
     const ignored = buildPatientUpdatePayload({
       isFrontDesk: false,

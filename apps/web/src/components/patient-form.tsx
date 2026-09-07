@@ -217,7 +217,7 @@ export function PatientForm({
     >
       <h3 className="md:col-span-2 font-semibold">Demographics</h3>
       <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required />
-      <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} required />
+      <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} />
       <Field label="Date of birth" type="date" value={values.dateOfBirth} onChange={(v) => setField("dateOfBirth", v)} required />
       <label className="text-sm font-medium text-slate-700">
         Gender

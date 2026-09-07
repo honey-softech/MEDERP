@@ -33,7 +33,7 @@ export function buildPatientUpdatePayload(input: {
   for (const field of textFields) {
     if (input.body[field] !== undefined) {
       const value = String(input.body[field] ?? "").trim();
-      data[field] = value || null;
+      data[field] = field === "lastName" ? value : value || null;
     }
   }
 
@@ -74,7 +74,6 @@ export function buildPatientUpdatePayload(input: {
       data.photoData = sanitizePhotoData(input.body.photoData);
     }
     if (!data.firstName) data.firstName = input.existing.firstName;
-    if (!data.lastName) data.lastName = input.existing.lastName;
   }
 
   if (Object.keys(data).length === 0) {

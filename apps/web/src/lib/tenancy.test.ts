@@ -22,4 +22,15 @@ describe("tenancy", () => {
     if (!parsed.success) return;
     expect(parsed.data).not.toHaveProperty("hospitalId");
   });
+
+  it("allows registering a patient without a last name", () => {
+    const parsed = createPatientSchema.safeParse({
+      firstName: "Ravi",
+      dateOfBirth: "2000-01-15",
+      gender: "MALE",
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.lastName).toBe("");
+  });
 });

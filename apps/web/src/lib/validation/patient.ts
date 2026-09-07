@@ -51,10 +51,10 @@ export const createPatientSchema = z
     const lastName = text(data.lastName);
     const dateOfBirth = data.dateOfBirth ? new Date(String(data.dateOfBirth)) : null;
     const gender = text(data.gender);
-    if (!firstName || !lastName || !dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
+    if (!firstName || !dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
       ctx.addIssue({
         code: "custom",
-        message: "First name, last name, and date of birth are required.",
+        message: "First name and date of birth are required.",
       });
       return z.NEVER;
     }

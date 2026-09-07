@@ -215,7 +215,7 @@ export function parseEmployeeBody(body: Record<string, unknown> | null, role: Ap
   const gender = body?.gender ? (String(body.gender) as Gender) : null;
   const employmentStatus = (String(body?.employmentStatus ?? "ACTIVE") as EmploymentStatus) || "ACTIVE";
 
-  if (!firstName || !lastName) return { error: "First name and last name are required." };
+  if (!firstName) return { error: "First name is required." };
   if (email && !email.includes("@")) return { error: "Enter a valid email, or leave it blank." };
   if (employmentType && !EMPLOYMENT_TYPES.includes(employmentType)) {
     return { error: "Select a valid employment type." };

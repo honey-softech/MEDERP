@@ -6,7 +6,6 @@ import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
 import {
   allocateHospitalUserIdentity,
-  generateStaffPassword,
   parseEmployeeBody,
   suggestedUsername,
   uniqueUsername,
@@ -106,14 +105,15 @@ export async function POST(request: Request) {
     }
 
     const password = String(body?.password ?? "").trim();
-    if (password && password.length < MIN_PASSWORD_LENGTH) {
+    if (!password) {
+      return NextResponse.json({ error: "Password is required." }, { status: 400 });
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
         { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
         { status: 400 },
       );
     }
-    const generatedPassword = password.length >= MIN_PASSWORD_LENGTH ? null : generateStaffPassword();
-    const passwordToHash = password.length >= MIN_PASSWORD_LENGTH ? password : generatedPassword!;
 
     const username = await uniqueUsername(
       input.username || suggestedUsername(input.firstName, input.lastName, hospital.code),
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
       data: {
         username,
         mobile,
-        passwordHash: await hashPassword(passwordToHash),
+        passwordHash: await hashPassword(password),
         otpCode: null,
         otpExpiresAt: null,
         otpAttempts: 0,
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
       metadata: { mobile: user.mobile, role: user.role, employeeId: user.employeeId },
     });
 
-    return NextResponse.json({ ok: true, user, generatedPassword });
+    return NextResponse.json({ ok: true, user });
   } catch (error) {
     console.error("Failed to create hospital user", error);
     return NextResponse.json(

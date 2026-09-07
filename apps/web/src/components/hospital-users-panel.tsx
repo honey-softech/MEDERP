@@ -158,7 +158,7 @@ function UserFormDialog({
               <p className="mt-1 text-sm text-slate-500">
                 {editingId
                   ? "Saved details are loaded below. Update any field and save."
-                  : "Choose a role first. Only the fields for that role are shown."}
+                  : "Name, mobile, and password are required. Expand a section for extra details."}
               </p>
             </div>
             <button type="button" className={secondaryButtonClass} onClick={onClose}>

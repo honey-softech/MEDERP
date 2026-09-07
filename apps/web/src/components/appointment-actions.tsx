@@ -62,7 +62,7 @@ export function AppointmentActions({
         className={secondaryButtonClass}
         type="button"
         disabled={Boolean(pending)}
-        onClick={() => void run("remind", { channels: ["SMS", "WHATSAPP", "EMAIL"] })}
+        onClick={() => void run("remind", { channels: ["WHATSAPP"] })}
       >
         {pending === "remind" ? "…" : "Send reminder"}
       </button>

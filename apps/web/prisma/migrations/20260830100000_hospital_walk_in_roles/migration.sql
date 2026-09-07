@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Hospital" ADD COLUMN "walkInByDoctor" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Hospital" ADD COLUMN "walkInByNurse" BOOLEAN NOT NULL DEFAULT false;

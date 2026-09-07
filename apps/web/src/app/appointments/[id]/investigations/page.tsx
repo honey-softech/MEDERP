@@ -70,7 +70,11 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
           <Link href={`/appointments/${appointment.id}`} className={secondaryButtonClass}>
             Back to visit
           </Link>
-          <SendPatientMessageButton appointmentId={appointment.id} patientPhone={appointment.patient.phone} />
+          <SendPatientMessageButton
+            endpoint={`/api/appointments/${appointment.id}/investigations/send`}
+            patientPhone={appointment.patient.phone}
+            label="Send WhatsApp"
+          />
           <PrintButton label="Print list" variant="primary" />
         </div>
       </div>

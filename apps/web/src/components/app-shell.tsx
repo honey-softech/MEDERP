@@ -194,7 +194,7 @@ const superAdminNav: NavSection[] = [
   {
     title: "Administration",
     items: [
-      { href: "/hospital/settings", label: "Hospital branding" },
+      { href: "/hospital/settings", label: "Hospital settings" },
       { href: "/drug-brands", label: "Medicine brands" },
       { href: "/hospital/users", label: "Hospital users" },
       { href: "/hospital/subscription", label: "Subscription" },

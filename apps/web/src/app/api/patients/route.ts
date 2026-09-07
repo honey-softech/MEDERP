@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import type { AppRole, FamilyRelation, Gender, IdProofType } from "@prisma/client";
+import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import {
-  PATIENT_REGISTER_ROLES,
+  canRegisterPatient,
   CLINICAL_VIEW_ROLES,
   digitsOnly,
   ensureFamilyGroup,
@@ -13,10 +13,9 @@ import {
   requireHospitalActor,
   sanitizePhotoData,
 } from "@/lib/front-desk";
+import { createPatientSchema } from "@/lib/validation/patient";
+import { parseJsonBody } from "@/lib/validation/parse";
 
-const GENDERS: Gender[] = ["MALE", "FEMALE", "OTHER"];
-const ID_PROOFS: IdProofType[] = ["AADHAAR", "PAN", "PASSPORT", "DRIVING_LICENSE", "VOTER_ID", "OTHER"];
-const RELATIONS: FamilyRelation[] = ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"];
 const PATIENT_VIEW_ROLES: AppRole[] = [...CLINICAL_VIEW_ROLES, "ACCOUNTANT"];
 
 export async function GET(request: Request) {
@@ -100,49 +99,40 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, PATIENT_REGISTER_ROLES);
-  if (denied) return denied;
+  if (!canRegisterPatient(scoped.user)) {
+    return NextResponse.json({ error: "You do not have access to this action." }, { status: 403 });
+  }
 
   try {
 
-  const body = await request.json().catch(() => null);
-  const firstName = String(body?.firstName ?? "").trim();
-  const lastName = String(body?.lastName ?? "").trim();
-  const dateOfBirth = body?.dateOfBirth ? new Date(String(body.dateOfBirth)) : null;
-  const gender = String(body?.gender ?? "") as Gender;
-  const phone = String(body?.phone ?? "").trim() || null;
-  const email = String(body?.email ?? "").trim() || null;
-  const address = String(body?.address ?? "").trim() || null;
-  const bloodGroup = String(body?.bloodGroup ?? "").trim() || null;
-  const allergies = String(body?.allergies ?? "").trim() || null;
-  const medicalHistory = String(body?.medicalHistory ?? "").trim() || null;
-  const familyHistory = String(body?.familyHistory ?? "").trim() || null;
-  const socialHistory = String(body?.socialHistory ?? "").trim() || null;
-  const currentMedications = String(body?.currentMedications ?? "").trim() || null;
-  const emergencyName = String(body?.emergencyName ?? "").trim() || null;
-  const emergencyPhone = String(body?.emergencyPhone ?? "").trim() || null;
-  const idProofType = body?.idProofType ? (String(body.idProofType) as IdProofType) : null;
-  const idProofNumber = String(body?.idProofNumber ?? "").trim() || null;
-  const insuranceProvider = String(body?.insuranceProvider ?? "").trim() || null;
-  const insurancePolicyNo = String(body?.insurancePolicyNo ?? "").trim() || null;
-  const insuranceValidUntil = body?.insuranceValidUntil ? new Date(String(body.insuranceValidUntil)) : null;
-  const photoData = sanitizePhotoData(body?.photoData);
-  const familyOfPatientId = String(body?.familyOfPatientId ?? "").trim() || null;
-  const familyRelation = (String(body?.familyRelation ?? "CHILD") as FamilyRelation) || "CHILD";
-  const force = Boolean(body?.force);
-
-  if (!firstName || !lastName || !dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
-    return NextResponse.json({ error: "First name, last name, and date of birth are required." }, { status: 400 });
-  }
-  if (!GENDERS.includes(gender)) {
-    return NextResponse.json({ error: "Select a valid gender." }, { status: 400 });
-  }
-  if (idProofType && !ID_PROOFS.includes(idProofType)) {
-    return NextResponse.json({ error: "Select a valid ID proof type." }, { status: 400 });
-  }
-  if (familyOfPatientId && !RELATIONS.includes(familyRelation)) {
-    return NextResponse.json({ error: "Select a valid family relation." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, createPatientSchema);
+  if (!parsed.ok) return parsed.response;
+  const {
+    firstName,
+    lastName,
+    dateOfBirth,
+    gender,
+    phone,
+    email,
+    address,
+    bloodGroup,
+    allergies,
+    medicalHistory,
+    familyHistory,
+    socialHistory,
+    currentMedications,
+    emergencyName,
+    emergencyPhone,
+    idProofType,
+    idProofNumber,
+    insuranceProvider,
+    insurancePolicyNo,
+    insuranceValidUntil,
+    familyOfPatientId,
+    familyRelation,
+    force,
+  } = parsed.data;
+  const photoData = sanitizePhotoData(parsed.data.photoData);
 
   let guardian = familyOfPatientId
     ? await prisma.patient.findFirst({

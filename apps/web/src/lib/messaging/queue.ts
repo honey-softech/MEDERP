@@ -60,11 +60,22 @@ export async function processOutboundQueue() {
       where: { id: row.id },
       data: { attempts: { increment: 1 } },
     });
+    const variables =
+      row.variables && typeof row.variables === "object" && !Array.isArray(row.variables)
+        ? (row.variables as Record<string, unknown>)
+        : {};
+    const stringVars: Record<string, string> = {};
+    for (const [key, value] of Object.entries(variables)) {
+      if (typeof value === "string") stringVars[key] = value;
+    }
+    const otp = typeof variables.otp === "string" ? variables.otp : undefined;
     const result = await deliverMessage({
       toPhone: row.toPhone,
       channel: row.channel,
       body: row.body,
       templateKey: row.templateKey,
+      otp,
+      variables: stringVars,
     });
     if (result.ok) {
       sent += 1;

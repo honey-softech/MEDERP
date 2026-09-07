@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PrintButton } from "@/components/print-button";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { VisitSummaryDocument } from "@/components/visit-summary-document";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
@@ -66,6 +67,13 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
           <Link href={`/appointments/${appointment.id}`} className={secondaryButtonClass}>
             Back to visit
           </Link>
+          {approved ? (
+            <SendPatientMessageButton
+              endpoint={`/api/appointments/${appointment.id}/summary/send`}
+              patientPhone={appointment.patient.phone}
+              label="Send PDF on WhatsApp"
+            />
+          ) : null}
           {approved || canPreviewDraft ? <PrintButton label="Print record" variant="primary" /> : null}
         </div>
       </div>

@@ -346,6 +346,8 @@ model Hospital {
   labEnabled         Boolean           @default(false)
   inventoryEnabled   Boolean           @default(false)
   requireSignatureForApproval Boolean  @default(false)
+  walkInByDoctor     Boolean           @default(true)
+  walkInByNurse      Boolean           @default(false)
   trialEndsAt        DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt

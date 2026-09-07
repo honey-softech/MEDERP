@@ -115,7 +115,9 @@ export async function POST(request: Request) {
     const generatedPassword = password.length >= MIN_PASSWORD_LENGTH ? null : generateStaffPassword();
     const passwordToHash = password.length >= MIN_PASSWORD_LENGTH ? password : generatedPassword!;
 
-    const username = await uniqueUsername(input.username || suggestedUsername(input.firstName, input.lastName));
+    const username = await uniqueUsername(
+      input.username || suggestedUsername(input.firstName, input.lastName, hospital.code),
+    );
     const clash = await prisma.appUser.findFirst({
       where: {
         OR: [{ username }, { mobile }],
@@ -156,7 +158,7 @@ export async function POST(request: Request) {
         photoData: input.photoData,
         dateOfBirth: input.dateOfBirth,
         gender: input.gender,
-        email: input.email,
+        email: input.email || null,
         dateJoined: input.dateJoined,
         employmentType: input.employmentType,
         preferredLanguage: input.preferredLanguage,

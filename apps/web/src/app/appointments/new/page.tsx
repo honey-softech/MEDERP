@@ -7,7 +7,7 @@ import {
   listBookableDoctors,
   requireHospitalPage,
   staffIdForAppUser,
-  WALK_IN_ROLES,
+  canAddWalkIn,
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -19,12 +19,14 @@ export default async function NewAppointmentPage({
 }) {
   const user = await requireHospitalPage();
   const canFrontDesk = FRONT_DESK_ROLES.includes(user.role);
-  const canWalkIn = WALK_IN_ROLES.includes(user.role);
+  const canWalkIn = canAddWalkIn(user);
   if (!canWalkIn) redirect("/appointments");
 
   const { walkin, patientId } = await searchParams;
   const doctorWalkIn = user.role === "DOCTOR";
-  if (doctorWalkIn && !walkin) {
+  const nurseWalkIn = user.role === "NURSE";
+  const staffWalkIn = doctorWalkIn || nurseWalkIn;
+  if (staffWalkIn && !walkin) {
     redirect(patientId ? `/appointments/new?walkin=1&patientId=${patientId}` : "/appointments/new?walkin=1");
   }
 
@@ -60,11 +62,13 @@ export default async function NewAppointmentPage({
   const doctorOptions = doctors.map((doctor) => ({ id: doctor.id, label: doctorName(doctor) }));
 
   return (
-    <AppShell title={walkin || doctorWalkIn ? "Walk-in registration" : "Book appointment"}>
+    <AppShell title={walkin || staffWalkIn ? "Walk-in registration" : "Book appointment"}>
       <p className="mb-4 text-sm text-slate-500">
         {doctorWalkIn
           ? "Add a walk-in to your OPD queue. Register a new patient first if they are not already in the hospital."
-          : "Search an existing patient to book. For a new patient, register them first, then schedule. Walk-ins join the OPD queue immediately."}
+          : nurseWalkIn
+            ? "Add a walk-in and assign them to a doctor. Register a new patient first if they are not already in the hospital."
+            : "Search an existing patient to book. For a new patient, register them first, then schedule. Walk-ins join the OPD queue immediately."}
       </p>
       {doctorWalkIn && !myStaffId ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -72,7 +76,7 @@ export default async function NewAppointmentPage({
         </p>
       ) : (
         <AppointmentForm
-          defaultQueueType={walkin || doctorWalkIn ? "WALK_IN" : "SCHEDULED"}
+          defaultQueueType={walkin || staffWalkIn ? "WALK_IN" : "SCHEDULED"}
           initialPatient={patient}
           doctors={doctorOptions}
           departments={departments.map((dept) => ({ id: dept.id, label: dept.name }))}

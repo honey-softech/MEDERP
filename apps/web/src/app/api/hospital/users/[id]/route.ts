@@ -5,8 +5,35 @@ import { STAFF_ROLES, getCurrentUser, hashPassword, invalidateUserSessions, pass
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { parseEmployeeBody, suggestedUsername, uniqueUsername, upsertEmployeeStaff, nextEmployeeId, nextUserCode } from "@/lib/employee";
+import { userFormInitial } from "@/lib/user-form-initial";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_request: Request, context: Ctx) {
+  const actor = await getCurrentUser();
+  if (!actor) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
+  const isPlatformAdmin = actor.role === "SOFTWARE_ADMIN";
+  if (!isPlatformAdmin && (actor.role !== "SUPER_ADMIN" || !actor.hospitalId)) {
+    return NextResponse.json({ error: "Hospital admin access required." }, { status: 403 });
+  }
+
+  const { id } = await context.params;
+  const existing = await prisma.appUser.findFirst({
+    where: isPlatformAdmin ? { id } : { id, hospitalId: actor.hospitalId! },
+    include: { staffProfile: true },
+  });
+  if (!existing || !existing.hospitalId) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+  if (existing.role === "SOFTWARE_ADMIN" || existing.role === "HELPDESK") {
+    return NextResponse.json({ error: "This account cannot be edited here." }, { status: 403 });
+  }
+
+  return NextResponse.json({ user: userFormInitial(existing) });
+}
 
 export async function PATCH(request: Request, context: Ctx) {
   const actor = await getCurrentUser();
@@ -80,8 +107,12 @@ export async function PATCH(request: Request, context: Ctx) {
       }
     }
 
+    const hospital = await prisma.hospital.findUnique({
+      where: { id: hospitalId },
+      select: { code: true },
+    });
     const username = await uniqueUsername(
-      input.username || existing.username || suggestedUsername(input.firstName, input.lastName),
+      input.username || existing.username || suggestedUsername(input.firstName, input.lastName, hospital?.code),
       id,
     );
 
@@ -118,7 +149,7 @@ export async function PATCH(request: Request, context: Ctx) {
         photoData: input.photoData,
         dateOfBirth: input.dateOfBirth,
         gender: input.gender,
-        email: input.email,
+        email: input.email || null,
         dateJoined: input.dateJoined,
         employmentType: input.employmentType,
         preferredLanguage: input.preferredLanguage,

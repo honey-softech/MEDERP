@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
 
 const GENDERS = [
@@ -19,6 +20,14 @@ const ID_PROOFS = [
   { value: "DRIVING_LICENSE", label: "Driving licence" },
   { value: "VOTER_ID", label: "Voter ID" },
   { value: "OTHER", label: "Other" },
+];
+
+const FAMILY_RELATIONS = [
+  { value: "CHILD", label: "Child" },
+  { value: "SPOUSE", label: "Spouse" },
+  { value: "PARENT", label: "Parent" },
+  { value: "SIBLING", label: "Sibling" },
+  { value: "OTHER", label: "Other dependent" },
 ];
 
 export type PatientFormValues = {
@@ -72,12 +81,19 @@ export function PatientForm({
   nextHref?: string;
 }) {
   const router = useRouter();
+  const isEdit = Boolean(initial?.id);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [familyHits, setFamilyHits] = useState<FamilyHit[]>([]);
   const [familyOf, setFamilyOf] = useState(familyOfPatientId ?? "");
   const [familyRelation, setFamilyRelation] = useState(familyRelationDefault);
+  const [familyOpen, setFamilyOpen] = useState(Boolean(familyOfPatientId));
+  const [contactOpen, setContactOpen] = useState(isEdit);
+  const [historyOpen, setHistoryOpen] = useState(isEdit);
+  const [idProofOpen, setIdProofOpen] = useState(isEdit);
+  const [insuranceOpen, setInsuranceOpen] = useState(isEdit);
+  const [photoOpen, setPhotoOpen] = useState(isEdit || Boolean(initial?.photoData));
   const [values, setValues] = useState<PatientFormValues>(
     initial ?? {
       firstName: "",
@@ -109,10 +125,12 @@ export function PatientForm({
   }
 
   useEffect(() => {
-    if (initial?.id || familyOfPatientId) return;
+    if (isEdit || familyOfPatientId) return;
     const phone = values.phone.replace(/\D/g, "");
     if (phone.length < 8) {
       setFamilyHits([]);
+      setFamilyOf("");
+      setFamilyOpen(false);
       return;
     }
     const timer = window.setTimeout(async () => {
@@ -124,13 +142,25 @@ export function PatientForm({
       } catch {
         data = { patients: [] };
       }
-      setFamilyHits(data.patients ?? []);
-      if (!familyOfPatientId && (data.patients ?? []).length > 0) {
-        setFamilyOf((current) => current || data.patients![0].id);
+      const patients = data.patients ?? [];
+      setFamilyHits(patients);
+      if (patients.length === 0) {
+        setFamilyOf("");
+        setFamilyOpen(false);
       }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [values.phone, initial?.id, familyOfPatientId]);
+  }, [values.phone, isEdit, familyOfPatientId]);
+
+  function toggleFamily() {
+    if (familyOpen) {
+      setFamilyOpen(false);
+      setFamilyOf(familyOfPatientId ?? "");
+      return;
+    }
+    setFamilyOpen(true);
+    if (!familyOf && familyHits[0]) setFamilyOf(familyHits[0].id);
+  }
 
   async function submit(force = false, asFamilyId = familyOf) {
     setError("");
@@ -175,6 +205,8 @@ export function PatientForm({
     router.refresh();
   }
 
+  const showFamilyLookup = !isEdit && !familyOfPatientId && familyHits.length > 0;
+
   return (
     <form
       onSubmit={(event) => {
@@ -183,8 +215,6 @@ export function PatientForm({
       }}
       className="grid max-w-5xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:grid-cols-2"
     >
-      <PhotoCapture value={values.photoData} onChange={(value) => setField("photoData", value)} label="Patient photo" />
-
       <h3 className="md:col-span-2 font-semibold">Demographics</h3>
       <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required />
       <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} required />
@@ -199,94 +229,154 @@ export function PatientForm({
           ))}
         </select>
       </label>
-      <Field label="Blood group" value={values.bloodGroup} onChange={(v) => setField("bloodGroup", v)} placeholder="B+" />
-
-      <h3 className="md:col-span-2 mt-2 font-semibold">Clinical history</h3>
-      <Area label="Allergies" value={values.allergies} onChange={(v) => setField("allergies", v)} />
-      <Area label="Medical history" value={values.medicalHistory} onChange={(v) => setField("medicalHistory", v)} />
-      <Area label="Family history" value={values.familyHistory} onChange={(v) => setField("familyHistory", v)} />
-      <Area label="Social history" value={values.socialHistory} onChange={(v) => setField("socialHistory", v)} />
-      <Area
-        label="Current medications"
-        value={values.currentMedications}
-        onChange={(v) => setField("currentMedications", v)}
-        className="md:col-span-2"
-      />
-
-      <h3 className="md:col-span-2 mt-2 font-semibold">Contact</h3>
       <Field
-        label="Phone (parent mobile is OK for children)"
+        label="Phone (use parent mobile for a child or relative)"
         value={values.phone}
         onChange={(v) => setField("phone", v)}
       />
-      <Field label="Email" type="email" value={values.email} onChange={(v) => setField("email", v)} />
-      <label className="md:col-span-2 text-sm font-medium text-slate-700">
-        Address
-        <input className={fieldClass} value={values.address} onChange={(event) => setField("address", event.target.value)} />
-      </label>
-      <Field label="Emergency contact name" value={values.emergencyName} onChange={(v) => setField("emergencyName", v)} />
-      <Field label="Emergency phone" value={values.emergencyPhone} onChange={(v) => setField("emergencyPhone", v)} />
+      <Field label="Blood group" value={values.bloodGroup} onChange={(v) => setField("bloodGroup", v)} placeholder="B+" />
 
-      {!initial?.id && (familyHits.length > 0 || familyOf) ? (
-        <div className="md:col-span-2 rounded-xl border border-teal-200 bg-teal-50 p-4 text-sm">
-          <p className="font-medium text-teal-950">This mobile already has a hospital family group</p>
-          <p className="mt-1 text-teal-800">
-            Each person still gets a unique UHID. Add a child or dependent under the existing patient.
-          </p>
-          <ul className="mt-3 space-y-1">
-            {familyHits.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center gap-2">
-                <a className="text-teal-800 underline" href={`/patients/${row.id}`}>
-                  {row.firstName} {row.lastName} · {row.mrn}
-                </a>
-                {row.familyGroupCode ? <span className="text-xs text-slate-500">{row.familyGroupCode}</span> : null}
-                <button
-                  type="button"
-                  className={secondaryButtonClass}
-                  onClick={() => setFamilyOf(row.id)}
-                >
-                  {familyOf === row.id ? "Selected as family head" : "Add under this patient"}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {familyOf ? (
-            <label className="mt-3 block font-medium text-slate-700">
-              Relation to family head
-              <select className={fieldClass} value={familyRelation} onChange={(event) => setFamilyRelation(event.target.value)}>
-                <option value="CHILD">Child</option>
-                <option value="SPOUSE">Spouse</option>
-                <option value="PARENT">Parent</option>
-                <option value="SIBLING">Sibling</option>
-                <option value="OTHER">Other dependent</option>
-              </select>
-            </label>
+      {showFamilyLookup ? (
+        <div className="md:col-span-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-medium text-teal-950">This mobile is already on file</p>
+              <p className="mt-1 text-teal-800">
+                Expand only if you are registering a child or relative under this number. Each person still gets a unique UHID.
+              </p>
+            </div>
+            <ExpandToggle
+              open={familyOpen}
+              onToggle={toggleFamily}
+              labelOpen="Hide relatives"
+              labelClosed="Add relative"
+            />
+          </div>
+          {familyOpen ? (
+            <div className="mt-3 border-t border-teal-200 pt-3">
+              <ul className="space-y-1">
+                {familyHits.map((row) => (
+                  <li key={row.id} className="flex flex-wrap items-center gap-2">
+                    <a className="text-teal-800 underline" href={`/patients/${row.id}`}>
+                      {row.firstName} {row.lastName} · {row.mrn}
+                    </a>
+                    {row.familyGroupCode ? <span className="text-xs text-slate-500">{row.familyGroupCode}</span> : null}
+                    <button
+                      type="button"
+                      className={secondaryButtonClass}
+                      onClick={() => setFamilyOf(row.id)}
+                    >
+                      {familyOf === row.id ? "Selected as family head" : "Add under this patient"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {familyOf ? (
+                <label className="mt-3 block font-medium text-slate-700">
+                  Relation to family head
+                  <select className={fieldClass} value={familyRelation} onChange={(event) => setFamilyRelation(event.target.value)}>
+                    {FAMILY_RELATIONS.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}
 
-      <h3 className="md:col-span-2 mt-2 font-semibold">ID proof</h3>
-      <label className="text-sm font-medium text-slate-700">
-        ID type
-        <select className={fieldClass} value={values.idProofType} onChange={(event) => setField("idProofType", event.target.value)}>
-          {ID_PROOFS.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Field label="ID number" value={values.idProofNumber} onChange={(v) => setField("idProofNumber", v)} />
+      {familyOfPatientId ? (
+        <label className="md:col-span-2 text-sm font-medium text-slate-700">
+          Relation to family head
+          <select className={fieldClass} value={familyRelation} onChange={(event) => setFamilyRelation(event.target.value)}>
+            {FAMILY_RELATIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
-      <h3 className="md:col-span-2 mt-2 font-semibold">Insurance</h3>
-      <Field label="Provider" value={values.insuranceProvider} onChange={(v) => setField("insuranceProvider", v)} />
-      <Field label="Policy number" value={values.insurancePolicyNo} onChange={(v) => setField("insurancePolicyNo", v)} />
-      <Field
-        label="Valid until"
-        type="date"
-        value={values.insuranceValidUntil}
-        onChange={(v) => setField("insuranceValidUntil", v)}
-      />
+      <FormSection
+        title="Photo"
+        open={photoOpen}
+        onToggle={() => setPhotoOpen((open) => !open)}
+        hint={values.photoData ? "Photo captured" : "Optional camera or upload"}
+      >
+        <PhotoCapture value={values.photoData} onChange={(value) => setField("photoData", value)} label="Patient photo" />
+      </FormSection>
+
+      <FormSection
+        title="More contact"
+        open={contactOpen}
+        onToggle={() => setContactOpen((open) => !open)}
+        hint="Email, address, emergency contact"
+      >
+        <Field label="Email" type="email" value={values.email} onChange={(v) => setField("email", v)} />
+        <label className="md:col-span-2 text-sm font-medium text-slate-700">
+          Address
+          <input className={fieldClass} value={values.address} onChange={(event) => setField("address", event.target.value)} />
+        </label>
+        <Field label="Emergency contact name" value={values.emergencyName} onChange={(v) => setField("emergencyName", v)} />
+        <Field label="Emergency phone" value={values.emergencyPhone} onChange={(v) => setField("emergencyPhone", v)} />
+      </FormSection>
+
+      <FormSection
+        title="Clinical history"
+        open={historyOpen}
+        onToggle={() => setHistoryOpen((open) => !open)}
+        hint="Allergies, medical and family history"
+      >
+        <Area label="Allergies" value={values.allergies} onChange={(v) => setField("allergies", v)} />
+        <Area label="Medical history" value={values.medicalHistory} onChange={(v) => setField("medicalHistory", v)} />
+        <Area label="Family history" value={values.familyHistory} onChange={(v) => setField("familyHistory", v)} />
+        <Area label="Social history" value={values.socialHistory} onChange={(v) => setField("socialHistory", v)} />
+        <Area
+          label="Current medications"
+          value={values.currentMedications}
+          onChange={(v) => setField("currentMedications", v)}
+          className="md:col-span-2"
+        />
+      </FormSection>
+
+      <FormSection
+        title="ID proof"
+        open={idProofOpen}
+        onToggle={() => setIdProofOpen((open) => !open)}
+        hint="Aadhaar, PAN, or other ID"
+      >
+        <label className="text-sm font-medium text-slate-700">
+          ID type
+          <select className={fieldClass} value={values.idProofType} onChange={(event) => setField("idProofType", event.target.value)}>
+            {ID_PROOFS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Field label="ID number" value={values.idProofNumber} onChange={(v) => setField("idProofNumber", v)} />
+      </FormSection>
+
+      <FormSection
+        title="Insurance"
+        open={insuranceOpen}
+        onToggle={() => setInsuranceOpen((open) => !open)}
+        hint="Provider and policy"
+      >
+        <Field label="Provider" value={values.insuranceProvider} onChange={(v) => setField("insuranceProvider", v)} />
+        <Field label="Policy number" value={values.insurancePolicyNo} onChange={(v) => setField("insurancePolicyNo", v)} />
+        <Field
+          label="Valid until"
+          type="date"
+          value={values.insuranceValidUntil}
+          onChange={(v) => setField("insuranceValidUntil", v)}
+        />
+      </FormSection>
 
       {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
       {duplicates.length > 0 ? (
@@ -324,10 +414,37 @@ export function PatientForm({
       ) : null}
       <div className="md:col-span-2">
         <button className={buttonClass} type="submit" disabled={pending}>
-          {pending ? "Saving…" : familyOf && !initial?.id ? "Register in family group" : submitLabel}
+          {pending ? "Saving…" : familyOf && !isEdit ? "Register in family group" : submitLabel}
         </button>
       </div>
     </form>
+  );
+}
+
+function FormSection({
+  title,
+  open,
+  onToggle,
+  hint,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="md:col-span-2 rounded-xl border border-slate-200">
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <div className="min-w-0">
+          <h3 className="font-semibold">{title}</h3>
+          {!open && hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
+        </div>
+        <ExpandToggle open={open} onToggle={onToggle} />
+      </div>
+      {open ? <div className="grid gap-4 border-t border-slate-200 p-3 md:grid-cols-2">{children}</div> : null}
+    </div>
   );
 }
 

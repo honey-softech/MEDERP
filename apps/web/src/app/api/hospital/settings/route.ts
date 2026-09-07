@@ -42,7 +42,13 @@ export async function PATCH(request: Request) {
     data.requireSignatureForApproval = Boolean(body?.requireSignatureForApproval);
   }
 
-  if (!brandingSent && !policySent) {
+  const walkInSent = body != null && ("walkInByDoctor" in body || "walkInByNurse" in body);
+  if (walkInSent) {
+    if ("walkInByDoctor" in body) data.walkInByDoctor = Boolean(body.walkInByDoctor);
+    if ("walkInByNurse" in body) data.walkInByNurse = Boolean(body.walkInByNurse);
+  }
+
+  if (!brandingSent && !policySent && !walkInSent) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -59,8 +65,25 @@ export async function PATCH(request: Request) {
   const changes = diffAuditFields(
     existing as unknown as Record<string, unknown>,
     hospital as unknown as Record<string, unknown>,
-    { fields: ["address", "phone", "opdFee", "logoData", "sealData", "requireSignatureForApproval"] },
+    {
+      fields: [
+        "address",
+        "phone",
+        "opdFee",
+        "logoData",
+        "sealData",
+        "requireSignatureForApproval",
+        "walkInByDoctor",
+        "walkInByNurse",
+      ],
+    },
   );
+
+  const action = walkInSent && !brandingSent && !policySent
+    ? "HOSPITAL_WALK_IN_POLICY_UPDATED"
+    : policySent && !brandingSent
+      ? "HOSPITAL_SIGNATURE_POLICY_UPDATED"
+      : "HOSPITAL_BRANDING_UPDATED";
 
   await writeAuditLog({
     request,
@@ -68,11 +91,12 @@ export async function PATCH(request: Request) {
     actorUserId: scoped.user.id,
     actorUsername: scoped.user.username,
     actorRole: scoped.user.role,
-    action: policySent && !brandingSent ? "HOSPITAL_SIGNATURE_POLICY_UPDATED" : "HOSPITAL_BRANDING_UPDATED",
+    action,
     entity: "Hospital",
     entityId: hospital.id,
-    summary:
-      policySent && !brandingSent
+    summary: walkInSent && !brandingSent && !policySent
+      ? `${scoped.user.username} updated who can add walk-ins.`
+      : policySent && !brandingSent
         ? `${scoped.user.username} ${data.requireSignatureForApproval ? "required" : "stopped requiring"} signatures for visit summary approval.`
         : `${scoped.user.username} updated hospital print branding.`,
     metadata: { changes },

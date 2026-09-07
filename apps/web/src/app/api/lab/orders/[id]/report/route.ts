@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import {
-  EXTERNAL_REPORT_UPLOAD_ROLES,
-  LAB_REPORT_VIEW_ROLES,
-  LAB_WORK_ROLES,
-  patientName,
-  requireHospitalActor,
-} from "@/lib/front-desk";
+import { patientName, requireHospitalActor } from "@/lib/front-desk";
 import { notifyLabResults } from "@/lib/lab";
 import {
   isAllowedLabReport,
@@ -15,6 +9,8 @@ import {
   sanitizeReportFileName,
   saveLabReportFile,
 } from "@/lib/lab-report-store";
+import { canUploadLabReport, canViewLabReport } from "@/lib/lab-orders/rules";
+import { hospitalScope } from "@/lib/tenancy";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,20 +19,18 @@ export async function GET(_request: Request, context: Ctx) {
   if (scoped.error) return scoped.error;
   const { id } = await context.params;
   const order = await prisma.labOrder.findFirst({
-    where: { id, hospitalId: scoped.user.hospitalId },
+    where: { id, ...hospitalScope(scoped.user.hospitalId) },
   });
   if (!order?.reportFileName || !order.reportMimeType) {
     return NextResponse.json({ error: "No report has been uploaded yet." }, { status: 404 });
   }
-  const canView =
-    LAB_REPORT_VIEW_ROLES.includes(scoped.user.role) ||
-    LAB_WORK_ROLES.includes(scoped.user.role) ||
-    (order.fulfillment === "EXTERNAL" && EXTERNAL_REPORT_UPLOAD_ROLES.includes(scoped.user.role));
-  if (!canView) {
-    return NextResponse.json({ error: "You cannot open this report." }, { status: 403 });
-  }
-  if (scoped.user.role === "LAB_TECH" && order.status === "RESULTED") {
-    return NextResponse.json({ error: "This report is on the patient record for the doctor and nurse." }, { status: 403 });
+  const view = canViewLabReport({
+    role: scoped.user.role,
+    fulfillment: order.fulfillment,
+    status: order.status,
+  });
+  if (!view.ok) {
+    return NextResponse.json({ error: view.error }, { status: view.status });
   }
 
   const bytes = await readLabReportFile(order.hospitalId, order.id);
@@ -59,7 +53,7 @@ export async function POST(request: Request, context: Ctx) {
 
   const { id } = await context.params;
   const order = await prisma.labOrder.findFirst({
-    where: { id, hospitalId: scoped.user.hospitalId },
+    where: { id, ...hospitalScope(scoped.user.hospitalId) },
     include: {
       patient: true,
       appointment: { include: { doctor: { select: { appUserId: true } } } },
@@ -69,23 +63,15 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: "Lab order not found." }, { status: 404 });
   }
 
+  const allowed = canUploadLabReport({
+    role: scoped.user.role,
+    fulfillment: order.fulfillment,
+    status: order.status,
+  });
+  if (!allowed.ok) {
+    return NextResponse.json({ error: allowed.error }, { status: allowed.status });
+  }
   const external = order.fulfillment === "EXTERNAL";
-  const allowed = external
-    ? EXTERNAL_REPORT_UPLOAD_ROLES.includes(scoped.user.role)
-    : LAB_WORK_ROLES.includes(scoped.user.role);
-  if (!allowed) {
-    return NextResponse.json({ error: "You cannot upload this report." }, { status: 403 });
-  }
-  if (external) {
-    if (order.status === "CANCELLED") {
-      return NextResponse.json({ error: "This investigation was cancelled." }, { status: 409 });
-    }
-  } else if (order.status === "AWAITING_PAYMENT" || order.status === "CANCELLED") {
-    return NextResponse.json({ error: "Collect payment before uploading a report." }, { status: 409 });
-  }
-  if (order.status === "RESULTED" && scoped.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "This order is already marked done." }, { status: 409 });
-  }
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

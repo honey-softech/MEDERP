@@ -8,8 +8,9 @@ import {
   sessionCookieOptions,
   verifyPassword,
 } from "@/lib/auth";
-import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
+import { loginSchema } from "@/lib/validation/auth";
+import { parseJsonBody } from "@/lib/validation/parse";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
@@ -25,13 +26,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json().catch(() => null);
-  const mobile = normalizeMobile(String(body?.mobile ?? body?.identifier ?? ""));
-  const password = String(body?.password ?? "");
-
-  if (!isValidIndianMobile(mobile) || !password) {
-    return NextResponse.json({ error: "Enter a valid 10-digit mobile number and password." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, loginSchema);
+  if (!parsed.ok) return parsed.response;
+  const { mobile, password } = parsed.data;
 
   const user = await prisma.appUser.findUnique({
     where: { mobile },

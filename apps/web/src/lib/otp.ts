@@ -1,13 +1,12 @@
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { deliverMessage } from "@/lib/messaging/providers";
-import { enqueueMessage } from "@/lib/messaging/queue";
+import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { renderTemplate } from "@/lib/messaging/templates";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 
-/** Temporary stand-in until SMS OTP is wired. Set OTP_DUMMY=0 to require a real issued code. */
+/** Temporary stand-in until WhatsApp OTP is wired. Set OTP_DUMMY=0 to require a real issued code. */
 export const DUMMY_OTP = "123456";
 
 export function dummyOtpEnabled() {
@@ -19,27 +18,31 @@ export function hashOtp(otp: string) {
 }
 
 export function generateOtp() {
-  if (dummyOtpEnabled()) return DUMMY_OTP;
+  // Keep 123456 only when WhatsApp is not configured. Once it is on, send a real code
+  // so the WhatsApp message is useful; dummy verify still accepts 123456 until OTP_DUMMY=0.
+  if (dummyOtpEnabled() && messagingProvider() !== "whatsapp") return DUMMY_OTP;
   return String(randomInt(100_000, 1_000_000));
 }
 
-/** Deliver OTP via the messaging queue when the user belongs to a hospital; otherwise send immediately. */
-export async function deliverOtp(mobile: string, otp: string, purpose: string, hospitalId?: string | null) {
+/** Deliver OTP on WhatsApp immediately (do not wait for the outbound queue). */
+export async function deliverOtp(mobile: string, otp: string, purpose: string, _hospitalId?: string | null) {
   const body = renderTemplate("otp", { otp });
-  if (hospitalId) {
-    const queued = await enqueueMessage({
-      hospitalId,
-      channel: "SMS",
-      templateKey: "otp",
-      variables: { otp, purpose },
-      toPhone: mobile,
-    });
-    if ("error" in queued) {
-      await deliverMessage({ toPhone: mobile, channel: "SMS", body, templateKey: "otp" });
-    }
-    return;
+  const result = await deliverMessage({
+    toPhone: mobile,
+    channel: "WHATSAPP",
+    body,
+    templateKey: "otp",
+    otp,
+    variables: { otp, purpose },
+  });
+  if (!result.ok) {
+    console.error(`[otp] WhatsApp send failed for ******${mobile.slice(-4)} (${purpose}): ${result.error}`);
+  } else if (messagingProvider() === "console") {
+    console.warn(
+      `[otp] WhatsApp not configured (set WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_ACCESS_TOKEN). Logged OTP for ******${mobile.slice(-4)}.`,
+    );
   }
-  await deliverMessage({ toPhone: mobile, channel: "SMS", body, templateKey: "otp" });
+  return result;
 }
 
 export async function issueOtp(userId: string, mobile: string, purpose: string) {
@@ -87,7 +90,7 @@ async function clearOtp(userId: string) {
   });
 }
 
-/** Verifies OTP. On success clears it (single-use). Dummy 123456 is accepted until SMS is live. */
+/** Verifies OTP. On success clears it (single-use). Dummy 123456 is accepted until WhatsApp OTP is live. */
 export async function verifyAndConsumeOtp(
   user: { id: string; otpCode: string | null; otpExpiresAt: Date | null; otpAttempts: number },
   otp: string,

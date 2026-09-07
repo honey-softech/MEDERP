@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { InvoiceActions } from "@/components/billing-forms";
 import { PrintButton } from "@/components/print-button";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { SignatureBlock } from "@/components/signature-block";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
@@ -82,6 +83,13 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <Link href="/billing" className={secondaryButtonClass}>
           Back
         </Link>
+        {invoice.status !== "VOID" && invoice.status !== "DRAFT" ? (
+          <SendPatientMessageButton
+            endpoint={`/api/invoices/${invoice.id}/send`}
+            patientPhone={invoice.patient.phone}
+            label="Send PDF on WhatsApp"
+          />
+        ) : null}
         <PrintButton />
       </div>
 

@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { FilterableTable } from "@/components/filterable-table";
+import { HospitalUsersPanel } from "@/components/hospital-users-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { countHospitalStaffSeats } from "@/lib/platform-billing";
 import { staffSeatLimit } from "@/lib/platform-pricing";
 import { prisma } from "@/lib/prisma";
-import { CreateUserDialog } from "@/components/create-user-dialog";
 import { backfillHospitalUserIdentity } from "@/lib/employee";
 
 export default async function HospitalUsersPage() {
@@ -81,36 +80,21 @@ export default async function HospitalUsersPage() {
           </p>
         ) : null}
       </div>
-      <CreateUserDialog
+      <HospitalUsersPanel
         departments={departments.map((row) => ({ id: row.id, label: row.name }))}
         disabled={seatLimitReached}
         disabledReason={limitReason}
         subscriptionHref="/hospital/subscription"
+        users={users.map((row) => ({
+          id: row.id,
+          code: row.userCode ?? "—",
+          employeeId: row.employeeId ?? "—",
+          username: row.firstName ? `${row.firstName} ${row.lastName ?? ""}`.trim() : row.username,
+          mobile: row.mobile,
+          role: row.role.replace(/_/g, " "),
+          verified: row.isActive === false ? "Inactive" : row.isVerified ? "Active" : "Pending OTP",
+        }))}
       />
-      <div className="mt-8">
-        <FilterableTable
-          rows={users.map((row) => ({
-            id: row.id,
-            code: row.userCode ?? "—",
-            employeeId: row.employeeId ?? "—",
-            username: row.firstName ? `${row.firstName} ${row.lastName ?? ""}`.trim() : row.username,
-            mobile: row.mobile,
-            role: row.role.replace(/_/g, " "),
-            verified: row.isActive === false ? "Inactive" : row.isVerified ? "Active" : "Pending OTP",
-            edit: "Edit",
-            href: `/hospital/users/${row.id}`,
-          }))}
-          columns={[
-            { key: "code", header: "User ID", className: "font-mono text-xs" },
-            { key: "employeeId", header: "Employee ID" },
-            { key: "username", header: "Name", className: "font-medium", hrefKey: "href" },
-            { key: "mobile", header: "Mobile" },
-            { key: "role", header: "Role" },
-            { key: "verified", header: "Status" },
-            { key: "edit", header: "Action", filter: false, hrefKey: "href" },
-          ]}
-        />
-      </div>
     </AppShell>
   );
 }

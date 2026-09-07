@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, normalizeMobile, passwordValidationError } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { resetPasswordSchema } from "@/lib/validation/auth";
+import { parseJsonBody } from "@/lib/validation/parse";
 import { otpErrorMessage, verifyAndConsumeOtp } from "@/lib/otp";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
@@ -18,18 +20,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json().catch(() => null);
-  const mobile = normalizeMobile(String(body?.mobile ?? ""));
-  const otp = String(body?.otp ?? "").trim();
-  const password = String(body?.password ?? "");
-
-  if (!mobile || !otp) {
-    return NextResponse.json({ error: "Mobile number and OTP are required." }, { status: 400 });
-  }
-  const passwordError = passwordValidationError(password);
-  if (passwordError) {
-    return NextResponse.json({ error: passwordError }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, resetPasswordSchema);
+  if (!parsed.ok) return parsed.response;
+  const { mobile, otp, password } = parsed.data;
 
   const user = await prisma.appUser.findUnique({ where: { mobile } });
   if (!user || user.isActive === false) {

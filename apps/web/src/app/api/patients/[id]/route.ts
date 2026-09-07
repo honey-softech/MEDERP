@@ -1,25 +1,11 @@
 import { NextResponse } from "next/server";
-import type { Gender, IdProofType } from "@prisma/client";
+import { CLINICAL_VIEW_ROLES, requireHospitalActor } from "@/lib/authz/hospital";
+import { patientActionResponse } from "@/lib/patients/http";
+import { updatePatient } from "@/lib/patients/update";
 import { prisma } from "@/lib/prisma";
-import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import {
-  CLINICAL_VIEW_ROLES,
-  DOCTOR_VISIT_ROLES,
-  FRONT_DESK_ROLES,
-  forbidUnless,
-  requireHospitalActor,
-  sanitizePhotoData,
-} from "@/lib/front-desk";
-
-const GENDERS: Gender[] = ["MALE", "FEMALE", "OTHER"];
-const ID_PROOFS: IdProofType[] = ["AADHAAR", "PAN", "PASSPORT", "DRIVING_LICENSE", "VOTER_ID", "OTHER"];
-const CLINICAL_HISTORY_FIELDS = [
-  "allergies",
-  "medicalHistory",
-  "familyHistory",
-  "socialHistory",
-  "currentMedications",
-] as const;
+import { hospitalScope } from "@/lib/tenancy";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { updatePatientSchema } from "@/lib/validation/patient";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -34,7 +20,7 @@ export async function GET(_request: Request, context: Ctx) {
 
   const { id } = await context.params;
   const patient = await prisma.patient.findFirst({
-    where: { id, hospitalId: scoped.user.hospitalId },
+    where: { id, ...hospitalScope(scoped.user.hospitalId) },
     include: {
       familyAsPrimary: { include: { relatedPatient: true } },
       familyAsRelated: { include: { primaryPatient: true } },
@@ -51,118 +37,18 @@ export async function PATCH(request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
 
-  const isFrontDesk = FRONT_DESK_ROLES.includes(scoped.user.role);
-  const isClinician = DOCTOR_VISIT_ROLES.includes(scoped.user.role);
-  if (!isFrontDesk && !isClinician) {
-    return forbidUnless(scoped.user.role, FRONT_DESK_ROLES)!;
-  }
+  const { id } = await context.params;
+  const parsed = await parseJsonBody(request, updatePatientSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
-    const { id } = await context.params;
-    const existing = await prisma.patient.findFirst({
-      where: { id, hospitalId: scoped.user.hospitalId, mergedIntoId: null },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "Patient not found." }, { status: 404 });
-    }
-
-    const body = await request.json().catch(() => null);
-    const data: Record<string, unknown> = {};
-    const textFields = isFrontDesk
-      ? ([
-          "firstName",
-          "lastName",
-          "phone",
-          "email",
-          "address",
-          "bloodGroup",
-          ...CLINICAL_HISTORY_FIELDS,
-          "emergencyName",
-          "emergencyPhone",
-          "idProofNumber",
-          "insuranceProvider",
-          "insurancePolicyNo",
-        ] as const)
-      : CLINICAL_HISTORY_FIELDS;
-
-    for (const field of textFields) {
-      if (body?.[field] !== undefined) {
-        const value = String(body[field] ?? "").trim();
-        data[field] = value || null;
-      }
-    }
-
-    if (isFrontDesk) {
-      if (body?.dateOfBirth) {
-        const dateOfBirth = new Date(String(body.dateOfBirth));
-        if (Number.isNaN(dateOfBirth.getTime())) {
-          return NextResponse.json({ error: "Invalid date of birth." }, { status: 400 });
-        }
-        data.dateOfBirth = dateOfBirth;
-      }
-      if (body?.gender) {
-        const gender = String(body.gender) as Gender;
-        if (!GENDERS.includes(gender)) {
-          return NextResponse.json({ error: "Select a valid gender." }, { status: 400 });
-        }
-        data.gender = gender;
-      }
-      if (body?.idProofType !== undefined) {
-        const idProofType = body.idProofType ? (String(body.idProofType) as IdProofType) : null;
-        if (idProofType && !ID_PROOFS.includes(idProofType)) {
-          return NextResponse.json({ error: "Select a valid ID proof type." }, { status: 400 });
-        }
-        data.idProofType = idProofType;
-      }
-      if (body?.insuranceValidUntil !== undefined) {
-        data.insuranceValidUntil = body.insuranceValidUntil
-          ? new Date(String(body.insuranceValidUntil))
-          : null;
-      }
-      if (body?.photoData !== undefined) {
-        data.photoData = sanitizePhotoData(body.photoData);
-      }
-      if (!data.firstName) data.firstName = existing.firstName;
-      if (!data.lastName) data.lastName = existing.lastName;
-    }
-
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: "No changes provided." }, { status: 400 });
-    }
-
-    const patient = await prisma.patient.update({
-      where: { id },
-      data,
-    });
-
-    await writeAuditLog({
+    const result = await updatePatient({
       request,
-      hospitalId: scoped.user.hospitalId,
-      actorUserId: scoped.user.id,
-      actorUsername: scoped.user.username,
-      actorRole: scoped.user.role,
-      action: "PATIENT_UPDATED",
-      entity: "Patient",
-      entityId: patient.id,
-      summary: `${scoped.user.username} updated patient ${patient.firstName} ${patient.lastName} (${patient.mrn}).`,
-      metadata: {
-        changes: diffAuditFields(
-          existing as unknown as Record<string, unknown>,
-          patient as unknown as Record<string, unknown>,
-          { fields: Object.keys(data) },
-        ),
-      },
+      user: scoped.user,
+      patientId: id,
+      body: parsed.data,
     });
-
-    return NextResponse.json({
-      ok: true,
-      patient: {
-        id: patient.id,
-        mrn: patient.mrn,
-        firstName: patient.firstName,
-        lastName: patient.lastName,
-      },
-    });
+    return patientActionResponse(result);
   } catch (error) {
     console.error("Failed to update patient", error);
     return NextResponse.json(

@@ -1,10 +1,8 @@
-import { NextResponse } from "next/server";
-import type { FamilyRelation } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { FRONT_DESK_ROLES, forbidUnless, requireHospitalActor } from "@/lib/front-desk";
-
-const RELATIONS: FamilyRelation[] = ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"];
+import { linkFamilyMember } from "@/lib/patients/family";
+import { patientActionResponse } from "@/lib/patients/http";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { linkFamilySchema } from "@/lib/validation/patient";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,62 +13,15 @@ export async function POST(request: Request, context: Ctx) {
   if (denied) return denied;
 
   const { id } = await context.params;
-  const body = await request.json().catch(() => null);
-  const relatedPatientId = String(body?.relatedPatientId ?? "");
-  const relation = String(body?.relation ?? "") as FamilyRelation;
+  const parsed = await parseJsonBody(request, linkFamilySchema);
+  if (!parsed.ok) return parsed.response;
 
-  if (!RELATIONS.includes(relation)) {
-    return NextResponse.json({ error: "Select a valid family relation." }, { status: 400 });
-  }
-  if (!relatedPatientId || relatedPatientId === id) {
-    return NextResponse.json({ error: "Select a different family member." }, { status: 400 });
-  }
-
-  const [primary, related] = await Promise.all([
-    prisma.patient.findFirst({ where: { id, hospitalId: scoped.user.hospitalId, mergedIntoId: null } }),
-    prisma.patient.findFirst({
-      where: { id: relatedPatientId, hospitalId: scoped.user.hospitalId, mergedIntoId: null },
-    }),
-  ]);
-  if (!primary || !related) {
-    return NextResponse.json({ error: "Patient not found in this hospital." }, { status: 404 });
-  }
-
-  const existingLink = await prisma.patientFamily.findUnique({
-    where: { primaryPatientId_relatedPatientId: { primaryPatientId: id, relatedPatientId } },
-  });
-
-  const link = await prisma.patientFamily.upsert({
-    where: {
-      primaryPatientId_relatedPatientId: { primaryPatientId: id, relatedPatientId },
-    },
-    update: { relation },
-    create: {
-      hospitalId: scoped.user.hospitalId,
-      primaryPatientId: id,
-      relatedPatientId,
-      relation,
-    },
-  });
-
-  await writeAuditLog({
+  const result = await linkFamilyMember({
     request,
-    hospitalId: scoped.user.hospitalId,
-    actorUserId: scoped.user.id,
-    actorUsername: scoped.user.username,
-    actorRole: scoped.user.role,
-    action: "PATIENT_FAMILY_LINKED",
-    entity: "Patient",
-    entityId: id,
-    summary: `${scoped.user.username} linked ${related.firstName} ${related.lastName} as ${relation.toLowerCase()} of ${primary.firstName} ${primary.lastName}.`,
-    metadata: {
-      changes: diffAuditFields(
-        existingLink ? { relatedPatientId: existingLink.relatedPatientId, relation: existingLink.relation } : null,
-        { relatedPatientId, relation },
-        { fields: ["relatedPatientId", "relation"] },
-      ),
-    },
+    user: scoped.user,
+    primaryId: id,
+    relatedPatientId: parsed.data.relatedPatientId,
+    relation: parsed.data.relation,
   });
-
-  return NextResponse.json({ ok: true, link });
+  return patientActionResponse(result);
 }

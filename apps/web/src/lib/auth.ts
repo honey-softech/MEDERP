@@ -66,11 +66,18 @@ export function readBearerToken(request?: Request | null) {
   return token || null;
 }
 
+export function sessionCookieSecure() {
+  const explicit = process.env.COOKIE_SECURE?.trim().toLowerCase();
+  if (explicit === "0" || explicit === "false") return false;
+  if (explicit === "1" || explicit === "true") return true;
+  return process.env.NODE_ENV === "production";
+}
+
 export function sessionCookieOptions(expiresAt: Date) {
   return {
     httpOnly: true,
     sameSite: "strict" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     path: "/",
     expires: expiresAt,
   };

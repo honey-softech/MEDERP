@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { STAFF_ROLES, hashPassword, passwordValidationError } from "@/lib/auth";
-import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
+import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { issueOtp } from "@/lib/otp";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
-import type { AppRole } from "@prisma/client";
+import { signupSchema } from "@/lib/validation/auth";
+import { parseJsonBody } from "@/lib/validation/parse";
 
 export async function POST(request: Request) {
   const limited = checkRateLimit(clientKey(request, "signup"), {
@@ -21,31 +21,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json().catch(() => null);
-    const username = String(body?.username ?? "").trim();
-    const mobile = normalizeMobile(String(body?.mobile ?? ""));
-    const password = String(body?.password ?? "");
-    const requestedRole = String(body?.role ?? "RECEPTIONIST") as AppRole;
-
-    if (username.length < 3) {
-      return NextResponse.json({ error: "Username must be at least 3 characters." }, { status: 400 });
-    }
-    if (!/^[a-zA-Z0-9._]+$/.test(username)) {
-      return NextResponse.json(
-        { error: "Username can only contain letters, numbers, dots, and underscores." },
-        { status: 400 },
-      );
-    }
-    if (!isValidIndianMobile(mobile)) {
-      return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
-    }
-    const passwordError = passwordValidationError(password);
-    if (passwordError) {
-      return NextResponse.json({ error: passwordError }, { status: 400 });
-    }
-    if (!STAFF_ROLES.includes(requestedRole)) {
-      return NextResponse.json({ error: "Select a valid hospital role." }, { status: 400 });
-    }
+    const parsed = await parseJsonBody(request, signupSchema);
+    if (!parsed.ok) return parsed.response;
+    const { username, mobile, password, role: requestedRole } = parsed.data;
 
     const existing = await prisma.appUser.findFirst({
       where: { OR: [{ username }, { mobile }] },

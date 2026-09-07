@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
+import { forgotPasswordSchema } from "@/lib/validation/auth";
+import { parseJsonBody } from "@/lib/validation/parse";
 import { issueOtp } from "@/lib/otp";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
@@ -24,12 +25,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json().catch(() => null);
-  const mobile = normalizeMobile(String(body?.mobile ?? body?.identifier ?? ""));
-
-  if (!isValidIndianMobile(mobile)) {
-    return NextResponse.json({ error: "Enter the 10-digit mobile number registered on this account." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, forgotPasswordSchema);
+  if (!parsed.ok) return parsed.response;
+  const { mobile } = parsed.data;
 
   const user = await prisma.appUser.findUnique({ where: { mobile } });
 

@@ -83,6 +83,8 @@ The app calls the Next.js API at `http://localhost:3000`. Android emulators shou
 | Billing | Invoices and line items |
 | Records | Encounter notes |
 
+System design, layering, and incremental refactor plan: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 API starters:
 
 - `GET /api/health`

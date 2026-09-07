@@ -4,13 +4,15 @@ import { useState } from "react";
 import { compactButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 
 export function SendPatientMessageButton({
-  appointmentId,
+  endpoint,
   patientPhone,
   compact = false,
+  label = "Send WhatsApp",
 }: {
-  appointmentId: string;
+  endpoint: string;
   patientPhone?: string | null;
   compact?: boolean;
+  label?: string;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -26,10 +28,10 @@ export function SendPatientMessageButton({
     setPending(true);
     setError("");
     setDone("");
-    const response = await fetch(`/api/appointments/${appointmentId}/investigations/send`, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: "SMS" }),
+      body: JSON.stringify({ channel: "WHATSAPP" }),
     });
     const data = await response.json().catch(() => ({}));
     setPending(false);
@@ -37,13 +39,13 @@ export function SendPatientMessageButton({
       setError(data.error ?? "Could not queue the message.");
       return;
     }
-    setDone("Queued");
+    setDone(data.status === "SENT" ? "Sent" : "Queued");
   }
 
   return (
     <span className="inline-flex flex-col items-start">
       <button type="button" className={className} disabled={pending} onClick={() => void send()}>
-        {pending ? "Sending…" : done || "Send"}
+        {pending ? "Sending…" : done || label}
       </button>
       {error ? <span className="mt-1 text-[11px] text-red-600">{error}</span> : null}
     </span>

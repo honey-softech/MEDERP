@@ -15,4 +15,4 @@ fi
 echo "Running prisma migrate deploy..."
 npx prisma migrate deploy
 echo "Migrations done. Starting server..."
-exec npm run start
+exec npx tsx server.ts

@@ -106,6 +106,7 @@ export default function HospitalUserForm({
   departments = [],
   plain = false,
   onCreated,
+  onSaved,
   createUrl = "/api/hospital/users",
   updateUrl,
   returnHref = "/hospital/users",
@@ -116,9 +117,10 @@ export default function HospitalUserForm({
   departments?: { id: string; label: string }[];
   plain?: boolean;
   onCreated?: (generatedPassword?: string) => void;
+  onSaved?: () => void;
   createUrl?: string;
   updateUrl?: string;
-  returnHref?: string;
+  returnHref?: string | null;
   allowSuperAdminRole?: boolean;
   hospitalId?: string;
 }) {
@@ -179,14 +181,16 @@ export default function HospitalUserForm({
       setGeneratedPassword(data.generatedPassword);
     }
     if (editing) {
-      router.push(returnHref);
+      onSaved?.();
       router.refresh();
+      if (returnHref) router.push(returnHref);
       return;
     }
     setValues({ ...empty, role: "RECEPTIONIST" });
     setPassword("");
     router.refresh();
     onCreated?.(data.generatedPassword);
+    onSaved?.();
   }
 
   return (
@@ -207,10 +211,14 @@ export default function HospitalUserForm({
         </div>
       )}
 
+      <p className="md:col-span-2 text-sm text-slate-500">
+        Fields marked <span className="font-semibold text-red-600">*</span> are required.
+      </p>
       <Select
         label="Role"
         value={roleLocked ? "SUPER_ADMIN" : role}
         disabled={roleLocked}
+        required
         onChange={(value) => setField("role", value)}
         options={roleLocked ? [{ value: "SUPER_ADMIN", label: "Hospital super admin" }] : roleOptions}
       />
@@ -229,9 +237,9 @@ export default function HospitalUserForm({
       <div className="md:col-span-2">
         <PhotoCapture value={values.photoData ?? ""} onChange={(value) => setField("photoData", value)} label="Profile photo" />
       </div>
-      <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required />
-      <Field label="Middle name" value={values.middleName} onChange={(v) => setField("middleName", v)} />
-      <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} required />
+      <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required autoComplete="given-name" />
+      <Field label="Middle name" value={values.middleName} onChange={(v) => setField("middleName", v)} autoComplete="additional-name" />
+      <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} required autoComplete="family-name" />
       <Field label="Date of birth" type="date" value={values.dateOfBirth} onChange={(v) => setField("dateOfBirth", v)} />
       <Select
         label="Gender"
@@ -244,14 +252,21 @@ export default function HospitalUserForm({
           { value: "OTHER", label: "Other" },
         ]}
       />
-      <Field label="Mobile number" value={values.mobile} onChange={(v) => setField("mobile", v)} required placeholder="+91 XXXXX XXXXX" />
-      <Field label="Email" type="email" value={values.email} onChange={(v) => setField("email", v)} required />
-      <Field label="Username" value={values.username} onChange={(v) => setField("username", v)} placeholder="Auto from name if blank" />
+      <Field label="Mobile number" value={values.mobile} onChange={(v) => setField("mobile", v)} required placeholder="+91 XXXXX XXXXX" autoComplete="tel" />
+      <Field label="Email" type="email" value={values.email} onChange={(v) => setField("email", v)} placeholder="Optional" autoComplete="email" />
+      <Field
+        label="Username"
+        value={values.username}
+        onChange={(v) => setField("username", v)}
+        placeholder="Auto from hospital code and name if blank"
+        autoComplete={editing ? "username" : "off"}
+      />
       <Field
         label={editing ? "New password (optional)" : "Password (leave blank to auto-generate)"}
         type="password"
         value={password}
         onChange={setPassword}
+        autoComplete="new-password"
       />
       <Select
         label="Account status"
@@ -408,6 +423,7 @@ function Field({
   required,
   placeholder,
   disabled,
+  autoComplete,
 }: {
   label: string;
   value?: string | null;
@@ -416,10 +432,12 @@ function Field({
   required?: boolean;
   placeholder?: string;
   disabled?: boolean;
+  autoComplete?: string;
 }) {
   return (
     <label className="text-sm font-medium text-slate-700">
       {label}
+      {required ? <span className="text-red-600"> *</span> : null}
       <input
         className={fieldClass}
         type={type}
@@ -427,6 +445,7 @@ function Field({
         required={required}
         placeholder={placeholder}
         disabled={disabled}
+        autoComplete={autoComplete}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
@@ -439,17 +458,20 @@ function Select({
   onChange,
   options,
   disabled,
+  required,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
   disabled?: boolean;
+  required?: boolean;
 }) {
   return (
     <label className="text-sm font-medium text-slate-700">
       {label}
-      <select className={fieldClass} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+      {required ? <span className="text-red-600"> *</span> : null}
+      <select className={fieldClass} value={value} disabled={disabled} required={required} onChange={(event) => onChange(event.target.value)}>
         {options.map((item) => (
           <option key={item.value || "empty"} value={item.value}>
             {item.label}

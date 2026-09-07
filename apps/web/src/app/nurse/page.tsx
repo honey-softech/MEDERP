@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import {
+  canAddWalkIn,
   NURSE_VITALS_ROLES,
   dayRange,
   doctorName,
@@ -39,9 +40,16 @@ export default async function NurseStationPage() {
 
   return (
     <AppShell title="Nurse station">
-      <p className="mb-4 text-sm text-slate-500">
-        When reception books a consult or adds a walk-in, you are notified here. Height, weight, and temperature are required; other vitals are optional. The doctor will see them in the room.
-      </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          When reception books a consult or adds a walk-in, you are notified here. Height, weight, and temperature are required; other vitals are optional. The doctor will see them in the room.
+        </p>
+        {canAddWalkIn(user) ? (
+          <Link href="/appointments/new?walkin=1" className={primaryButtonClass}>
+            Add walk-in
+          </Link>
+        ) : null}
+      </div>
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Vitals pending" value={String(pending.length)} />
         <Stat label="Arrived, waiting on vitals" value={String(arrivedPending.length)} />

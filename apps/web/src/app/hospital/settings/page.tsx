@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { HospitalBrandingForm } from "@/components/hospital-branding-form";
 import { SignaturePolicyForm } from "@/components/signature-policy-form";
+import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { countStaffWithoutSignature } from "@/lib/signatures";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +23,8 @@ export default async function HospitalSettingsPage() {
         sealData: true,
         opdFee: true,
         requireSignatureForApproval: true,
+        walkInByDoctor: true,
+        walkInByNurse: true,
       },
     }),
     countStaffWithoutSignature(user.hospitalId),
@@ -29,9 +32,9 @@ export default async function HospitalSettingsPage() {
   if (!hospital) redirect("/");
 
   return (
-    <AppShell title="Hospital branding">
+    <AppShell title="Hospital settings">
       <p className="mb-4 text-sm text-slate-500">
-        Upload logos, address, and the default OPD amount used when reception records a visit payment.
+        Branding, document policy, and who can add walk-ins. Only the hospital admin can change these.
       </p>
       <HospitalBrandingForm
         initial={{
@@ -47,6 +50,12 @@ export default async function HospitalSettingsPage() {
       <SignaturePolicyForm
         initial={{ requireSignatureForApproval: hospital.requireSignatureForApproval }}
         coverage={coverage}
+      />
+      <WalkInPolicyForm
+        initial={{
+          walkInByDoctor: hospital.walkInByDoctor,
+          walkInByNurse: hospital.walkInByNurse,
+        }}
       />
     </AppShell>
   );

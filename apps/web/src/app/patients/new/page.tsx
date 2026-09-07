@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PatientForm } from "@/components/patient-form";
-import { getCurrentUser } from "@/lib/auth";
-import { PATIENT_REGISTER_ROLES } from "@/lib/front-desk";
+import { canRegisterPatient, requireHospitalPage } from "@/lib/front-desk";
 
 function nextAfterRegister(next?: string) {
   if (next === "walkin") return "/appointments/new?walkin=1";
@@ -16,9 +15,8 @@ export default async function NewPatientPage({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user?.hospitalId) redirect("/login");
-  if (!PATIENT_REGISTER_ROLES.includes(user.role)) redirect("/patients");
+  const user = await requireHospitalPage();
+  if (!canRegisterPatient(user)) redirect("/patients");
   const { next } = await searchParams;
   const bookingNext = nextAfterRegister(next);
 
@@ -29,7 +27,7 @@ export default async function NewPatientPage({
           ? next === "admit"
             ? "Register the new patient, then continue to admit them to a ward."
             : "Register the new patient, then continue to book their appointment."
-          : "Enter the parent's mobile to find an existing family. Children get their own UHID and stay in the same family group. Use the camera to capture a photo."}
+          : "Enter name, date of birth, and mobile to register. Extra details stay collapsed. If this mobile is already on file, expand Add relative to register a child or family member under that number."}
       </p>
       <PatientForm
         submitLabel={bookingNext ? "Register and continue booking" : "Register patient"}

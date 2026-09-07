@@ -48,7 +48,12 @@ export function LabOrderPanel({
         <h4 className="text-sm font-semibold text-text-primary">Investigations</h4>
         {canPrint && appointmentId ? (
           <div className="flex flex-wrap gap-1.5">
-            <SendPatientMessageButton appointmentId={appointmentId} patientPhone={patientPhone} compact />
+            <SendPatientMessageButton
+              endpoint={`/api/appointments/${appointmentId}/investigations/send`}
+              patientPhone={patientPhone}
+              compact
+              label="Send"
+            />
             <Link href={`/appointments/${appointmentId}/investigations`} className={compactButtonClass}>
               Print
             </Link>

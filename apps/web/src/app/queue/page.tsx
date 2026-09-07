@@ -14,7 +14,7 @@ import {
   FRONT_DESK_ROLES,
   NURSE_VITALS_ROLES,
   PRINT_SUMMARY_ROLES,
-  WALK_IN_ROLES,
+  canAddWalkIn,
   dayRange,
   doctorName,
   groupByDoctor,
@@ -112,7 +112,7 @@ export default async function QueuePage({
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <OpdDayNav action="/queue" dateValue={dateValue} />
-          {WALK_IN_ROLES.includes(user.role) && isToday ? (
+          {canAddWalkIn(user) && isToday ? (
             <Link href="/appointments/new?walkin=1" className={compactPrimaryButtonClass}>
               Add walk-in
             </Link>

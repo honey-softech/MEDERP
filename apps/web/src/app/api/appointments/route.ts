@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import type { QueueType, ReferralSource, VisitType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import {
   CLINICAL_VIEW_ROLES,
   FRONT_DESK_ROLES,
-  WALK_IN_ROLES,
+  canAddWalkIn,
   doctorIsOnLeave,
   doctorName,
   forbidUnless,
@@ -18,10 +17,8 @@ import {
 } from "@/lib/front-desk";
 import { staffIdsOnApprovedLeave } from "@/lib/staff-leave";
 import { notifyNursesOfConsult } from "@/lib/notifications";
-
-const QUEUE_TYPES: QueueType[] = ["SCHEDULED", "WALK_IN"];
-const VISIT_TYPES: VisitType[] = ["NEW", "FOLLOW_UP", "EMERGENCY"];
-const REFERRALS: ReferralSource[] = ["SELF", "DOCTOR", "INSURANCE"];
+import { createAppointmentSchema } from "@/lib/validation/appointment";
+import { parseJsonBody } from "@/lib/validation/parse";
 
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
@@ -82,42 +79,47 @@ export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
   const canFrontDesk = FRONT_DESK_ROLES.includes(scoped.user.role);
-  const canWalkIn = WALK_IN_ROLES.includes(scoped.user.role);
+  const canWalkIn = canAddWalkIn(scoped.user);
   if (!canWalkIn) {
-    const denied = forbidUnless(scoped.user.role, WALK_IN_ROLES);
-    if (denied) return denied;
+    return NextResponse.json({ error: "You do not have access to this action." }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => null);
-  const patientId = String(body?.patientId ?? "");
-  let doctorId = String(body?.doctorId ?? "");
-  const departmentId = String(body?.departmentId ?? "");
-  const queueType = (String(body?.queueType ?? "SCHEDULED") as QueueType);
+  const parsed = await parseJsonBody(request, createAppointmentSchema);
+  if (!parsed.ok) return parsed.response;
+  const {
+    patientId,
+    departmentId,
+    queueType,
+    visitType,
+    referralSource,
+    referredBy,
+    reason,
+    notes,
+    checkInNow,
+    scheduledAt,
+  } = parsed.data;
+  let doctorId = parsed.data.doctorId;
+  const photoData = sanitizePhotoData(parsed.data.photoData);
 
   if (!canFrontDesk) {
     if (queueType !== "WALK_IN") {
-      return NextResponse.json({ error: "Doctors can add walk-ins to their own queue." }, { status: 403 });
+      return NextResponse.json(
+        {
+          error:
+            scoped.user.role === "NURSE"
+              ? "Nurses can add walk-ins. Ask reception to book a scheduled visit."
+              : "Doctors can add walk-ins to their own queue.",
+        },
+        { status: 403 },
+      );
     }
-    const myStaffId = await staffIdForAppUser(scoped.user.id, scoped.user.hospitalId);
-    if (!myStaffId) {
-      return NextResponse.json({ error: "Your doctor profile is not linked. Ask the hospital admin." }, { status: 400 });
+    if (scoped.user.role === "DOCTOR") {
+      const myStaffId = await staffIdForAppUser(scoped.user.id, scoped.user.hospitalId);
+      if (!myStaffId) {
+        return NextResponse.json({ error: "Your doctor profile is not linked. Ask the hospital admin." }, { status: 400 });
+      }
+      doctorId = myStaffId;
     }
-    doctorId = myStaffId;
-  }
-  const visitType = (String(body?.visitType ?? "NEW") as VisitType);
-  const referralSource = (String(body?.referralSource ?? "SELF") as ReferralSource);
-  const referredBy = String(body?.referredBy ?? "").trim() || null;
-  const reason = String(body?.reason ?? "").trim() || null;
-  const notes = String(body?.notes ?? "").trim() || null;
-  const photoData = sanitizePhotoData(body?.photoData);
-  const checkInNow = Boolean(body?.checkInNow);
-  const scheduledAt = body?.scheduledAt ? new Date(String(body.scheduledAt)) : new Date();
-
-  if (!QUEUE_TYPES.includes(queueType) || !VISIT_TYPES.includes(visitType) || !REFERRALS.includes(referralSource)) {
-    return NextResponse.json({ error: "Invalid visit, queue, or referral type." }, { status: 400 });
-  }
-  if (Number.isNaN(scheduledAt.getTime())) {
-    return NextResponse.json({ error: "Choose a valid appointment time." }, { status: 400 });
   }
 
   const [patient, doctor, department] = await Promise.all([

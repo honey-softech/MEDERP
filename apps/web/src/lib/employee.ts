@@ -33,11 +33,12 @@ export function generateStaffPassword() {
   return `Med${randomBytes(4).toString("hex")}@${randomInt(10, 99)}`;
 }
 
-export function suggestedUsername(firstName: string, lastName: string) {
+export function suggestedUsername(firstName: string, lastName: string, hospitalCode?: string | null) {
   const first = firstName.toLowerCase().replace(/[^a-z0-9]/g, "");
   const last = lastName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const base = [first, last].filter(Boolean).join(".") || "staff";
-  return base.slice(0, 40);
+  const code = (hospitalCode ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const name = [first, last].filter(Boolean).join("") || "staff";
+  return `${code}${name}`.slice(0, 48);
 }
 
 export async function nextUserCode(hospitalId: string, role: AppRole) {
@@ -213,10 +214,9 @@ export function parseEmployeeBody(body: Record<string, unknown> | null, role: Ap
   const employmentType = body?.employmentType ? (String(body.employmentType) as EmploymentType) : null;
   const gender = body?.gender ? (String(body.gender) as Gender) : null;
   const employmentStatus = (String(body?.employmentStatus ?? "ACTIVE") as EmploymentStatus) || "ACTIVE";
-  const staffRole = role !== "SUPER_ADMIN" && role !== "SOFTWARE_ADMIN" && role !== "HELPDESK";
 
   if (!firstName || !lastName) return { error: "First name and last name are required." };
-  if (staffRole && (!email || !email.includes("@"))) return { error: "A valid email is required." };
+  if (email && !email.includes("@")) return { error: "Enter a valid email, or leave it blank." };
   if (employmentType && !EMPLOYMENT_TYPES.includes(employmentType)) {
     return { error: "Select a valid employment type." };
   }
@@ -321,7 +321,7 @@ export function staffDataFromEmployee(hospitalId: string, input: EmployeeInput):
   const staffRole = staffRoleFor(input.role);
   return {
     hospitalId,
-    email: input.email,
+    email: input.email || `${(input.username || input.firstName).toLowerCase().replace(/\s+/g, ".")}@hospital.local`,
     firstName: input.firstName,
     middleName: input.middleName,
     lastName: input.lastName,
@@ -410,7 +410,7 @@ export async function upsertEmployeeStaff(params: {
       data: {
         ...data,
         appUserId: params.appUserId,
-        email: `${params.appUserId.slice(-6)}.${params.input.email}`,
+        email: `${params.appUserId.slice(-6)}.${params.input.email || "staff"}@hospital.local`,
       },
     });
   }

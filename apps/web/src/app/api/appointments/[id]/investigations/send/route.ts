@@ -15,9 +15,10 @@ export async function POST(request: Request, context: Ctx) {
 
   const { id } = await context.params;
   const payload = await request.json().catch(() => null);
-  const channel = String(payload?.channel ?? "SMS").toUpperCase();
-  if (channel !== "SMS" && channel !== "WHATSAPP") {
-    return NextResponse.json({ error: "Choose SMS or WhatsApp." }, { status: 400 });
+  const requested = String(payload?.channel ?? "WHATSAPP").toUpperCase();
+  const channel = requested === "SMS" ? "WHATSAPP" : requested;
+  if (channel !== "WHATSAPP") {
+    return NextResponse.json({ error: "Choose WhatsApp." }, { status: 400 });
   }
 
   const appointment = await prisma.appointment.findFirst({

@@ -6,7 +6,8 @@ import { FamilyLinkForm, MergePatientForm } from "@/components/patient-family-me
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { PatientVisitHistory } from "@/components/patient-visit-history";
-import { CLINICAL_VIEW_ROLES, FRONT_DESK_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageYears, inr, patientName, prettyEnum } from "@/lib/front-desk";
+import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
+import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, FRONT_DESK_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageYears, inr, patientName, prettyEnum } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 
@@ -47,6 +48,19 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         take: 1,
         include: { bed: { include: { ward: true } } },
       },
+      medicalCertificates: {
+        orderBy: { issuedAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          certificateNo: true,
+          type: true,
+          status: true,
+          issuedAt: true,
+          issuedByDisplayName: true,
+          issuedByUsername: true,
+        },
+      },
     },
   });
   if (!patient) notFound();
@@ -63,6 +77,8 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
   const canAdmit = WARD_ADMIT_ROLES.includes(user.role) && !patient.mergedIntoId;
   const activeStay = patient.admissions[0];
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
+  const canIssueCertificate = DOCTOR_VISIT_ROLES.includes(user.role) && !patient.mergedIntoId;
+  const canViewCertificates = PRINT_SUMMARY_ROLES.includes(user.role);
   const canViewLabReports = LAB_REPORT_VIEW_ROLES.includes(user.role);
   const labReports = canViewLabReports
     ? patient.appointments.flatMap((visit) =>
@@ -115,6 +131,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         ) : canWalkIn ? (
           <Link href={`/appointments/new?walkin=1&patientId=${patient.id}`} className={primaryButtonClass}>
             Add walk-in
+          </Link>
+        ) : null}
+        {canIssueCertificate ? (
+          <Link href={`/certificates/new?patientId=${patient.id}`} className={secondaryButtonClass}>
+            Issue certificate
           </Link>
         ) : null}
       </div>
@@ -200,6 +221,37 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           </>
         ) : null}
       </section>
+
+      {canViewCertificates ? (
+        <section className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold">Medical certificates</h3>
+            {canIssueCertificate ? (
+              <Link href={`/certificates/new?patientId=${patient.id}`} className="text-sm font-medium text-teal-700 hover:underline">
+                Issue certificate
+              </Link>
+            ) : null}
+          </div>
+          {patient.medicalCertificates.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">No medical certificates on this file yet.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {patient.medicalCertificates.map((row) => (
+                <li key={row.id}>
+                  <Link className="font-medium text-teal-700 hover:underline" href={`/certificates/${row.id}`}>
+                    {row.certificateNo}
+                  </Link>
+                  <span className="text-slate-500">
+                    {" "}
+                    · {certificateTitle(row.type)} · {formatCertDate(row.issuedAt)} ·{" "}
+                    {row.issuedByDisplayName || row.issuedByUsername} · {prettyEnum(row.status)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {canViewLabReports ? (
         <section className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">

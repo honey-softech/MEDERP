@@ -94,6 +94,7 @@ function templateName(key: string) {
   if (key === "otp") return env("WHATSAPP_OTP_TEMPLATE", "mederp_otp");
   if (key === "investigation_list") return env("WHATSAPP_INVESTIGATION_TEMPLATE", "investigation_list");
   if (key === "visit_summary") return env("WHATSAPP_VISIT_SUMMARY_TEMPLATE", "visit_summary");
+  if (key === "medical_certificate") return env("WHATSAPP_MEDICAL_CERTIFICATE_TEMPLATE", "medical_certificate");
   if (key === "bill_receipt") return env("WHATSAPP_BILL_RECEIPT_TEMPLATE", "bill_receipt");
   return env("WHATSAPP_REMINDER_TEMPLATE", "appointment_reminder");
 }
@@ -138,6 +139,20 @@ export function templateComponents(payload: ProviderPayload, includeOtpButton: b
         { name: "hospital_name", value: vars.hospital },
         { name: "doctor_name", value: vars.doctor },
         { name: "visit_when", value: vars.when },
+      ]),
+    ];
+  }
+  if (payload.templateKey === "medical_certificate") {
+    if (!payload.documentMediaId) {
+      return { error: "Medical certificate PDF media id is missing." };
+    }
+    return [
+      documentHeader(payload.documentMediaId, payload.documentFilename || "medical-certificate.pdf"),
+      namedBody([
+        { name: "patient_name", value: vars.patient },
+        { name: "hospital_name", value: vars.hospital },
+        { name: "doctor_name", value: vars.doctor },
+        { name: "issued_when", value: vars.when },
       ]),
     ];
   }

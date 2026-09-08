@@ -44,8 +44,8 @@ export function SignaturePolicyForm({
       <div>
         <h3 className="font-semibold">Clinical document policy</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Signatures are uploaded per user from Hospital users. This controls whether one is mandatory before a doctor
-          can approve a visit summary.
+          Signatures are uploaded when you edit a user under Hospital users. Only a hospital admin can add the image.
+          This controls whether one is mandatory before a doctor can approve a visit summary.
         </p>
       </div>
 

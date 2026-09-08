@@ -112,7 +112,7 @@ export async function PATCH(request: Request, context: Ctx) {
       select: { code: true },
     });
     const username = await uniqueUsername(
-      input.username || existing.username || suggestedUsername(input.firstName, input.lastName, hospital?.code),
+      input.username || existing.username || suggestedUsername(input.firstName, input.lastName, role),
       id,
     );
 

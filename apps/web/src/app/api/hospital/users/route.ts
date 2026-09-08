@@ -116,7 +116,7 @@ export async function POST(request: Request) {
     }
 
     const username = await uniqueUsername(
-      input.username || suggestedUsername(input.firstName, input.lastName, hospital.code),
+      input.username || suggestedUsername(input.firstName, input.lastName, role),
     );
     const clash = await prisma.appUser.findFirst({
       where: {

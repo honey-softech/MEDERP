@@ -85,6 +85,17 @@ enum VisitAssessmentStatus {
   APPROVED
 }
 
+enum MedicalCertificateType {
+  SICK_LEAVE
+  FITNESS
+  GENERAL
+}
+
+enum MedicalCertificateStatus {
+  ISSUED
+  VOIDED
+}
+
 enum SignatureStatus {
   PENDING
   ACTIVE
@@ -386,6 +397,7 @@ model Hospital {
   staffSignatures   UserSignature[]
   announcements     HospitalAnnouncement[]
   outboundMessages  OutboundMessage[]
+  medicalCertificates MedicalCertificate[]
 }
 
 model HospitalSubscription {
@@ -486,6 +498,7 @@ model UserSignature {
   visitAssessments   VisitAssessment[]
   labOrders          LabOrder[]
   payments           Payment[]
+  medicalCertificates MedicalCertificate[]
 
   @@index([hospitalId, userId, status])
 }
@@ -619,6 +632,7 @@ model Staff {
   leaves                 StaffLeave[]
   admittingAdmissions    Admission[]        @relation("AdmittingDoctor")
   attendingAdmissions    Admission[]        @relation("AttendingDoctor")
+  medicalCertificates    MedicalCertificate[]
 
   @@unique([hospitalId, email])
 }
@@ -672,6 +686,7 @@ model Patient {
   visitAssessments    VisitAssessment[]
   pharmacyRxOrders    PharmacyRxOrder[]
   outboundMessages    OutboundMessage[]
+  medicalCertificates MedicalCertificate[]
 
   @@unique([hospitalId, mrn])
   @@index([hospitalId, phone])
@@ -727,6 +742,7 @@ model Appointment {
   labOrders         LabOrder[]
   pharmacyRxOrders  PharmacyRxOrder[]
   admissions        Admission[]
+  medicalCertificates MedicalCertificate[]
 
   @@index([hospitalId, scheduledAt])
   @@index([hospitalId, doctorId, scheduledAt])
@@ -790,6 +806,43 @@ model VisitAssessment {
   updatedAt            DateTime              @updatedAt
 
   @@index([hospitalId, status, updatedAt])
+}
+
+model MedicalCertificate {
+  id                    String                    @id @default(cuid())
+  hospitalId            String
+  hospital              Hospital                  @relation(fields: [hospitalId], references: [id])
+  patientId             String
+  patient               Patient                   @relation(fields: [patientId], references: [id])
+  appointmentId         String?
+  appointment           Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  issuedByStaffId       String?
+  issuedByStaff         Staff?                    @relation(fields: [issuedByStaffId], references: [id], onDelete: SetNull)
+  certificateNo         String
+  type                  MedicalCertificateType
+  status                MedicalCertificateStatus  @default(ISSUED)
+  diagnosis             String
+  remarks               String?
+  restFrom              DateTime?
+  restTo                DateTime?
+  fitFor                String?
+  purpose               String?
+  issuedAt              DateTime                  @default(now())
+  issuedByUserId        String
+  issuedByUsername      String
+  issuedByDisplayName   String?
+  issuedByCredentials   String?
+  issuedBySignatureId   String?
+  issuedBySignature     UserSignature?            @relation(fields: [issuedBySignatureId], references: [id], onDelete: SetNull)
+  voidedAt              DateTime?
+  voidedByUserId        String?
+  voidReason            String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@unique([hospitalId, certificateNo])
+  @@index([hospitalId, issuedAt])
+  @@index([patientId, issuedAt])
 }
 
 model StaffNotification {

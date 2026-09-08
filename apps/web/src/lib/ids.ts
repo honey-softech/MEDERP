@@ -37,6 +37,11 @@ export async function nextInvoiceNo(hospitalId: string, hospitalCode: string) {
   return `INV-${hospitalCode}-${pad(n)}`;
 }
 
+export async function nextCertificateNo(hospitalId: string, hospitalCode: string) {
+  const n = await nextCounter(hospitalId, "MEDICAL_CERT");
+  return `MC-${hospitalCode}-${pad(n)}`;
+}
+
 export async function nextToken(hospitalId: string, doctorId: string, at = new Date()) {
   const day = at.toISOString().slice(0, 10);
   return nextCounter(hospitalId, `TOKEN-${day}-${doctorId}`);

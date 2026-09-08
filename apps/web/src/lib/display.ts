@@ -46,8 +46,8 @@ export function doctorName(doctor: {
   appUser?: { username: string } | null;
 }) {
   const full = `${doctor.firstName} ${doctor.lastName}`.replace(/\s+Doctor$/i, "").trim();
-  if (full && doctor.lastName) {
-    return /^dr/i.test(full) ? full : `Dr. ${full}`;
+  if (full) {
+    return /^dr\.?\s/i.test(full) ? full : `Dr. ${full}`;
   }
   const username = doctor.appUser?.username?.trim();
   if (username) {

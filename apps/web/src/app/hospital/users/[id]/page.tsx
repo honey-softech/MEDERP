@@ -39,7 +39,13 @@ export default async function EditHospitalUserPage({ params }: { params: Promise
         departments={departments.map((row) => ({ id: row.id, label: row.name }))}
       />
       <div className="mt-6">
-        <UserSignatureManager userId={user.id} roleLabel={user.role.replace(/_/g, " ")} />
+        <UserSignatureManager
+          userId={user.id}
+          roleLabel={user.role.replace(/_/g, " ")}
+          firstName={user.firstName ?? user.staffProfile?.firstName ?? ""}
+          lastName={user.lastName ?? user.staffProfile?.lastName ?? ""}
+          role={user.role}
+        />
       </div>
     </AppShell>
   );

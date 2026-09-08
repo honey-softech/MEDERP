@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { doctorName } from "@/lib/front-desk";
+import { suggestedSignatureName } from "@/lib/usernames";
 
 export type SignatureSnapshot = {
   id: string;
@@ -37,11 +38,12 @@ export function signatureNameFor(user: {
 }) {
   const firstName = user.staffProfile?.firstName ?? user.firstName ?? "";
   const lastName = user.staffProfile?.lastName ?? user.lastName ?? "";
-  const full = `${firstName} ${lastName}`.trim();
+  const printed = suggestedSignatureName(firstName, lastName, user.role);
+  if (printed) return printed;
   if (user.role === "DOCTOR") {
     return doctorName({ firstName, lastName, appUser: { username: user.username } });
   }
-  return full || user.username;
+  return user.username;
 }
 
 export function signatureCredentialsFor(user: {

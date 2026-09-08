@@ -5,6 +5,7 @@ export type MessageTemplateKey =
   | "otp"
   | "investigation_list"
   | "visit_summary"
+  | "medical_certificate"
   | "bill_receipt";
 
 /** Keep WhatsApp template variables short — Meta rejects oversized bodies. */
@@ -26,6 +27,9 @@ export function renderTemplate(
   }
   if (key === "visit_summary") {
     return `Hi ${variables.patient ?? "patient"}, your visit summary from ${variables.hospital ?? "the clinic"} with ${variables.doctor ?? "the doctor"} on ${variables.when ?? ""} is attached. Please follow the doctor's advice.`;
+  }
+  if (key === "medical_certificate") {
+    return `Hi ${variables.patient ?? "patient"}, your ${variables.type ?? "medical certificate"} from ${variables.hospital ?? "the clinic"} issued by ${variables.doctor ?? "the doctor"} on ${variables.when ?? ""} is attached.`;
   }
   if (key === "bill_receipt") {
     return `Hi ${variables.patient ?? "patient"}, thank you for visiting ${variables.hospital ?? "the clinic"}. Your bill receipt ${variables.invoiceNo ?? ""} is attached as a PDF. The net total for this visit is ${variables.total ?? ""}. Please keep this receipt for your records. If you have any billing questions, contact the hospital front desk.`;

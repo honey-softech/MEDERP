@@ -43,6 +43,7 @@ const doctorNav: NavSection[] = [
     items: [
       { href: "/", label: "Dashboard" },
       { href: "/patients", label: "Patients" },
+      { href: "/certificates", label: "Certificates" },
       { href: "/appointments", label: "Appointments" },
       { href: "/queue", label: "OPD queue" },
     ],
@@ -208,6 +209,7 @@ const superAdminNav: NavSection[] = [
     items: [
       { href: "/nurse", label: "Nurse station" },
       { href: "/patients", label: "Patients" },
+      { href: "/certificates", label: "Certificates" },
       { href: "/appointments", label: "Appointments" },
       { href: "/queue", label: "OPD queue" },
       { href: "/staff", label: "Staff" },

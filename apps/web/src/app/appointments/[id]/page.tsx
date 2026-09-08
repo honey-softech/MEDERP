@@ -236,6 +236,14 @@ export default async function AppointmentDetailPage({
               {summaryApproved ? "Print" : "Preview"}
             </Link>
           ) : null}
+          {canAssess ? (
+            <Link
+              href={`/certificates/new?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
+              className={compactButtonClass}
+            >
+              Certificate
+            </Link>
+          ) : null}
           {WARD_ADMIT_ROLES.includes(user.role) && !activeStay ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
@@ -273,6 +281,14 @@ export default async function AppointmentDetailPage({
           {assessment && (canAssess || (canPrintSummary && summaryApproved)) ? (
             <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
               {summaryApproved ? "Print" : "Preview"}
+            </Link>
+          ) : null}
+          {canAssess ? (
+            <Link
+              href={`/certificates/new?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
+              className={compactButtonClass}
+            >
+              Certificate
             </Link>
           ) : null}
           {WARD_ADMIT_ROLES.includes(user.role) && !activeStay ? (

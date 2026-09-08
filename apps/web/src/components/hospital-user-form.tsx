@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
+import { suggestedUsername } from "@/lib/usernames";
 
 const roles = [
   { value: "RECEPTIONIST", label: "Receptionist" },
@@ -143,15 +144,24 @@ export default function HospitalUserForm({
   const [error, setError] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [pending, setPending] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(editing);
-  const [employmentOpen, setEmploymentOpen] = useState(editing);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [employmentOpen, setEmploymentOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
-  const [professionalOpen, setProfessionalOpen] = useState(editing);
+  const [professionalOpen, setProfessionalOpen] = useState(false);
+  const [usernameTouched, setUsernameTouched] = useState(editing);
 
   const role = roleLocked ? "SUPER_ADMIN" : values.role ?? "RECEPTIONIST";
 
   function setField<K extends keyof HospitalUserFormInitial>(key: K, value: HospitalUserFormInitial[K]) {
-    setValues((current) => ({ ...current, [key]: value }));
+    if (key === "username") setUsernameTouched(true);
+    setValues((current) => {
+      const next = { ...current, [key]: value };
+      const nextRole = key === "role" ? String(value) : roleLocked ? "SUPER_ADMIN" : next.role ?? "RECEPTIONIST";
+      if (!usernameTouched && (key === "firstName" || key === "lastName" || key === "role")) {
+        next.username = suggestedUsername(next.firstName ?? "", next.lastName ?? "", nextRole);
+      }
+      return next;
+    });
   }
 
   const payload = useMemo(
@@ -240,6 +250,13 @@ export default function HospitalUserForm({
 
       <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required autoComplete="given-name" />
       <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} autoComplete="family-name" />
+      <Field
+        label="Username"
+        value={values.username}
+        onChange={(v) => setField("username", v)}
+        placeholder="Auto from first name, last name, and role"
+        autoComplete={editing ? "username" : "off"}
+      />
       <Field label="Mobile number" value={values.mobile} onChange={(v) => setField("mobile", v)} required placeholder="+91 XXXXX XXXXX" autoComplete="tel" />
       <Field
         label={editing ? "New password (optional)" : "Password"}
@@ -256,7 +273,7 @@ export default function HospitalUserForm({
         title="Account details"
         open={accountOpen}
         onToggle={() => setAccountOpen((open) => !open)}
-        hint="Photo, email, username, and login extras"
+        hint="Photo, email, and login extras"
       >
         <div className="md:col-span-2">
           <PhotoCapture value={values.photoData ?? ""} onChange={(value) => setField("photoData", value)} label="Profile photo" />
@@ -275,13 +292,6 @@ export default function HospitalUserForm({
           ]}
         />
         <Field label="Email" type="email" value={values.email} onChange={(v) => setField("email", v)} placeholder="Optional" autoComplete="email" />
-        <Field
-          label="Username"
-          value={values.username}
-          onChange={(v) => setField("username", v)}
-          placeholder="Auto from hospital code and name if blank"
-          autoComplete={editing ? "username" : "off"}
-        />
         <Select
           label="Account status"
           value={values.isActive === false ? "INACTIVE" : "ACTIVE"}

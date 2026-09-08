@@ -25,6 +25,7 @@ export {
 } from "@/lib/authz/hospital";
 
 export {
+  nextCertificateNo,
   nextCounter,
   nextFamilyGroupCode,
   nextInvoiceNo,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FilterableTable } from "@/components/filterable-table";
 import HospitalUserForm, { type HospitalUserFormInitial } from "@/components/hospital-user-form";
+import { UserSignatureManager } from "@/components/user-signature-manager";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 
 type UserRow = {
@@ -157,8 +158,8 @@ function UserFormDialog({
               </h3>
               <p className="mt-1 text-sm text-slate-500">
                 {editingId
-                  ? "Saved details are loaded below. Update any field and save."
-                  : "Name, mobile, and password are required. Expand a section for extra details."}
+                  ? "Saved details are loaded below. Extra sections stay collapsed — expand one only if you need it. Signature and seal is at the bottom."
+                  : "Name, mobile, and password are required. Extra sections stay collapsed — expand one only if you need those details."}
               </p>
             </div>
             <button type="button" className={secondaryButtonClass} onClick={onClose}>
@@ -168,14 +169,28 @@ function UserFormDialog({
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           {!initial && !error ? <p className="text-sm text-slate-500">Loading user…</p> : null}
           {initial ? (
-            <HospitalUserForm
-              key={initial.id ?? "create"}
-              initial={initial}
-              departments={departments}
-              plain
-              returnHref={null}
-              onSaved={onClose}
-            />
+            <>
+              <HospitalUserForm
+                key={initial.id ?? "create"}
+                initial={initial}
+                departments={departments}
+                plain
+                returnHref={null}
+                onSaved={onClose}
+              />
+              {editingId ? (
+                <div className="mt-6">
+                  <UserSignatureManager
+                    userId={editingId}
+                    roleLabel={(initial.role ?? "staff").replace(/_/g, " ")}
+                    firstName={initial.firstName ?? ""}
+                    lastName={initial.lastName ?? ""}
+                    role={initial.role}
+                    embedded
+                  />
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>

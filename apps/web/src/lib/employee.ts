@@ -33,13 +33,7 @@ export function generateStaffPassword() {
   return `Med${randomBytes(4).toString("hex")}@${randomInt(10, 99)}`;
 }
 
-export function suggestedUsername(firstName: string, lastName: string, hospitalCode?: string | null) {
-  const first = firstName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const last = lastName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const code = (hospitalCode ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const name = [first, last].filter(Boolean).join("") || "staff";
-  return `${code}${name}`.slice(0, 48);
-}
+export { suggestedUsername } from "@/lib/usernames";
 
 export async function nextUserCode(hospitalId: string, role: AppRole) {
   const prefix = USER_CODE_PREFIX[role] ?? "USR";

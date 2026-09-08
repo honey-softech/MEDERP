@@ -31,6 +31,8 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
         {" · "}
         <span className="font-mono">{patient.mrn}</span>
         {patient.familyGroupCode ? ` · ${patient.familyGroupCode}` : ""}
+        {" · "}
+        Extra details stay collapsed. Expand a section only if you need to change it.
       </p>
       <PatientForm
         submitLabel="Save patient details"

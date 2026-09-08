@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["socket.io", "bufferutil", "utf-8-validate"],
+  serverExternalPackages: ["@prisma/client", "prisma", "socket.io", "bufferutil", "utf-8-validate"],
   experimental: {
     proxyClientMaxBodySize: "10mb",
     serverActions: {

@@ -41,6 +41,18 @@ describe("WhatsApp template builder", () => {
       false,
     );
     expect(missingPdf).toEqual({ error: "Visit summary PDF media id is missing." });
+
+    const missingCertPdf = templateComponents(
+      {
+        toPhone: "9876543210",
+        channel: "WHATSAPP",
+        body: "unused",
+        templateKey: "medical_certificate",
+        variables: { patient: "Ravi", hospital: "City Clinic", doctor: "Dr Sharma", when: "8 Sep 2026" },
+      },
+      false,
+    );
+    expect(missingCertPdf).toEqual({ error: "Medical certificate PDF media id is missing." });
   });
 
   it("requires an OTP value for the authentication template", () => {

@@ -88,12 +88,12 @@ export function PatientForm({
   const [familyHits, setFamilyHits] = useState<FamilyHit[]>([]);
   const [familyOf, setFamilyOf] = useState(familyOfPatientId ?? "");
   const [familyRelation, setFamilyRelation] = useState(familyRelationDefault);
-  const [familyOpen, setFamilyOpen] = useState(Boolean(familyOfPatientId));
-  const [contactOpen, setContactOpen] = useState(isEdit);
-  const [historyOpen, setHistoryOpen] = useState(isEdit);
-  const [idProofOpen, setIdProofOpen] = useState(isEdit);
-  const [insuranceOpen, setInsuranceOpen] = useState(isEdit);
-  const [photoOpen, setPhotoOpen] = useState(isEdit || Boolean(initial?.photoData));
+  const [familyOpen, setFamilyOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [idProofOpen, setIdProofOpen] = useState(false);
+  const [insuranceOpen, setInsuranceOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [values, setValues] = useState<PatientFormValues>(
     initial ?? {
       firstName: "",
@@ -235,6 +235,9 @@ export function PatientForm({
         onChange={(v) => setField("phone", v)}
       />
       <Field label="Blood group" value={values.bloodGroup} onChange={(v) => setField("bloodGroup", v)} placeholder="B+" />
+      <p className="md:col-span-2 text-sm text-slate-500">
+        Extra details stay collapsed. Expand a section only if you need to add or change it.
+      </p>
 
       {showFamilyLookup ? (
         <div className="md:col-span-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm">

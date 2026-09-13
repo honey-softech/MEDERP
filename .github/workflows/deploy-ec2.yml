@@ -42,6 +42,21 @@ jobs:
 
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml up -d --build
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml ps
-            curl -fsS -m 20 http://127.0.0.1/api/health
+
+            echo "Waiting for /api/health (app needs a few seconds after container start)..."
+            ok=0
+            for i in $(seq 1 30); do
+              if curl -fsS -m 5 http://127.0.0.1/api/health; then
+                ok=1
+                break
+              fi
+              echo "  not ready yet ($i/30)"
+              sleep 4
+            done
+            if [ "$ok" != "1" ]; then
+              echo "Health check failed. Recent web logs:"
+              sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml logs --tail=80 web
+              exit 1
+            fi
             echo
             echo "Deploy finished."

@@ -24,7 +24,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-  if (!isMediaWriteAuthorized(request.headers.get("x-mederp-media-key") ?? "")) {
+  const provided =
+    request.headers.get("x-mederp-media-key")?.trim() ||
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ||
+    new URL(request.url).searchParams.get("token")?.trim() ||
+    "";
+  if (!isMediaWriteAuthorized(provided)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   const { id } = await context.params;

@@ -81,14 +81,17 @@ export function shouldPublishRemote(publicUrl: string) {
   }
 }
 
+const DEFAULT_MEDIA_WRITE_KEY = "mederp-whatsapp-media";
+
 function mediaWriteKey() {
-  return env("WHATSAPP_MEDIA_UPLOAD_KEY") || env("ASKEVA_API_TOKEN") || env("WHATSAPP_ACCESS_TOKEN");
+  return env("WHATSAPP_MEDIA_UPLOAD_KEY") || DEFAULT_MEDIA_WRITE_KEY;
 }
 
 export function isMediaWriteAuthorized(provided: string) {
   const expected = mediaWriteKey();
-  if (!expected || !provided) return false;
-  const left = Buffer.from(provided);
+  const value = provided.trim();
+  if (!expected || !value) return false;
+  const left = Buffer.from(value);
   const right = Buffer.from(expected);
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
@@ -156,6 +159,13 @@ async function publishDocument(url: string, row: StoredDocument) {
       body: new Uint8Array(row.buffer),
     });
     if (response.ok) return { ok: true as const };
+    if (response.status === 401) {
+      return {
+        ok: false as const,
+        error:
+          "Live server rejected the PDF copy. Send this bill from http://18.61.210.135, or deploy the latest MedERP and try localhost again.",
+      };
+    }
     if (response.status === 404 || response.status === 405) {
       return {
         ok: false as const,

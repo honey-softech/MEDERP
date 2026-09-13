@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
+import { MissingRecord } from "@/components/missing-record";
+import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { VisitPaymentForm } from "@/components/visit-payment-form";
 import { secondaryButtonClass } from "@/components/auth-shell";
@@ -22,7 +24,7 @@ export default async function CollectVisitPaymentPage({
 }) {
   const user = await requireHospitalPage();
   if (!BILLING_ROLES.includes(user.role)) redirect("/");
-  const { appointmentId } = await params;
+  const appointmentId = await routeParam(params, "appointmentId");
 
   const appointment = await prisma.appointment.findFirst({
     where: { id: appointmentId, hospitalId: user.hospitalId },
@@ -34,7 +36,9 @@ export default async function CollectVisitPaymentPage({
       invoices: { orderBy: { issuedAt: "desc" }, take: 1, include: { payments: true } },
     },
   });
-  if (!appointment) notFound();
+  if (!appointment) {
+    return <MissingRecord title="Record payment" backHref="/billing/collections" backLabel="Back to collections" />;
+  }
 
   const invoice = appointment.invoices[0] ?? null;
   const fee = invoice

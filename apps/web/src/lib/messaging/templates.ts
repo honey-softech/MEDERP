@@ -20,10 +20,12 @@ export function renderTemplate(
   variables: Record<string, string>,
 ): string {
   if (key === "otp") {
-    return `MedERP OTP: ${variables.otp ?? ""}. Valid for 10 minutes. Do not share this code.`;
+    const number = variables.birthyear || variables.value || variables.number || variables.otp || "";
+    const label = variables.patientname || variables.label || variables.code || "Code";
+    return `Hello, ${label} is ${number}.\nThanks for choosing mederp.`;
   }
   if (key === "investigation_list") {
-    return `Hi ${variables.patient ?? "patient"}, ${variables.hospital ?? "the clinic"} has listed tests/scans for you: ${variables.items ?? ""}. Please follow the doctor's advice.`;
+    return `Hi ${variables.patient ?? "patient"}, ${variables.hospital ?? "the clinic"} has listed tests/scans for you: ${variables.items ?? ""}. The investigation request is attached as a PDF. Please follow the doctor's advice.`;
   }
   if (key === "visit_summary") {
     return `Hi ${variables.patient ?? "patient"}, your visit summary from ${variables.hospital ?? "the clinic"} with ${variables.doctor ?? "the doctor"} on ${variables.when ?? ""} is attached. Please follow the doctor's advice.`;

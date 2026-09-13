@@ -46,3 +46,6 @@ next-env.d.ts
 # Lab result documents
 /uploads/lab-reports
 
+# Temporary WhatsApp PDFs served to AskEva
+/.data/
+

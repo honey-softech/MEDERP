@@ -26,20 +26,20 @@ export function generateOtp() {
 
 /** Deliver OTP on WhatsApp immediately (do not wait for the outbound queue). */
 export async function deliverOtp(mobile: string, otp: string, purpose: string, _hospitalId?: string | null) {
-  const body = renderTemplate("otp", { otp });
+  const body = renderTemplate("otp", { otp, number: otp });
   const result = await deliverMessage({
     toPhone: mobile,
     channel: "WHATSAPP",
     body,
     templateKey: "otp",
     otp,
-    variables: { otp, purpose },
+    variables: { otp, number: otp, purpose },
   });
   if (!result.ok) {
     console.error(`[otp] WhatsApp send failed for ******${mobile.slice(-4)} (${purpose}): ${result.error}`);
   } else if (messagingProvider() === "console") {
     console.warn(
-      `[otp] WhatsApp not configured (set WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_ACCESS_TOKEN). Logged OTP for ******${mobile.slice(-4)}.`,
+      `[otp] WhatsApp not configured (set ASKEVA_API_TOKEN). Logged OTP for ******${mobile.slice(-4)}.`,
     );
   }
   return result;

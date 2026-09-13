@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { MissingRecord } from "@/components/missing-record";
+import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { InvoiceActions } from "@/components/billing-forms";
 import { PrintButton } from "@/components/print-button";
@@ -23,7 +24,7 @@ import { redirect } from "next/navigation";
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireHospitalPage();
   if (!BILLING_ROLES.includes(user.role)) redirect("/");
-  const { id } = await params;
+  const id = await routeParam(params, "id");
   const invoice = await prisma.invoice.findFirst({
     where: { id, hospitalId: user.hospitalId },
     include: {
@@ -38,7 +39,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true } },
     },
   });
-  if (!invoice) notFound();
+  if (!invoice) {
+    return <MissingRecord title="Invoice" backHref="/billing" backLabel="Back to billing" />;
+  }
 
   const due = Math.max(0, Number(invoice.netTotal) - Number(invoice.paidAmount));
 

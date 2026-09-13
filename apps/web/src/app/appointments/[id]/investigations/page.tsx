@@ -64,7 +64,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
       <div className="visit-summary-frame mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 print:hidden">
         <div>
           <p className="text-sm font-semibold text-slate-900">Investigation list</p>
-          <p className="mt-0.5 text-xs text-slate-500">Print for the patient or queue an SMS to their mobile.</p>
+          <p className="mt-0.5 text-xs text-slate-500">Print for the patient or send the list PDF on WhatsApp.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/appointments/${appointment.id}`} className={secondaryButtonClass}>
@@ -73,7 +73,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
           <SendPatientMessageButton
             endpoint={`/api/appointments/${appointment.id}/investigations/send`}
             patientPhone={appointment.patient.phone}
-            label="Send WhatsApp"
+            label="Send PDF on WhatsApp"
           />
           <PrintButton label="Print list" variant="primary" />
         </div>

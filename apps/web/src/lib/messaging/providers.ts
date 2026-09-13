@@ -1,3 +1,15 @@
+import {
+  billReceiptComponents,
+  documentHeader,
+  investigationListComponents,
+  META_PATIENT_TEMPLATES,
+  namedBody,
+  parseOtpDigits,
+  reminderComponents,
+  utilityAccessCodeComponents,
+  type WhatsAppComponent,
+} from "@/lib/messaging/whatsapp-meta-templates";
+
 export type SendResult = { ok: true; providerMessageId?: string } | { ok: false; error: string };
 
 export type ProviderPayload = {
@@ -7,19 +19,9 @@ export type ProviderPayload = {
   templateKey: string;
   otp?: string;
   variables?: Record<string, string>;
-  /** WhatsApp media id for DOCUMENT header templates (visit summary / bill PDF). */
+  /** WhatsApp media id for DOCUMENT header templates (investigation / visit summary / bill PDF). */
   documentMediaId?: string;
   documentFilename?: string;
-};
-
-type TextParam = { type: "text"; text: string; parameter_name?: string };
-type DocumentParam = { type: "document"; document: { id: string; filename: string } };
-
-type WhatsAppComponent = {
-  type: string;
-  sub_type?: string;
-  index?: string;
-  parameters: Array<TextParam | DocumentParam>;
 };
 
 export async function sendViaConsole(payload: ProviderPayload): Promise<SendResult> {
@@ -41,92 +43,56 @@ function env(name: string, fallback = "") {
   return process.env[name]?.trim() || fallback;
 }
 
+function askevaToken() {
+  return env("ASKEVA_API_TOKEN") || env("WHATSAPP_ACCESS_TOKEN");
+}
+
+function askevaBaseUrl() {
+  return env("ASKEVA_API_URL", "https://backend.askeva.io/v1").replace(/\/$/, "");
+}
+
 function whatsappConfigured() {
-  return Boolean(env("WHATSAPP_PHONE_NUMBER_ID") && env("WHATSAPP_ACCESS_TOKEN"));
-}
-
-function paramText(value: string | undefined) {
-  const text = (value ?? "").trim();
-  return text || "-";
-}
-
-/** Named body params (Meta Utility templates). OTP auth templates stay positional. */
-function namedBody(params: { name: string; value: string | undefined }[]): WhatsAppComponent {
-  return {
-    type: "body",
-    parameters: params.map((param) => ({
-      type: "text",
-      parameter_name: param.name,
-      text: paramText(param.value),
-    })),
-  };
-}
-
-function positionalBody(texts: string[]): WhatsAppComponent {
-  return {
-    type: "body",
-    parameters: texts.map((text) => ({ type: "text", text: paramText(text) })),
-  };
-}
-
-function documentHeader(mediaId: string, filename: string): WhatsAppComponent {
-  return {
-    type: "header",
-    parameters: [
-      {
-        type: "document",
-        document: { id: mediaId, filename },
-      },
-    ],
-  };
-}
-
-function otpCopyCodeButton(otp: string): WhatsAppComponent {
-  return {
-    type: "button",
-    sub_type: "url",
-    index: "0",
-    parameters: [{ type: "text", text: paramText(otp) }],
-  };
+  return Boolean(askevaToken());
 }
 
 function templateName(key: string) {
-  if (key === "otp") return env("WHATSAPP_OTP_TEMPLATE", "mederp_otp");
-  if (key === "investigation_list") return env("WHATSAPP_INVESTIGATION_TEMPLATE", "investigation_list");
-  if (key === "visit_summary") return env("WHATSAPP_VISIT_SUMMARY_TEMPLATE", "visit_summary");
+  if (key === "otp") return env("WHATSAPP_OTP_TEMPLATE", META_PATIENT_TEMPLATES.otp.defaultName);
+  if (key === "investigation_list") {
+    return env("WHATSAPP_INVESTIGATION_TEMPLATE", META_PATIENT_TEMPLATES.investigation_list.defaultName);
+  }
+  if (key === "visit_summary") return env("WHATSAPP_VISIT_SUMMARY_TEMPLATE", META_PATIENT_TEMPLATES.visit_summary.defaultName);
   if (key === "medical_certificate") return env("WHATSAPP_MEDICAL_CERTIFICATE_TEMPLATE", "medical_certificate");
-  if (key === "bill_receipt") return env("WHATSAPP_BILL_RECEIPT_TEMPLATE", "bill_receipt");
-  return env("WHATSAPP_REMINDER_TEMPLATE", "appointment_reminder");
+  if (key === "bill_receipt") return env("WHATSAPP_BILL_RECEIPT_TEMPLATE", META_PATIENT_TEMPLATES.bill_receipt.defaultName);
+  return env("WHATSAPP_REMINDER_TEMPLATE", META_PATIENT_TEMPLATES.appointment_reminder.defaultName);
 }
 
-export function templateComponents(payload: ProviderPayload, includeOtpButton: boolean): WhatsAppComponent[] | { error: string } {
+function reminderParamFormat(): "named" | "positional" {
+  return env("WHATSAPP_REMINDER_PARAMS", "named").toLowerCase() === "positional" ? "positional" : "named";
+}
+
+function accessCodeLabel(vars: Record<string, string>) {
+  return env(
+    "WHATSAPP_OTP_CODE_LABEL",
+    vars.patientname || vars.label || vars.code || META_PATIENT_TEMPLATES.otp.defaultCodeLabel,
+  );
+}
+
+export function templateComponents(payload: ProviderPayload, _includeOtpButton = false): WhatsAppComponent[] | { error: string } {
   const vars = payload.variables ?? {};
   if (payload.templateKey === "otp") {
-    const otp = payload.otp?.trim() || vars.otp?.trim();
-    if (!otp) return { error: "OTP value missing for WhatsApp send." };
-    const components = [positionalBody([otp])];
-    if (includeOtpButton) components.push(otpCopyCodeButton(otp));
-    return components;
+    const parsed = parseOtpDigits(payload.otp || vars.otp || vars.birthyear || vars.value || vars.number);
+    if ("error" in parsed) return parsed;
+    return utilityAccessCodeComponents(accessCodeLabel(vars), parsed.otp);
   }
   if (payload.templateKey === "appointment_reminder") {
-    // Approved Meta body (positional): Hello {{1}}, ... with {{2}} on {{3}} at {{4}}.
-    return [
-      positionalBody([
-        vars.patient,
-        vars.doctor,
-        vars.date || vars.when,
-        vars.time || vars.hospital,
-      ]),
-    ];
+    return reminderComponents(vars, reminderParamFormat());
   }
   if (payload.templateKey === "investigation_list") {
-    return [
-      namedBody([
-        { name: "patient_name", value: vars.patient },
-        { name: "hospital_name", value: vars.hospital },
-        { name: "test_list", value: vars.items },
-      ]),
-    ];
+    return investigationListComponents({
+      vars,
+      documentMediaId: payload.documentMediaId,
+      documentFilename: payload.documentFilename,
+    });
   }
   if (payload.templateKey === "visit_summary") {
     if (!payload.documentMediaId) {
@@ -157,34 +123,51 @@ export function templateComponents(payload: ProviderPayload, includeOtpButton: b
     ];
   }
   if (payload.templateKey === "bill_receipt") {
-    if (!payload.documentMediaId) {
-      return { error: "Bill receipt PDF media id is missing." };
-    }
-    return [
-      documentHeader(payload.documentMediaId, payload.documentFilename || "bill-receipt.pdf"),
-      namedBody([
-        { name: "patient_name", value: vars.patient },
-        { name: "invoice_no", value: vars.invoiceNo },
-        { name: "hospital_name", value: vars.hospital },
-        { name: "total_amount", value: vars.total },
-      ]),
-    ];
+    return billReceiptComponents({
+      vars,
+      documentMediaId: payload.documentMediaId,
+      documentFilename: payload.documentFilename,
+    });
   }
   return { error: `Unsupported WhatsApp template key: ${payload.templateKey}` };
+}
+
+function looksLikeAskEvaMediaFailure(text: string) {
+  return /media upload|failed to (download|fetch|upload) (media|document|file)|cannot download/i.test(text);
 }
 
 function parseWhatsAppResult(text: string, httpStatus: number): SendResult {
   try {
     const json = JSON.parse(text) as {
       messages?: { id?: string }[];
-      error?: { message?: string; error_user_msg?: string };
+      data?: { id?: string; messages?: { id?: string }[] };
+      id?: string;
+      messageId?: string;
+      success?: boolean;
+      error?: { message?: string; error_user_msg?: string } | string;
+      message?: string;
     };
-    const messageId = json.messages?.[0]?.id;
-    if (messageId) return { ok: true, providerMessageId: messageId.slice(0, 120) };
-    const error = json.error?.error_user_msg || json.error?.message;
-    if (error) return { ok: false, error: error.slice(0, 300) };
+    const error =
+      (typeof json.error === "string" ? json.error : json.error?.error_user_msg || json.error?.message) ||
+      (json.success === false ? json.message : undefined);
+    if (json.success === false || looksLikeAskEvaMediaFailure(text)) {
+      return { ok: false, error: (error || json.message || text).slice(0, 300) };
+    }
+    const messageId =
+      json.messages?.[0]?.id ||
+      json.data?.messages?.[0]?.id ||
+      json.data?.id ||
+      json.messageId ||
+      json.id;
+    if (messageId) return { ok: true, providerMessageId: String(messageId).slice(0, 120) };
+    if (httpStatus.toString().startsWith("2") && json.success !== false) {
+      return { ok: true };
+    }
+    if (error || json.message) return { ok: false, error: (error || json.message || "").slice(0, 300) };
   } catch {
-    // fall through
+    if (looksLikeAskEvaMediaFailure(text)) {
+      return { ok: false, error: text.slice(0, 300) };
+    }
   }
   if (!httpStatus.toString().startsWith("2")) {
     return { ok: false, error: text.slice(0, 300) || `WhatsApp HTTP ${httpStatus}` };
@@ -198,26 +181,22 @@ async function postWhatsAppTemplate(params: {
   language: string;
   components: WhatsAppComponent[];
 }): Promise<SendResult> {
-  const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
-  const token = env("WHATSAPP_ACCESS_TOKEN");
-  const version = env("WHATSAPP_GRAPH_VERSION", "v22.0");
-  const url = `https://graph.facebook.com/${version}/${phoneNumberId}/messages`;
+  const token = askevaToken();
+  if (!token) {
+    return { ok: false, error: "AskEva API token is missing." };
+  }
+  const url = `${askevaBaseUrl()}/message/send-message?token=${encodeURIComponent(token)}`;
 
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
         to: params.to,
         type: "template",
         template: {
+          language: { policy: "deterministic", code: params.language },
           name: params.name,
-          language: { code: params.language },
           components: params.components,
         },
       }),
@@ -237,16 +216,21 @@ async function postWhatsAppTemplate(params: {
 
 /** Prefer English (India), then English — create the same template in both languages in Meta. */
 function templateLanguages(): string[] {
-  const raw = env("WHATSAPP_TEMPLATE_LANG", "en_IN,en");
+  const raw = env("WHATSAPP_TEMPLATE_LANG", "en,en_IN");
   const list = raw
     .split(/[,|]+/)
     .map((code) => code.trim())
     .filter(Boolean);
-  return list.length > 0 ? [...new Set(list)] : ["en_IN", "en"];
+  return list.length > 0 ? [...new Set(list)] : ["en", "en_IN"];
 }
 
-function otpCopyCodeEnabled() {
-  return env("WHATSAPP_OTP_COPY_CODE", "1") !== "0";
+function asPositionalComponents(components: WhatsAppComponent[]): WhatsAppComponent[] {
+  return components.map((component) => ({
+    ...component,
+    parameters: component.parameters.map((parameter) =>
+      parameter.type === "text" ? { type: "text", text: parameter.text } : parameter,
+    ),
+  }));
 }
 
 async function sendWhatsAppTemplateWithFallbacks(params: {
@@ -255,10 +239,13 @@ async function sendWhatsAppTemplateWithFallbacks(params: {
   components: WhatsAppComponent[];
 }): Promise<SendResult> {
   const languages = templateLanguages();
+  const variants = [params.components, asPositionalComponents(params.components)];
   let last: SendResult = { ok: false, error: "No WhatsApp template language configured." };
   for (const language of languages) {
-    last = await postWhatsAppTemplate({ ...params, language });
-    if (last.ok) return last;
+    for (const components of variants) {
+      last = await postWhatsAppTemplate({ ...params, language, components });
+      if (last.ok) return last;
+    }
   }
   return last;
 }
@@ -278,16 +265,9 @@ export async function sendViaWhatsApp(payload: ProviderPayload): Promise<SendRes
   }
 
   const name = templateName(payload.templateKey);
-  const withButton = payload.templateKey === "otp" && otpCopyCodeEnabled();
-  const first = templateComponents(payload, withButton);
-  if ("error" in first) return { ok: false, error: first.error };
-
-  const result = await sendWhatsAppTemplateWithFallbacks({ to: mobile, name, components: first });
-  if (result.ok || !withButton) return result;
-
-  const withoutButton = templateComponents(payload, false);
-  if ("error" in withoutButton) return result;
-  return sendWhatsAppTemplateWithFallbacks({ to: mobile, name, components: withoutButton });
+  const components = templateComponents(payload);
+  if ("error" in components) return { ok: false, error: components.error };
+  return sendWhatsAppTemplateWithFallbacks({ to: mobile, name, components });
 }
 
 export function messagingProvider() {

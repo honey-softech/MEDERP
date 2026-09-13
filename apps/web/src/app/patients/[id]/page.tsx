@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
+import { MissingRecord } from "@/components/missing-record";
+import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { PatientForm } from "@/components/patient-form";
 import { FamilyLinkForm, MergePatientForm } from "@/components/patient-family-merge";
@@ -20,7 +22,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
   const user = await getCurrentUser();
   if (!user?.hospitalId) redirect("/login");
   if (!CLINICAL_VIEW_ROLES.includes(user.role) && user.role !== "ACCOUNTANT") redirect("/");
-  const { id } = await params;
+  const id = await routeParam(params, "id");
 
   const patient = await prisma.patient.findFirst({
     where: { id, hospitalId: user.hospitalId },
@@ -63,7 +65,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       },
     },
   });
-  if (!patient) notFound();
+  if (!patient) {
+    return <MissingRecord title="Patient" backHref="/patients" backLabel="Back to patients" />;
+  }
 
   const family = patient.familyGroupId
     ? await prisma.patient.findMany({

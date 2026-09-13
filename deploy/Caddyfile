@@ -1,14 +1,8 @@
 {
-	email {$ACME_EMAIL}
+	email admin@mederp.co.in
 }
 
-# Keep the EC2 IP working on HTTP while the domain is being verified.
-http://:80 {
-	reverse_proxy web:3000
-}
-
-# Let's Encrypt padlock for the real hostname after DNS points here.
-{$SITE_ADDRESS} {
+mederp.co.in, www.mederp.co.in {
 	encode gzip
 	reverse_proxy web:3000
 }

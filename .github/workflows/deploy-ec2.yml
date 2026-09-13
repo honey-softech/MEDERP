@@ -66,6 +66,8 @@ jobs:
             if [ -n "$PUBLIC_API_URL" ]; then
               ensure_env WHATSAPP_MEDIA_BASE_URL "$PUBLIC_API_URL"
             fi
+            ensure_env SITE_ADDRESS "mederp.co.in,www.mederp.co.in"
+            ensure_env ACME_EMAIL "admin@mederp.co.in"
 
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml up -d --build
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml ps
@@ -73,7 +75,7 @@ jobs:
             echo "Waiting for /api/health (app needs a few seconds after container start)..."
             ok=0
             for i in $(seq 1 30); do
-              if curl -fsS -m 5 http://127.0.0.1/api/health; then
+              if curl -fsS -m 5 http://127.0.0.1:3000/api/health; then
                 ok=1
                 break
               fi

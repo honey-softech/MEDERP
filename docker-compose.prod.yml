@@ -24,8 +24,10 @@ services:
         NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL}
         NEXT_PUBLIC_RAZORPAY_KEY_ID: ${NEXT_PUBLIC_RAZORPAY_KEY_ID}
     restart: unless-stopped
+    expose:
+      - "3000"
     ports:
-      - "80:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - apps/web/.env
     environment:
@@ -49,6 +51,25 @@ services:
       db:
         condition: service_healthy
 
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-mederp.co.in,www.mederp.co.in}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@mederp.co.in}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
 volumes:
   mederp_pgdata:
   mederp_whatsapp_media:
+  caddy_data:
+  caddy_config:

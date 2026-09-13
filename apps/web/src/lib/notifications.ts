@@ -194,14 +194,14 @@ export async function notifySummaryApproved(params: {
   token?: string | null;
 }) {
   const token = params.token ? ` · ${params.token}` : "";
-  const body = `${params.doctorName} approved the visit summary and prescription for ${params.patientName}${token}. It is ready to print.`;
+  const body = `${params.doctorName} approved the visit summary and prescription for ${params.patientName}${token}. It is ready to send on WhatsApp or print.`;
   await Promise.all([
     notifyHospitalRole({
       hospitalId: params.hospitalId,
       role: "NURSE",
       appointmentId: params.appointmentId,
       href: `/appointments/${params.appointmentId}`,
-      title: "Visit summary approved — print",
+      title: "Visit summary approved",
       body,
     }),
     notifyHospitalRole({
@@ -209,7 +209,7 @@ export async function notifySummaryApproved(params: {
       role: "RECEPTIONIST",
       appointmentId: params.appointmentId,
       href: `/appointments/${params.appointmentId}`,
-      title: "Visit summary approved — print",
+      title: "Visit summary approved",
       body,
     }),
   ]);

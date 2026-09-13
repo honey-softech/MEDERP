@@ -4,7 +4,9 @@ import { MissingRecord } from "@/components/missing-record";
 import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { VisitPaymentForm } from "@/components/visit-payment-form";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { secondaryButtonClass } from "@/components/auth-shell";
+import { canSendIssuedInvoice } from "@/lib/billing/rules";
 import {
   BILLING_ROLES,
   consultationFeeForVisit,
@@ -61,6 +63,18 @@ export default async function CollectVisitPaymentPage({
         <Link href="/billing/collections" className={secondaryButtonClass}>
           Doctor collections
         </Link>
+        {invoice && canSendIssuedInvoice(invoice.status) ? (
+          <>
+            <SendPatientMessageButton
+              endpoint={`/api/invoices/${invoice.id}/send`}
+              patientPhone={appointment.patient.phone}
+              label="Send on WhatsApp"
+            />
+            <Link href={`/billing/${invoice.id}`} className={secondaryButtonClass}>
+              View / print receipt
+            </Link>
+          </>
+        ) : null}
       </div>
 
       <article className="mb-6 max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

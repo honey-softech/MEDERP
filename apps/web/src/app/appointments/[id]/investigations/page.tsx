@@ -73,7 +73,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
           <SendPatientMessageButton
             endpoint={`/api/appointments/${appointment.id}/investigations/send`}
             patientPhone={appointment.patient.phone}
-            label="Send PDF on WhatsApp"
+            label="Send on WhatsApp"
           />
           <PrintButton label="Print list" variant="primary" />
         </div>

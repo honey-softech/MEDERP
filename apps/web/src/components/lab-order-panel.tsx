@@ -52,7 +52,7 @@ export function LabOrderPanel({
               endpoint={`/api/appointments/${appointmentId}/investigations/send`}
               patientPhone={patientPhone}
               compact
-              label="Send"
+              label="Send on WhatsApp"
             />
             <Link href={`/appointments/${appointmentId}/investigations`} className={compactButtonClass}>
               Print

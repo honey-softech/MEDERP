@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { compactButtonClass, compactPrimaryButtonClass, textActionClass } from "@/components/auth-shell";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 
 export type PastVisitItem = {
   id: string;
@@ -21,6 +22,7 @@ export function VisitHistorySheet({
   patientHref,
   canPrintSummary,
   canViewLabReports,
+  patientPhone,
   label = "Past visits",
   variant = "button",
 }: {
@@ -28,6 +30,7 @@ export function VisitHistorySheet({
   patientHref: string;
   canPrintSummary: boolean;
   canViewLabReports: boolean;
+  patientPhone?: string | null;
   label?: string;
   variant?: "button" | "link";
 }) {
@@ -109,9 +112,17 @@ export function VisitHistorySheet({
                             Open visit
                           </Link>
                           {visit.summaryApproved && canPrintSummary ? (
-                            <Link href={`/appointments/${visit.id}/summary`} className={compactPrimaryButtonClass}>
-                              Summary
-                            </Link>
+                            <>
+                              <SendPatientMessageButton
+                                endpoint={`/api/appointments/${visit.id}/summary/send`}
+                                patientPhone={patientPhone}
+                                compact
+                                label="Send on WhatsApp"
+                              />
+                              <Link href={`/appointments/${visit.id}/summary`} className={compactPrimaryButtonClass}>
+                                Summary
+                              </Link>
+                            </>
                           ) : null}
                           {canViewLabReports
                             ? visit.reports.map((report) => (

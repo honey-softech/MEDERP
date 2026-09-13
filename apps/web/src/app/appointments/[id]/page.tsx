@@ -11,6 +11,7 @@ import { LabOrderPanel } from "@/components/lab-order-panel";
 import { VisitAssessmentReadonly } from "@/components/visit-assessment-readonly";
 import { VisitLabTestsForm } from "@/components/visit-lab-tests-form";
 import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
 import {
   BILLING_ROLES,
@@ -207,6 +208,7 @@ export default async function AppointmentDetailPage({
                     id={appointment.id}
                     status={appointment.status}
                     summaryApproved={summaryApproved}
+                    patientPhone={appointment.patient.phone}
                     showHint={false}
                   />
                 </div>
@@ -229,12 +231,23 @@ export default async function AppointmentDetailPage({
             patientHref={`/patients/${appointment.patientId}`}
             canPrintSummary={canPrintSummary}
             canViewLabReports={canViewLabReport}
+            patientPhone={appointment.patient.phone}
             label="Past visits"
           />
           {assessment && (canAssess || (canPrintSummary && summaryApproved)) ? (
-            <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
-              {summaryApproved ? "Print" : "Preview"}
-            </Link>
+            <>
+              {summaryApproved && canPrintSummary && !canDoctorVisit ? (
+                <SendPatientMessageButton
+                  endpoint={`/api/appointments/${appointment.id}/summary/send`}
+                  patientPhone={appointment.patient.phone}
+                  compact
+                  label="Send on WhatsApp"
+                />
+              ) : null}
+              <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+                {summaryApproved ? "Print" : "Preview"}
+              </Link>
+            </>
           ) : null}
           {canAssess ? (
             <Link
@@ -265,6 +278,7 @@ export default async function AppointmentDetailPage({
               id={appointment.id}
               status={appointment.status}
               summaryApproved={summaryApproved}
+              patientPhone={appointment.patient.phone}
               showHint={false}
             />
           ) : null}
@@ -276,12 +290,23 @@ export default async function AppointmentDetailPage({
             patientHref={`/patients/${appointment.patientId}`}
             canPrintSummary={canPrintSummary}
             canViewLabReports={canViewLabReport}
+            patientPhone={appointment.patient.phone}
             label="Past visits"
           />
           {assessment && (canAssess || (canPrintSummary && summaryApproved)) ? (
-            <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
-              {summaryApproved ? "Print" : "Preview"}
-            </Link>
+            <>
+              {summaryApproved && canPrintSummary && !canDoctorVisit ? (
+                <SendPatientMessageButton
+                  endpoint={`/api/appointments/${appointment.id}/summary/send`}
+                  patientPhone={appointment.patient.phone}
+                  compact
+                  label="Send on WhatsApp"
+                />
+              ) : null}
+              <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+                {summaryApproved ? "Print" : "Preview"}
+              </Link>
+            </>
           ) : null}
           {canAssess ? (
             <Link
@@ -421,6 +446,7 @@ export default async function AppointmentDetailPage({
               summaryApproved={summaryApproved}
               canEdit={canAssess}
               canPrint={canPrintSummary}
+              patientPhone={appointment.patient.phone}
               chiefComplaint={assessment?.chiefComplaint}
               examination={assessment?.examination}
               diagnosis={assessment?.diagnosis}
@@ -470,11 +496,18 @@ export default async function AppointmentDetailPage({
 
           {summaryApproved ? (
             <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50 p-4">
-              <p className="text-sm text-teal-900">Visit summary approved.</p>
+              <p className="text-sm text-teal-900">Visit summary approved. Send it on WhatsApp or print the record.</p>
               {canPrintSummary ? (
-                <Link href={`/appointments/${appointment.id}/summary`} className={`${primaryButtonClass} inline-flex`}>
-                  View / print record
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <SendPatientMessageButton
+                    endpoint={`/api/appointments/${appointment.id}/summary/send`}
+                    patientPhone={appointment.patient.phone}
+                    label="Send on WhatsApp"
+                  />
+                  <Link href={`/appointments/${appointment.id}/summary`} className={`${primaryButtonClass} inline-flex`}>
+                    View / print record
+                  </Link>
+                </div>
               ) : null}
               {assessment?.followUpAt ? (
                 <p className="text-sm text-slate-700">

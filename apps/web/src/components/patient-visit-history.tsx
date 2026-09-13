@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { secondaryButtonClass } from "@/components/auth-shell";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { VitalsPanel } from "@/components/vitals-panel";
 import { doctorName, prettyEnum, tokenLabel } from "@/lib/front-desk";
 import { toVitalsValues } from "@/lib/vitals";
@@ -41,10 +42,12 @@ export function PatientVisitHistory({
   visits,
   canPrintSummary,
   canViewLabReports = false,
+  patientPhone,
 }: {
   visits: VisitRow[];
   canPrintSummary: boolean;
   canViewLabReports?: boolean;
+  patientPhone?: string | null;
 }) {
   const last = visits[0];
 
@@ -84,9 +87,17 @@ export function PatientVisitHistory({
                 <p className="mt-1 text-slate-600">Diagnosis: {last.assessment.diagnosis}</p>
               ) : null}
               {last.assessment.status === "APPROVED" && canPrintSummary ? (
-                <Link href={`/appointments/${last.id}/summary`} className="mt-2 inline-block text-teal-700 hover:underline">
-                  View / print summary
-                </Link>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <SendPatientMessageButton
+                    endpoint={`/api/appointments/${last.id}/summary/send`}
+                    patientPhone={patientPhone}
+                    compact
+                    label="Send on WhatsApp"
+                  />
+                  <Link href={`/appointments/${last.id}/summary`} className="text-teal-700 hover:underline">
+                    View / print summary
+                  </Link>
+                </div>
               ) : null}
             </div>
           ) : (
@@ -177,9 +188,17 @@ export function PatientVisitHistory({
                   </div>
                 </div>
                 {row.assessment?.status === "APPROVED" && canPrintSummary ? (
-                  <Link href={`/appointments/${row.id}/summary`} className="mt-2 inline-block text-teal-700 hover:underline">
-                    Print visit summary
-                  </Link>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SendPatientMessageButton
+                      endpoint={`/api/appointments/${row.id}/summary/send`}
+                      patientPhone={patientPhone}
+                      compact
+                      label="Send on WhatsApp"
+                    />
+                    <Link href={`/appointments/${row.id}/summary`} className="text-teal-700 hover:underline">
+                      Print visit summary
+                    </Link>
+                  </div>
                 ) : null}
                 {canViewLabReports
                   ? row.labOrders

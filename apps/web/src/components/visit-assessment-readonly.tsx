@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { parseMedications } from "@/lib/prescription-text";
 import { readableClinicalText } from "@/lib/visit-summary";
 
@@ -9,6 +10,7 @@ export function VisitAssessmentReadonly({
   summaryApproved,
   canEdit,
   canPrint,
+  patientPhone,
   chiefComplaint,
   examination,
   diagnosis,
@@ -23,6 +25,7 @@ export function VisitAssessmentReadonly({
   summaryApproved: boolean;
   canEdit: boolean;
   canPrint: boolean;
+  patientPhone?: string | null;
   chiefComplaint?: string | null;
   examination?: string | null;
   diagnosis?: string | null;
@@ -58,15 +61,23 @@ export function VisitAssessmentReadonly({
             {summaryApproved ? "Visit summary approved" : "Visit closed"}
           </p>
           <p className="mt-0.5 text-xs text-teal-800">
-            {statusLabel}. Open print view for the patient record
+            {statusLabel}. Send the record on WhatsApp or open print view
             {canEdit ? ", or edit to change the assessment" : ""}.
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {canPrint && summaryApproved ? (
-            <Link href={`/appointments/${appointmentId}/summary`} className={primaryButtonClass}>
-              Print record
-            </Link>
+            <>
+              <SendPatientMessageButton
+                endpoint={`/api/appointments/${appointmentId}/summary/send`}
+                patientPhone={patientPhone}
+                compact
+                label="Send on WhatsApp"
+              />
+              <Link href={`/appointments/${appointmentId}/summary`} className={primaryButtonClass}>
+                Print record
+              </Link>
+            </>
           ) : null}
           {canEdit ? (
             <Link href={`/appointments/${appointmentId}?edit=1`} className={compactButtonClass}>

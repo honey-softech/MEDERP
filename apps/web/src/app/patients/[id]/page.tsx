@@ -8,6 +8,7 @@ import { FamilyLinkForm, MergePatientForm } from "@/components/patient-family-me
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { PatientVisitHistory } from "@/components/patient-visit-history";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
 import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, FRONT_DESK_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageYears, inr, patientName, prettyEnum } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
@@ -241,15 +242,25 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
               {patient.medicalCertificates.map((row) => (
-                <li key={row.id}>
-                  <Link className="font-medium text-teal-700 hover:underline" href={`/certificates/${row.id}`}>
-                    {row.certificateNo}
-                  </Link>
-                  <span className="text-slate-500">
-                    {" "}
-                    · {certificateTitle(row.type)} · {formatCertDate(row.issuedAt)} ·{" "}
-                    {row.issuedByDisplayName || row.issuedByUsername} · {prettyEnum(row.status)}
+                <li key={row.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    <Link className="font-medium text-teal-700 hover:underline" href={`/certificates/${row.id}`}>
+                      {row.certificateNo}
+                    </Link>
+                    <span className="text-slate-500">
+                      {" "}
+                      · {certificateTitle(row.type)} · {formatCertDate(row.issuedAt)} ·{" "}
+                      {row.issuedByDisplayName || row.issuedByUsername} · {prettyEnum(row.status)}
+                    </span>
                   </span>
+                  {row.status === "ISSUED" ? (
+                    <SendPatientMessageButton
+                      endpoint={`/api/certificates/${row.id}/send`}
+                      patientPhone={patient.phone}
+                      compact
+                      label="Send on WhatsApp"
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -283,7 +294,12 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </section>
       ) : null}
 
-      <PatientVisitHistory visits={patient.appointments} canPrintSummary={canPrintSummary} canViewLabReports={canViewLabReports} />
+      <PatientVisitHistory
+        visits={patient.appointments}
+        canPrintSummary={canPrintSummary}
+        canViewLabReports={canViewLabReports}
+        patientPhone={patient.phone}
+      />
 
       {canEdit ? (
         <section className="mt-8 max-w-5xl rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-6">

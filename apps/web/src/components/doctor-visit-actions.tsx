@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { compactPrimaryButtonClass, compactButtonClass } from "@/components/auth-shell";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 
 export function DoctorVisitActions({
   id,
   status,
   summaryApproved = false,
+  patientPhone,
   assessmentHref,
   summaryHref,
   assessmentLabel,
@@ -18,6 +20,7 @@ export function DoctorVisitActions({
   id: string;
   status: string;
   summaryApproved?: boolean;
+  patientPhone?: string | null;
   assessmentHref?: string;
   summaryHref?: string;
   assessmentLabel?: string;
@@ -51,6 +54,15 @@ export function DoctorVisitActions({
     router.refresh();
   }
 
+  const sendButton = summaryApproved ? (
+    <SendPatientMessageButton
+      endpoint={`/api/appointments/${id}/summary/send`}
+      patientPhone={patientPhone}
+      compact
+      label="Send on WhatsApp"
+    />
+  ) : null;
+
   const closed = ["CANCELLED", "COMPLETED", "NO_SHOW"].includes(status);
   if (closed) {
     if (status !== "COMPLETED") return null;
@@ -62,6 +74,7 @@ export function DoctorVisitActions({
             {assessmentLabel ?? "View visit"}
           </Link>
         ) : null}
+        {sendButton}
         {summaryHref ? (
           <Link href={summaryHref} className={compactButtonClass}>
             {summaryLabel ?? "Print record"}
@@ -90,6 +103,7 @@ export function DoctorVisitActions({
           {assessmentLabel ?? "Doctor assessment"}
         </Link>
       ) : null}
+      {sendButton}
       {summaryHref ? (
         <Link href={summaryHref} className={compactButtonClass}>
           {summaryLabel ?? "Preview summary"}

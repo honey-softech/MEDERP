@@ -58,7 +58,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {issued
-              ? "Doctors and reception can print this certificate for the patient."
+              ? "Send this certificate on WhatsApp or print it for the patient."
               : certificate.voidReason
                 ? `Voided: ${certificate.voidReason}`
                 : "This certificate is no longer valid."}
@@ -75,7 +75,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
             <SendPatientMessageButton
               endpoint={`/api/certificates/${certificate.id}/send`}
               patientPhone={certificate.patient.phone}
-              label="Send PDF on WhatsApp"
+              label="Send on WhatsApp"
             />
           ) : null}
           {issued && canPrint ? <PrintButton label="Print certificate" variant="primary" /> : null}

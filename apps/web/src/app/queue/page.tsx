@@ -7,6 +7,7 @@ import {
   compactButtonClass,
   compactPrimaryButtonClass,
 } from "@/components/auth-shell";
+import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { OpdDayNav } from "@/components/opd-day-nav";
 import {
   CLINICAL_VIEW_ROLES,
@@ -232,6 +233,7 @@ export default async function QueuePage({
                             id={row.id}
                             status={row.status}
                             summaryApproved={row.assessment?.status === "APPROVED"}
+                            patientPhone={row.patient.phone}
                             assessmentHref={`/appointments/${row.id}`}
                             assessmentLabel={
                               row.assessment?.status === "APPROVED" || row.status === "COMPLETED"
@@ -251,7 +253,13 @@ export default async function QueuePage({
                       {!canDoctorVisit &&
                       canPrintSummary &&
                       row.assessment?.status === "APPROVED" ? (
-                        <div className="mt-2.5">
+                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                          <SendPatientMessageButton
+                            endpoint={`/api/appointments/${row.id}/summary/send`}
+                            patientPhone={row.patient.phone}
+                            compact
+                            label="Send on WhatsApp"
+                          />
                           <Link href={`/appointments/${row.id}/summary`} className={compactButtonClass}>
                             Print record
                           </Link>

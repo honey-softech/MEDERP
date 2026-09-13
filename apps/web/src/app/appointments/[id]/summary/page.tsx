@@ -59,8 +59,8 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {approved
-              ? "This is the printable clinical summary. Doctors and reception can print it."
-              : "Preview the printed page, then approve the assessment so reception can print it."}
+              ? "This is the printable clinical summary. Send it on WhatsApp or print it."
+              : "Preview the printed page, then approve the assessment so reception can send it on WhatsApp or print it."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -71,7 +71,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
             <SendPatientMessageButton
               endpoint={`/api/appointments/${appointment.id}/summary/send`}
               patientPhone={appointment.patient.phone}
-              label="Send PDF on WhatsApp"
+              label="Send on WhatsApp"
             />
           ) : null}
           {approved || canPreviewDraft ? <PrintButton label="Print record" variant="primary" /> : null}

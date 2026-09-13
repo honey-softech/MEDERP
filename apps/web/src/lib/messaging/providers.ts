@@ -81,7 +81,7 @@ export function templateComponents(payload: ProviderPayload, _includeOtpButton =
   const vars = payload.variables ?? {};
   if (payload.templateKey === "otp") {
     const parsed = parseOtpDigits(payload.otp || vars.otp || vars.birthyear || vars.value || vars.number);
-    if ("error" in parsed) return parsed;
+    if (parsed.error) return { error: parsed.error };
     return utilityAccessCodeComponents(accessCodeLabel(vars), parsed.otp);
   }
   if (payload.templateKey === "appointment_reminder") {
@@ -160,7 +160,7 @@ function parseWhatsAppResult(text: string, httpStatus: number): SendResult {
       json.messageId ||
       json.id;
     if (messageId) return { ok: true, providerMessageId: String(messageId).slice(0, 120) };
-    if (httpStatus.toString().startsWith("2") && json.success !== false) {
+    if (httpStatus.toString().startsWith("2")) {
       return { ok: true };
     }
     if (error || json.message) return { ok: false, error: (error || json.message || "").slice(0, 300) };

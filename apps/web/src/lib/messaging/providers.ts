@@ -210,8 +210,16 @@ async function postWhatsAppTemplate(params: {
     }
     return result;
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "WhatsApp request failed." };
+    return { ok: false, error: whatsappNetworkError(error) };
   }
+}
+
+function whatsappNetworkError(error: unknown) {
+  const message = error instanceof Error ? error.message : "WhatsApp request failed.";
+  if (/wrong final block length|ECONNRESET|ENETUNREACH|EAI_AGAIN|CERT_|SSL|OSSL|socket|TLS/i.test(message)) {
+    return "Could not reach AskEva from the live server (network/TLS). Retry the send, or check that EC2 can open HTTPS to backend.askeva.io.";
+  }
+  return message.slice(0, 300);
 }
 
 /** Prefer English (India), then English — create the same template in both languages in Meta. */

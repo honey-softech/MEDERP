@@ -1,6 +1,17 @@
 import PDFDocument from "pdfkit";
 import { physicianLine, prettyEnum } from "@/lib/front-desk";
 import {
+  drawClinicalRow,
+  drawIdentity,
+  drawLetterhead,
+  drawPrintFooter,
+  drawSignoff,
+  drawTitle,
+  drawTwoColTable,
+  drawVitalsList,
+  printClock,
+} from "@/lib/print-document-pdf";
+import {
   ageGenderLine,
   encounterNumber,
   parseMedications,
@@ -14,6 +25,8 @@ export type VisitSummaryPdfInput = {
     address?: string | null;
     phone?: string | null;
     code: string;
+    logoData?: string | null;
+    sealData?: string | null;
   };
   patient: {
     firstName: string;
@@ -31,6 +44,8 @@ export type VisitSummaryPdfInput = {
   visitType: string;
   scheduledAt: Date;
   tokenNumber?: number | null;
+  vitalsRows?: { label: string; value: string }[];
+  printedAt?: string;
   assessment: {
     diagnosis?: string | null;
     chiefComplaint?: string | null;
@@ -42,19 +57,12 @@ export type VisitSummaryPdfInput = {
     followUpAt?: Date | null;
     approvedByDisplayName?: string | null;
     approvedByCredentials?: string | null;
+    approvedBySignature?: { imageData?: string | null } | null;
   };
 };
 
-function section(doc: PDFKit.PDFDocument, title: string, body?: string | null) {
-  const text = readableClinicalText(body);
-  if (!text) return;
-  doc.moveDown(0.6);
-  doc.font("Helvetica-Bold").fontSize(11).text(title);
-  doc.font("Helvetica").fontSize(10).text(text, { lineGap: 2 });
-}
-
 export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise<Buffer> {
-  const patientName = `${input.patient.firstName} ${input.patient.lastName}`.trim().toUpperCase();
+  const patientName = `${input.patient.firstName} ${input.patient.lastName}`.trim();
   const medicines = parseMedications(readableClinicalText(input.assessment.prescription));
   const followUp = input.assessment.followUpAt
     ? input.assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
@@ -66,71 +74,75 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
         ? `Follow-up on ${followUp}`
         : input.assessment.visitOutcome === "FOLLOW_UP"
           ? "Follow up"
-          : "";
+          : "—";
+  const physician = physicianLine(input.doctor);
+  const printedAt = input.printedAt ?? printClock();
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 48, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.font("Helvetica-Bold").fontSize(16).text(input.hospital.name, { align: "center" });
-    doc.font("Helvetica").fontSize(9);
-    if (input.hospital.address) doc.text(input.hospital.address, { align: "center" });
-    if (input.hospital.phone) doc.text(`Phone: ${input.hospital.phone}`, { align: "center" });
-    doc.moveDown(0.4);
-    doc.font("Helvetica-Bold").fontSize(12).text("Visit summary", { align: "center" });
-    doc.moveDown(0.8);
+    drawLetterhead(doc, input.hospital);
+    drawTitle(doc, "Visit summary");
+    drawIdentity(doc, {
+      patientName,
+      ageGender: ageGenderLine(input.patient.dateOfBirth, input.patient.gender),
+      ids: [
+        { label: "Encounter no.", value: encounterNumber(input.hospital.code, input.scheduledAt, input.tokenNumber) },
+        { label: "UHID", value: input.patient.mrn },
+      ],
+      meta: [
+        { label: "Appointment type", value: prettyEnum(input.visitType) },
+        { label: "Date", value: visitDateLabel(input.scheduledAt) },
+        { label: "Consulting physician", value: physician },
+        { label: "Department", value: input.departmentName },
+      ],
+    });
 
-    doc.font("Helvetica").fontSize(10);
-    const meta = [
-      `Patient: ${patientName}`,
-      `MRN: ${input.patient.mrn}`,
-      `Age / Gender: ${ageGenderLine(input.patient.dateOfBirth, input.patient.gender)}`,
-      `Encounter: ${encounterNumber(input.hospital.code, input.scheduledAt, input.tokenNumber)}`,
-      `Visit type: ${prettyEnum(input.visitType)}`,
-      `Date: ${visitDateLabel(input.scheduledAt)}`,
-      `Physician: ${physicianLine(input.doctor)}`,
-      `Department: ${input.departmentName}`,
-    ];
-    for (const line of meta) doc.text(line);
+    drawClinicalRow(doc, "Diagnosis", `Final Diagnosis: ${readableClinicalText(input.assessment.diagnosis) || "—"}`);
+    drawClinicalRow(doc, "Presenting complaints", readableClinicalText(input.assessment.chiefComplaint) || "—");
+    drawClinicalRow(doc, "History of present illness", readableClinicalText(input.assessment.summary) || "—");
+    drawVitalsList(
+      doc,
+      input.vitalsRows && input.vitalsRows.length > 0
+        ? input.vitalsRows
+        : [
+            "Temperature",
+            "Height",
+            "Weight",
+            "BMI",
+            "BSA",
+            "SpO2",
+            "Pulse",
+            "Respiratory rate",
+            "BP",
+            "Blood sugar",
+            "Fever",
+            "Vital remarks",
+          ].map((label) => ({ label, value: "—" })),
+    );
+    drawClinicalRow(doc, "Systemic examination", readableClinicalText(input.assessment.examination) || "—");
+    drawClinicalRow(doc, "Advice", readableClinicalText(input.assessment.advice) || "—");
+    drawClinicalRow(doc, followUp ? "Follow-up" : "Outcome", outcome);
 
-    section(doc, "Chief complaint", input.assessment.chiefComplaint);
-    section(doc, "History / summary", input.assessment.summary);
-    section(doc, "Examination", input.assessment.examination);
-    section(doc, "Diagnosis", input.assessment.diagnosis);
-    section(doc, "Advice", input.assessment.advice);
-
-    if (medicines.length > 0) {
-      doc.moveDown(0.6);
-      doc.font("Helvetica-Bold").fontSize(11).text("Prescription");
-      doc.font("Helvetica").fontSize(10);
-      for (const med of medicines) {
-        doc.text(med.notes ? `• ${med.name} — ${med.notes}` : `• ${med.name}`);
-      }
-    }
-
-    if (outcome) {
-      doc.moveDown(0.6);
-      doc.font("Helvetica-Bold").fontSize(11).text("Outcome");
-      doc.font("Helvetica").fontSize(10).text(outcome);
-    }
-
-    if (input.assessment.approvedByDisplayName) {
-      doc.moveDown(1);
-      doc.font("Helvetica").fontSize(10).text(`Approved by: ${input.assessment.approvedByDisplayName}`);
-      if (input.assessment.approvedByCredentials) {
-        doc.text(input.assessment.approvedByCredentials);
-      }
-    }
-
-    doc.moveDown(1.2);
-    doc.fontSize(8).fillColor("#666666").text(
-      `Generated ${new Date().toLocaleString("en-IN")} · MedERP`,
-      { align: "center" },
+    drawTwoColTable(
+      doc,
+      ["Drug name", "Notes"],
+      medicines.map((med) => ({ left: med.name, right: med.notes || "—" })),
     );
 
+    drawSignoff(doc, {
+      name: input.assessment.approvedByDisplayName || physician,
+      credentials:
+        [input.assessment.approvedByCredentials, input.departmentName].filter(Boolean).join("\n") ||
+        input.departmentName,
+      imageData: input.assessment.approvedBySignature?.imageData,
+    });
+
+    drawPrintFooter(doc, { printedAt, confidential: true });
     doc.end();
   });
 }

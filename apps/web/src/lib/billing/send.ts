@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit";
 import type { HospitalActor } from "@/lib/authz/hospital";
 import { buildBillReceiptPdf } from "@/lib/bill-receipt-pdf";
+import { resolveReceiptCollector } from "@/lib/billing/receipt-collector";
 import {
   billPdfFilename,
   canSendIssuedInvoice,
@@ -28,7 +29,12 @@ export async function sendInvoiceWhatsApp(params: {
       patient: true,
       hospital: { select: { name: true, address: true, phone: true } },
       items: true,
-      payments: { orderBy: { receivedAt: "desc" } },
+      payments: {
+        orderBy: { receivedAt: "desc" },
+        include: {
+          receivedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
+        },
+      },
       appointment: {
         include: {
           doctor: { include: { appUser: { select: { username: true } } } },
@@ -64,19 +70,22 @@ export async function sendInvoiceWhatsApp(params: {
     : null;
 
   const pdf = await buildBillReceiptPdf({
-    hospital: invoice.hospital,
-    patient: invoice.patient,
-    invoiceNo: invoice.invoiceNo,
-    status: invoice.status,
+    hospitalName: invoice.hospital.name,
     issuedAt: invoice.issuedAt,
+    status: invoice.status,
+    patientName: patientName(invoice.patient),
+    patientMrn: invoice.patient.mrn,
+    visitLine,
     items: invoice.items,
     subtotal: invoice.subtotal,
     discountAmount: invoice.discountAmount,
     waiverAmount: invoice.waiverAmount,
+    waiverReason: invoice.waiverReason,
+    showWaiver: invoice.waiverStatus === "APPROVED",
     netTotal: invoice.netTotal,
     paidAmount: invoice.paidAmount,
     payments: invoice.payments,
-    visitLine,
+    collector: await resolveReceiptCollector(invoice.payments),
   });
 
   let documentMediaId: string | undefined;

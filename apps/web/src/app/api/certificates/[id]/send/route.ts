@@ -30,7 +30,10 @@ export async function POST(request: Request, context: Ctx) {
     where: { id, hospitalId: scoped.user.hospitalId },
     include: {
       patient: true,
-      hospital: { select: { name: true, address: true, phone: true, code: true } },
+      hospital: {
+        select: { name: true, address: true, phone: true, code: true, logoData: true, sealData: true },
+      },
+      issuedBySignature: { select: { imageData: true } },
     },
   });
   if (!certificate) {

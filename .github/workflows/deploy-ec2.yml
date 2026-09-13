@@ -40,6 +40,33 @@ jobs:
               exit 1
             fi
 
+            if ! grep -qE '^(ASKEVA_API_TOKEN|WHATSAPP_ACCESS_TOKEN)=' apps/web/.env; then
+              echo "ERROR: apps/web/.env is missing ASKEVA_API_TOKEN. Add the same AskEva API key used on local, then redeploy."
+              exit 1
+            fi
+
+            ensure_env() {
+              local key="$1"
+              local value="$2"
+              if ! grep -q "^${key}=" apps/web/.env; then
+                printf '%s=%s\n' "$key" "$value" >> apps/web/.env
+                echo "Added ${key} to apps/web/.env"
+              fi
+            }
+
+            PUBLIC_API_URL="$(grep -E '^NEXT_PUBLIC_API_URL=' apps/web/.env | head -n1 | cut -d= -f2- | tr -d '"' || true)"
+            ensure_env ASKEVA_API_URL "https://backend.askeva.io/v1"
+            ensure_env WHATSAPP_TEMPLATE_LANG "en,en_IN"
+            ensure_env WHATSAPP_OTP_TEMPLATE "as"
+            ensure_env WHATSAPP_REMINDER_PARAMS "named"
+            ensure_env WHATSAPP_REMINDER_TEMPLATE "appointment_reminder1"
+            ensure_env WHATSAPP_INVESTIGATION_TEMPLATE "investigation_list"
+            ensure_env WHATSAPP_VISIT_SUMMARY_TEMPLATE "visit_summary_"
+            ensure_env WHATSAPP_BILL_RECEIPT_TEMPLATE "billpreceipt"
+            if [ -n "$PUBLIC_API_URL" ]; then
+              ensure_env WHATSAPP_MEDIA_BASE_URL "$PUBLIC_API_URL"
+            fi
+
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml up -d --build
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml ps
 

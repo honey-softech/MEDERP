@@ -29,7 +29,7 @@ export async function POST(request: Request, context: Ctx) {
     where: { id, hospitalId: scoped.user.hospitalId },
     include: {
       patient: true,
-      hospital: { select: { name: true, address: true, phone: true } },
+      hospital: { select: { name: true, address: true, phone: true, logoData: true } },
       doctor: { include: { appUser: { select: { username: true } } } },
       department: { select: { name: true } },
       assessment: { select: { status: true } },
@@ -37,7 +37,7 @@ export async function POST(request: Request, context: Ctx) {
         where: { status: { not: "CANCELLED" } },
         include: {
           items: true,
-          orderedBySignature: { select: { displayName: true, credentials: true } },
+          orderedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
         },
         orderBy: { createdAt: "asc" },
       },
@@ -85,6 +85,8 @@ export async function POST(request: Request, context: Ctx) {
     items,
     requestedBy: signature?.displayName,
     requestedByCredentials: signature?.credentials,
+    requestedByImage: signature?.imageData,
+    printedBy: scoped.user.username,
   });
 
   let documentMediaId: string | undefined;

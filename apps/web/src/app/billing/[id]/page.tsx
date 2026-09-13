@@ -18,7 +18,7 @@ import {
   requireHospitalPage,
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
-import { signatureCredentialsFor, signatureNameFor } from "@/lib/signatures";
+import { resolveReceiptCollector } from "@/lib/billing/receipt-collector";
 import { redirect } from "next/navigation";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -44,41 +44,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   }
 
   const due = Math.max(0, Number(invoice.netTotal) - Number(invoice.paidAmount));
-
-  // Prefer the signature snapshotted when payment was taken; fall back to the collector's
-  // current active signature so receipts still print after a signature is uploaded later.
-  const latestCollection = invoice.payments.find((payment) => payment.kind === "COLLECTION") ?? null;
-  let collector:
-    | { name: string; credentials: string | null; imageData: string | null }
-    | null = null;
-  if (latestCollection?.receivedBySignature) {
-    collector = {
-      name: latestCollection.receivedBySignature.displayName,
-      credentials: latestCollection.receivedBySignature.credentials,
-      imageData: latestCollection.receivedBySignature.imageData,
-    };
-  } else if (latestCollection?.receivedByUserId) {
-    const receiver = await prisma.appUser.findUnique({
-      where: { id: latestCollection.receivedByUserId },
-      include: {
-        staffProfile: true,
-        signatures: {
-          where: { status: "ACTIVE" },
-          orderBy: { version: "desc" },
-          take: 1,
-          select: { imageData: true, displayName: true, credentials: true },
-        },
-      },
-    });
-    if (receiver) {
-      const live = receiver.signatures[0] ?? null;
-      collector = {
-        name: live?.displayName ?? signatureNameFor(receiver),
-        credentials: live?.credentials ?? signatureCredentialsFor(receiver),
-        imageData: live?.imageData ?? null,
-      };
-    }
-  }
+  const collector = await resolveReceiptCollector(invoice.payments);
 
   return (
     <AppShell title={invoice.invoiceNo}>
@@ -90,7 +56,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <SendPatientMessageButton
             endpoint={`/api/invoices/${invoice.id}/send`}
             patientPhone={invoice.patient.phone}
-            label="Send PDF on WhatsApp"
+            label="Send on WhatsApp"
           />
         ) : null}
         <PrintButton />

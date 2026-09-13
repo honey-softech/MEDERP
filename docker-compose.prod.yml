@@ -33,9 +33,22 @@ services:
       PORT: "3000"
       COOKIE_SECURE: ${COOKIE_SECURE:-0}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/mederp?schema=public
+      ASKEVA_API_URL: ${ASKEVA_API_URL:-https://backend.askeva.io/v1}
+      WHATSAPP_TEMPLATE_LANG: ${WHATSAPP_TEMPLATE_LANG:-en,en_IN}
+      WHATSAPP_OTP_TEMPLATE: ${WHATSAPP_OTP_TEMPLATE:-as}
+      WHATSAPP_REMINDER_PARAMS: ${WHATSAPP_REMINDER_PARAMS:-named}
+      WHATSAPP_REMINDER_TEMPLATE: ${WHATSAPP_REMINDER_TEMPLATE:-appointment_reminder1}
+      WHATSAPP_INVESTIGATION_TEMPLATE: ${WHATSAPP_INVESTIGATION_TEMPLATE:-investigation_list}
+      WHATSAPP_VISIT_SUMMARY_TEMPLATE: ${WHATSAPP_VISIT_SUMMARY_TEMPLATE:-visit_summary_}
+      WHATSAPP_BILL_RECEIPT_TEMPLATE: ${WHATSAPP_BILL_RECEIPT_TEMPLATE:-billpreceipt}
+      WHATSAPP_MEDIA_BASE_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_OPTIONS: "--max-old-space-size=768 --dns-result-order=ipv4first"
+    volumes:
+      - mederp_whatsapp_media:/app/.data/whatsapp-media
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   mederp_pgdata:
+  mederp_whatsapp_media:

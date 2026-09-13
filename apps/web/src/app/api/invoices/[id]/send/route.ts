@@ -16,10 +16,23 @@ export async function POST(request: Request, context: Ctx) {
   if (!parsed.ok) return parsed.response;
 
   const { id } = await context.params;
-  const result = await sendInvoiceWhatsApp({
-    request,
-    user: scoped.user,
-    invoiceId: id,
-  });
-  return billingActionResponse(result);
+  try {
+    const result = await sendInvoiceWhatsApp({
+      request,
+      user: scoped.user,
+      invoiceId: id,
+    });
+    return billingActionResponse(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not send the bill.";
+    console.error("[billing-send]", error);
+    if (/wrong final block length|OSSL|SSL|TLS/i.test(message)) {
+      return billingActionResponse({
+        ok: false,
+        error: "Could not reach AskEva from the live server (network/TLS).",
+        status: 502,
+      });
+    }
+    return billingActionResponse({ ok: false, error: message.slice(0, 300), status: 502 });
+  }
 }

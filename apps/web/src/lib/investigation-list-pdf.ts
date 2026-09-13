@@ -1,6 +1,14 @@
 import PDFDocument from "pdfkit";
 import { physicianLine, tokenLabel } from "@/lib/front-desk";
-import { ageGenderLine, visitDateLabel } from "@/lib/visit-summary";
+import {
+  drawLetterhead,
+  drawPrintFooter,
+  drawSignoff,
+  drawThreeColTable,
+  pageWidth,
+  printClock,
+} from "@/lib/print-document-pdf";
+import { ageGenderLine } from "@/lib/visit-summary";
 
 export type InvestigationListPdfItem = {
   name: string;
@@ -13,6 +21,8 @@ export type InvestigationListPdfInput = {
     name: string;
     address?: string | null;
     phone?: string | null;
+    logoData?: string | null;
+    sealData?: string | null;
   };
   patient: {
     firstName: string;
@@ -36,104 +46,79 @@ export type InvestigationListPdfInput = {
   items: InvestigationListPdfItem[];
   requestedBy?: string | null;
   requestedByCredentials?: string | null;
+  requestedByImage?: string | null;
+  printedBy?: string | null;
+  printedAt?: string;
 };
 
 export async function buildInvestigationListPdf(input: InvestigationListPdfInput): Promise<Buffer> {
-  const patientName = `${input.patient.firstName} ${input.patient.lastName}`.trim().toUpperCase();
+  const patientName = `${input.patient.firstName} ${input.patient.lastName}`.trim();
   const hasOutside = input.items.some((item) => item.outside);
+  const doctor = physicianLine(input.doctor);
+  const printedAt = input.printedAt ?? printClock();
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 48, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const left = doc.page.margins.left;
+    const width = pageWidth(doc);
 
-    doc.font("Helvetica-Bold").fontSize(16).text(input.hospital.name, { align: "center" });
-    doc.font("Helvetica").fontSize(9);
-    if (input.hospital.address) doc.text(input.hospital.address, { align: "center" });
-    if (input.hospital.phone) doc.text(`Phone: ${input.hospital.phone}`, { align: "center" });
-    doc.moveDown(0.4);
-    doc.font("Helvetica-Bold").fontSize(12).text("Investigation request", { align: "center" });
-    doc.moveDown(0.8);
+    drawLetterhead(doc, input.hospital, { kicker: "Investigation request" });
 
-    doc.font("Helvetica").fontSize(10);
-    const meta = [
-      `Patient: ${patientName}`,
-      `MRN: ${input.patient.mrn}`,
-      `Age / Gender: ${ageGenderLine(input.patient.dateOfBirth, input.patient.gender)}`,
-      ...(input.patient.phone ? [`Phone: ${input.patient.phone}`] : []),
-      `Physician: ${physicianLine(input.doctor)}`,
-      `Department: ${input.departmentName}`,
-      `Visit: ${visitDateLabel(input.scheduledAt)}${input.tokenNumber ? ` · Token ${tokenLabel(input.tokenNumber)}` : ""}`,
-    ];
-    for (const line of meta) doc.text(line);
-
-    doc.moveDown(0.8);
-    doc.font("Helvetica-Bold").fontSize(11).text("Tests / scans");
-    doc.moveDown(0.3);
-
-    const cols = [
-      { label: "Test / scan", width: contentWidth * 0.5 },
-      { label: "Category", width: contentWidth * 0.28 },
-      { label: "Where", width: contentWidth * 0.22 },
-    ];
-    let x = doc.page.margins.left;
-    const headerY = doc.y;
-    doc.font("Helvetica-Bold").fontSize(9);
-    for (const col of cols) {
-      doc.text(col.label, x, headerY, { width: col.width });
-      x += col.width;
+    doc.font("Helvetica").fontSize(10).fillColor("#64748b").text("Patient · ", left, doc.y, { continued: true });
+    doc.font("Helvetica-Bold").fillColor("#0f172a").text(`${patientName.toUpperCase()}`, { continued: true });
+    doc.font("Helvetica").text(` · ${input.patient.mrn} · ${ageGenderLine(input.patient.dateOfBirth, input.patient.gender)}`);
+    if (input.patient.phone) {
+      doc.font("Helvetica").fontSize(10).fillColor("#64748b").text("Phone · ", { continued: true });
+      doc.fillColor("#0f172a").text(input.patient.phone);
     }
-    doc.y = headerY + 16;
+    doc.fillColor("#64748b").text("Doctor · ", { continued: true });
+    doc.fillColor("#0f172a").text(`${doctor} · ${input.departmentName}`);
+    doc.fillColor("#64748b").text("Visit · ", { continued: true });
+    const visitWhen = input.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
     doc
-      .moveTo(doc.page.margins.left, doc.y)
-      .lineTo(doc.page.margins.left + contentWidth, doc.y)
-      .strokeColor("#cbd5e1")
-      .stroke();
-    doc.moveDown(0.3);
+      .fillColor("#0f172a")
+      .text(`${visitWhen}${input.tokenNumber ? ` · Token ${tokenLabel(input.tokenNumber)}` : ""}`);
 
-    doc.font("Helvetica").fontSize(10).fillColor("#000000");
-    for (const item of input.items) {
-      const rowY = doc.y;
-      const values = [item.name, item.category, item.outside ? "Outside" : "Hospital lab"];
-      x = doc.page.margins.left;
-      let rowHeight = 14;
-      for (let i = 0; i < cols.length; i += 1) {
-        const height = doc.heightOfString(values[i], { width: cols[i].width });
-        rowHeight = Math.max(rowHeight, height);
-        doc.text(values[i], x, rowY, { width: cols[i].width });
-        x += cols[i].width;
-      }
-      doc.y = rowY + rowHeight + 6;
-      doc.x = doc.page.margins.left;
+    doc.moveDown(0.7);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text("Tests / scans", left);
+    doc.moveDown(0.25);
+    if (input.items.length === 0) {
+      doc.font("Helvetica").fontSize(10).fillColor("#64748b").text("No tests or scans on this visit yet.", left, doc.y, {
+        width,
+      });
+    } else {
+      drawThreeColTable(
+        doc,
+        ["Test / scan", "Category", "Where"],
+        input.items.map((item) => [item.name, item.category, item.outside ? "Outside" : "Hospital lab"]),
+      );
     }
 
     if (hasOutside) {
-      doc.moveDown(0.4);
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .fillColor("#334155")
-        .text("Complete outside tests and bring the reports to the hospital.");
-      doc.fillColor("#000000");
+      doc.moveDown(0.3);
+      doc.font("Helvetica").fontSize(8).fillColor("#475569");
+      doc.text("Complete outside tests and bring the reports to the hospital.", left, doc.y, { width });
     }
 
     if (input.requestedBy) {
-      doc.moveDown(1);
-      doc.font("Helvetica").fontSize(10).text(`Requested by: ${input.requestedBy}`);
-      if (input.requestedByCredentials) {
-        doc.text(input.requestedByCredentials);
-      }
+      drawSignoff(doc, {
+        role: "Ordering physician",
+        name: input.requestedBy,
+        credentials: input.requestedByCredentials,
+        imageData: input.requestedByImage,
+        note: "Electronically authorised investigation request",
+      });
     }
 
-    doc.moveDown(1.2);
-    doc.fontSize(8).fillColor("#666666").text(`Generated ${new Date().toLocaleString("en-IN")} · MedERP`, {
-      align: "center",
+    drawPrintFooter(doc, {
+      printedAt,
+      printedBy: input.printedBy ?? undefined,
     });
-
     doc.end();
   });
 }

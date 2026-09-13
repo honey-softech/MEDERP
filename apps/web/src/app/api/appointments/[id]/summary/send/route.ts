@@ -4,6 +4,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { renderTemplate } from "@/lib/messaging/templates";
+import { printClock } from "@/lib/print-document-pdf";
+import { toVitalsValues } from "@/lib/vitals";
+import { generalExaminationRows } from "@/lib/visit-summary";
 import { buildVisitSummaryPdf } from "@/lib/visit-summary-pdf";
 import {
   doctorName,
@@ -34,10 +37,11 @@ export async function POST(request: Request, context: Ctx) {
     where: { id, hospitalId: scoped.user.hospitalId },
     include: {
       patient: true,
-      hospital: { select: { name: true, address: true, phone: true, code: true } },
+      hospital: { select: { name: true, address: true, phone: true, code: true, logoData: true, sealData: true } },
       doctor: { include: { appUser: { select: { username: true } } } },
       department: { select: { name: true } },
-      assessment: true,
+      vitals: true,
+      assessment: { include: { approvedBySignature: { select: { imageData: true } } } },
     },
   });
   if (!appointment) {
@@ -76,6 +80,8 @@ export async function POST(request: Request, context: Ctx) {
     visitType: appointment.visitType,
     scheduledAt: appointment.scheduledAt,
     tokenNumber: appointment.tokenNumber,
+    vitalsRows: generalExaminationRows(appointment.vitals ? toVitalsValues(appointment.vitals) : null),
+    printedAt: printClock(),
     assessment: appointment.assessment,
   });
 

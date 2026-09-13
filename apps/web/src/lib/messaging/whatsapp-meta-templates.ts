@@ -148,6 +148,6 @@ export const META_PATIENT_TEMPLATES = {
   },
   visit_summary: {
     category: "UTILITY" as const,
-    defaultName: "visit_summary",
+    defaultName: "visit_summary_",
   },
 };

@@ -1,3 +1,4 @@
+import { postAskEvaJson } from "@/lib/messaging/askeva-http";
 import {
   billReceiptComponents,
   documentHeader,
@@ -188,20 +189,16 @@ async function postWhatsAppTemplate(params: {
   const url = `${askevaBaseUrl()}/message/send-message?token=${encodeURIComponent(token)}`;
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: params.to,
-        type: "template",
-        template: {
-          language: { policy: "deterministic", code: params.language },
-          name: params.name,
-          components: params.components,
-        },
-      }),
+    const response = await postAskEvaJson(url, {
+      to: params.to,
+      type: "template",
+      template: {
+        language: { policy: "deterministic", code: params.language },
+        name: params.name,
+        components: params.components,
+      },
     });
-    const text = await response.text();
+    const text = response.text;
     const result = parseWhatsAppResult(text, response.status);
     if (!result.ok) {
       console.error(

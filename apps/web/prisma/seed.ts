@@ -4,10 +4,16 @@ import { LAB_CATALOG } from "../src/lib/lab-catalog";
 
 const prisma = new PrismaClient();
 
-async function main() {
+const SOFTWARE_ADMIN_MOBILE = "9999999999";
+const SOFTWARE_ADMIN_PASSWORD = "Software@123";
+
+async function ensureSoftwareAdmin() {
+  const passwordHash = await bcrypt.hash(SOFTWARE_ADMIN_PASSWORD, 12);
   await prisma.appUser.upsert({
     where: { username: "softwareadmin" },
     update: {
+      mobile: SOFTWARE_ADMIN_MOBILE,
+      passwordHash,
       role: "SOFTWARE_ADMIN",
       isVerified: true,
       isActive: true,
@@ -15,13 +21,18 @@ async function main() {
     },
     create: {
       username: "softwareadmin",
-      mobile: "9999999999",
-      passwordHash: await bcrypt.hash("Software@123", 12),
+      mobile: SOFTWARE_ADMIN_MOBILE,
+      passwordHash,
       otpCode: null,
       isVerified: true,
+      isActive: true,
       role: "SOFTWARE_ADMIN",
     },
   });
+}
+
+async function main() {
+  await ensureSoftwareAdmin();
 
   let sort = 0;
   for (const test of LAB_CATALOG) {
@@ -62,7 +73,7 @@ async function main() {
     create: { kind: "platform_invoice", value: 0 },
   });
 
-  console.log("Seeded software admin only. Create hospitals from the SaaS console.");
+  console.log(`Seeded software admin (${SOFTWARE_ADMIN_MOBILE} / ${SOFTWARE_ADMIN_PASSWORD}). Create hospitals from the SaaS console.`);
 }
 
 main()

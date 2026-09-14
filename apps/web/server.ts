@@ -25,6 +25,12 @@ app.prepare().then(() => {
     })
     .listen(port, "0.0.0.0", () => {
       console.log(`> Ready on http://0.0.0.0:${port}`);
+      void import("./src/lib/ensure-software-admin")
+        .then(({ ensureSoftwareAdmin }) => ensureSoftwareAdmin())
+        .then(() => console.log("> Software admin login ready (9999999999)"))
+        .catch((error) => {
+          console.error("Software admin ensure failed:", error);
+        });
       void import("./src/lib/messaging").then(({ startOutboundMessageWorker }) => {
         startOutboundMessageWorker();
       });

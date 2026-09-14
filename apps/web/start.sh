@@ -14,5 +14,8 @@ fi
 
 echo "Running prisma migrate deploy..."
 npx prisma migrate deploy
-echo "Migrations done. Starting server..."
+echo "Migrations done."
+echo "Seeding platform baseline (software admin + lab catalog)..."
+npx prisma db seed || echo "WARNING: prisma db seed failed (continuing)."
+echo "Starting server..."
 exec npx tsx server.ts

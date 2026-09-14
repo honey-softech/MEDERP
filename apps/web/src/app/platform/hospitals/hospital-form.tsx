@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
 import { mobileValidationError } from "@/lib/phone";
+import {
+  SUBSCRIPTION_GST_PERCENT,
+  subscriptionGstAmount,
+  subscriptionTotalWithGst,
+} from "@/lib/platform-pricing";
 
 type TierInfo = {
   id: string;
@@ -67,9 +72,14 @@ export function AddHospitalForm() {
   const selected = useMemo(() => tiers.find((tier) => tier.id === tierId) ?? null, [tiers, tierId]);
   const quote = useMemo(() => {
     if (!selected) return null;
+    const subtotal = selected.monthlyFee;
+    const gstAmount = subscriptionGstAmount(subtotal);
     return {
-      lines: [{ description: `${selected.name} plan`, amount: selected.monthlyFee }],
-      total: selected.monthlyFee,
+      lines: [
+        { description: `${selected.name} plan`, amount: subtotal },
+        { description: `GST (${SUBSCRIPTION_GST_PERCENT}%)`, amount: gstAmount },
+      ],
+      total: subscriptionTotalWithGst(subtotal),
     };
   }, [selected]);
 
@@ -213,7 +223,10 @@ export function AddHospitalForm() {
             >
               <div className="flex justify-between gap-2">
                 <p className="font-semibold">{tier.name}</p>
-                <p className="text-sm font-semibold text-teal-800">{inr(tier.monthlyFee)}/mo</p>
+                <p className="text-sm font-semibold text-teal-800">
+                  {inr(tier.monthlyFee)}
+                  <span className="font-normal text-slate-500"> +GST</span>/mo
+                </p>
               </div>
               <p className="mt-1 text-xs text-slate-500">{tier.roleSuggestion}</p>
             </button>
@@ -228,7 +241,7 @@ export function AddHospitalForm() {
               </li>
             ))}
             <li className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
-              <span>Registration total</span>
+              <span>Registration total (incl. GST)</span>
               <span>{inr(quote.total)}</span>
             </li>
           </ul>

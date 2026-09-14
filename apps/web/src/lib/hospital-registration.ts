@@ -1,4 +1,4 @@
-import type { AppRole, PaymentMethod } from "@prisma/client";
+import type { AppRole, HospitalSubscriptionStatus, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { hashPassword, MIN_PASSWORD_LENGTH, normalizeHospitalCode, normalizeMobile, passwordValidationError } from "@/lib/auth";
@@ -66,6 +66,7 @@ export type RegisterHospitalInput = {
   razorpayPlanId?: string | null;
   razorpaySubscriptionId?: string | null;
   razorpayPaymentId?: string | null;
+  subscriptionStatus?: HospitalSubscriptionStatus | null;
   subscriptionCurrentStart?: number | null;
   subscriptionCurrentEnd?: number | null;
   subscriptionChargeAt?: number | null;
@@ -390,7 +391,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
       razorpayPlanId: input.razorpayPlanId,
       razorpaySubscriptionId: input.razorpaySubscriptionId,
       monthlyAmount: prepared.quote.total,
-      status: "ACTIVE",
+      status: input.subscriptionStatus ?? "ACTIVE",
       termsAcceptedAt: new Date(),
       currentPeriodStart: unixToDate(input.subscriptionCurrentStart),
       currentPeriodEnd: unixToDate(input.subscriptionCurrentEnd),

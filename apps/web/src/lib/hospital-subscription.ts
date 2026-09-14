@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createPlatformInvoice } from "@/lib/platform-billing";
 import { pricingFromTier } from "@/lib/platform-pricing";
 import { getRazorpayClient, toPaise } from "@/lib/razorpay";
+import { trialEndsAtFromNow } from "@/lib/hospital-access";
 import {
   getSubscriptionTier,
   hospitalFieldsFromTier,
@@ -13,6 +14,10 @@ import {
 
 const SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles; cancel anytime
 
+/** Unix `start_at` for Razorpay: card now, first plan debit after the free trial month. */
+export function deferredSubscriptionStartAtUnix(now = new Date()) {
+  return Math.floor(trialEndsAtFromNow(now).getTime() / 1000);
+}
 export function unixToDate(value?: number | null) {
   if (!value) return null;
   return new Date(value * 1000);
@@ -50,7 +55,17 @@ export async function monthlyAmountForHospital(
   return pricingFromTier(normalizeSubscriptionTierId(hospital.subscriptionTier));
 }
 
-export function configuredRazorpayPlanId() {
+export function configuredRazorpayPlanId(tierId?: string) {
+  const normalized = String(tierId ?? "")
+    .trim()
+    .toUpperCase();
+  const byTier: Record<string, string | undefined> = {
+    CLINIC: process.env.RAZORPAY_PLAN_ID_CLINIC,
+    STARTER: process.env.RAZORPAY_PLAN_ID_STARTER,
+    GROWTH: process.env.RAZORPAY_PLAN_ID_GROWTH,
+  };
+  const fromTier = normalized ? byTier[normalized]?.trim() : "";
+  if (fromTier) return fromTier;
   return process.env.RAZORPAY_PLAN_ID?.trim() || "";
 }
 
@@ -58,8 +73,9 @@ export async function resolveOrCreatePlan(params: {
   hospitalCode: string;
   amountInr: number;
   description: string;
+  tierId?: string;
 }) {
-  const configuredId = configuredRazorpayPlanId();
+  const configuredId = configuredRazorpayPlanId(params.tierId);
   const amountPaise = toPaise(params.amountInr);
   if (amountPaise < 100) {
     throw new Error("Monthly amount is too small for Razorpay.");
@@ -72,6 +88,9 @@ export async function resolveOrCreatePlan(params: {
       if (Number(plan.item.amount) === amountPaise) {
         return plan;
       }
+      console.warn(
+        `Razorpay plan ${configuredId} amount ${plan.item.amount} paise does not match quote ${amountPaise} paise; creating a matching plan.`,
+      );
     } catch {
       // Configured plan missing or amount differs — create a matching plan.
     }
@@ -138,6 +157,11 @@ export async function createRazorpaySubscription(params: {
   adminUsername?: string;
   adminEmail?: string;
   adminMobile?: string;
+  /**
+   * Unix seconds. When set in the future, Checkout only authenticates the card now;
+   * the first plan charge runs at this time (Razorpay trial via `start_at`).
+   */
+  startAt?: number | null;
 }) {
   const razorpay = getRazorpayClient();
   const email = params.adminEmail?.trim().toLowerCase() || "";
@@ -154,11 +178,17 @@ export async function createRazorpaySubscription(params: {
     customerId = customer.id;
   }
 
+  const nowUnix = Math.floor(Date.now() / 1000);
+  // Razorpay requires start_at to be meaningfully in the future (not "now").
+  const startAt =
+    typeof params.startAt === "number" && params.startAt >= nowUnix + 15 * 60 ? params.startAt : undefined;
+
   return razorpay.subscriptions.create({
     plan_id: params.planId,
     total_count: SUBSCRIPTION_TOTAL_COUNT,
     quantity: 1,
     customer_notify: 1,
+    ...(startAt ? { start_at: startAt } : {}),
     ...(customerId ? { customer_id: customerId } : {}),
     ...(email || contact
       ? {
@@ -171,6 +201,7 @@ export async function createRazorpaySubscription(params: {
     notes: {
       purpose: "hospital_subscription",
       hospitalCode: params.hospitalCode,
+      ...(startAt ? { deferredStart: "1", trialMonths: "1" } : {}),
       ...(params.adminUsername ? { adminUsername: params.adminUsername } : {}),
       ...(email ? { adminEmail: email } : {}),
     },

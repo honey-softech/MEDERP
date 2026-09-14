@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { createSession, homeForRole } from "@/lib/auth";
-import { HospitalRegistrationError, prepareHospitalRegistration, registerHospital, doctorProfileFromBody } from "@/lib/hospital-registration";
+import { trialEndsAtFromNow } from "@/lib/hospital-access";
+import {
+  HospitalRegistrationError,
+  prepareHospitalRegistration,
+  registerHospital,
+  doctorProfileFromBody,
+} from "@/lib/hospital-registration";
+import { mapRazorpaySubscriptionStatus, unixToDate } from "@/lib/hospital-subscription";
 import {
   getRazorpayClient,
   razorpayConfigured,
@@ -89,18 +96,26 @@ export async function POST(request: Request) {
     const razorpay = getRazorpayClient();
     const expectedPaise = toPaise(prepared.quote.total);
     const payment = await razorpay.payments.fetch(razorpayPaymentId);
-    if (payment.status !== "captured" && payment.status !== "authorized") {
+    // Subscription card-auth (deferred start_at) often uses a ₹5 token that Razorpay
+    // auto-refunds; status becomes "refunded" even though auth succeeded.
+    const paymentStatus = String(payment.status ?? "").toLowerCase();
+    const paymentOk =
+      paymentStatus === "captured" ||
+      paymentStatus === "authorized" ||
+      paymentStatus === "refunded";
+    if (!paymentOk) {
       return NextResponse.json({ error: "Payment was not completed successfully." }, { status: 400 });
-    }
-    if (Number(payment.amount) !== expectedPaise) {
-      return NextResponse.json({ error: "Paid amount does not match the package total." }, { status: 400 });
     }
 
     let planId = razorpayPlanId;
     let subscriptionCurrentStart: number | null | undefined;
     let subscriptionCurrentEnd: number | null | undefined;
     let subscriptionChargeAt: number | null | undefined;
+    let subscriptionStatus: ReturnType<typeof mapRazorpaySubscriptionStatus> | undefined;
+    let deferredBilling = false;
+    let trialEndsAt: Date | null = null;
     let paymentNotes = `Razorpay order ${razorpayOrderId} · payment ${razorpayPaymentId}`;
+    let invoiceStatus: "PAID" | "ISSUED" = "PAID";
 
     if (mode === "subscription") {
       const subscription = await razorpay.subscriptions.fetch(razorpaySubscriptionId);
@@ -117,8 +132,27 @@ export async function POST(request: Request) {
       subscriptionCurrentStart = subscription.current_start;
       subscriptionCurrentEnd = subscription.current_end;
       subscriptionChargeAt = subscription.charge_at;
-      paymentNotes = `Razorpay subscription ${razorpaySubscriptionId} · payment ${razorpayPaymentId}`;
+      subscriptionStatus = mapRazorpaySubscriptionStatus(String(subscription.status ?? "AUTHENTICATED"));
+      const startAtUnix =
+        typeof subscription.start_at === "number"
+          ? subscription.start_at
+          : typeof subscription.charge_at === "number"
+            ? subscription.charge_at
+            : null;
+      deferredBilling = Boolean(startAtUnix && startAtUnix * 1000 > Date.now());
+      // Deferred trial: auth may be ₹0 / small token — do not require full plan amount today.
+      if (!deferredBilling && Number(payment.amount) !== expectedPaise) {
+        return NextResponse.json({ error: "Paid amount does not match the package total." }, { status: 400 });
+      }
+      trialEndsAt = unixToDate(startAtUnix) ?? trialEndsAtFromNow();
+      invoiceStatus = deferredBilling ? "ISSUED" : "PAID";
+      paymentNotes = deferredBilling
+        ? `Razorpay card authorised · subscription ${razorpaySubscriptionId} · first charge after trial · payment ${razorpayPaymentId}`
+        : `Razorpay subscription ${razorpaySubscriptionId} · payment ${razorpayPaymentId}`;
     } else {
+      if (Number(payment.amount) !== expectedPaise) {
+        return NextResponse.json({ error: "Paid amount does not match the package total." }, { status: 400 });
+      }
       const order = await razorpay.orders.fetch(razorpayOrderId);
       if (Number(order.amount) !== expectedPaise) {
         return NextResponse.json(
@@ -138,14 +172,16 @@ export async function POST(request: Request) {
       adminEmail: prepared.adminEmail,
       adminPassword: prepared.adminPassword,
       tierId: prepared.tierId,
-      invoiceStatus: "PAID",
+      invoiceStatus,
       paymentMethod: "UPI" as PaymentMethod,
       paymentNotes,
       termsAccepted: true,
+      trialEndsAt: mode === "subscription" ? trialEndsAt : null,
       ...doctorProfileFromBody(body),
       razorpayPlanId: mode === "subscription" ? planId || null : null,
       razorpaySubscriptionId: mode === "subscription" ? razorpaySubscriptionId : null,
       razorpayPaymentId,
+      subscriptionStatus: mode === "subscription" ? subscriptionStatus ?? "AUTHENTICATED" : null,
       subscriptionCurrentStart,
       subscriptionCurrentEnd,
       subscriptionChargeAt,
@@ -163,6 +199,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       mode,
+      deferredBilling,
       hospital: { id: result.hospital.id, name: result.hospital.name, code: result.hospital.code },
       invoice: {
         id: result.invoice.id,

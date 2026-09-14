@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { loadRazorpayCheckoutScript } from "@/lib/razorpay-checkout";
+import { SUBSCRIPTION_GST_PERCENT, subscriptionTotalWithGst } from "@/lib/platform-pricing";
 
 type TierInfo = {
   id: string;
@@ -61,7 +62,9 @@ export function HospitalSeatSubscriptionForm({
   const [message, setMessage] = useState("");
 
   const selected = useMemo(() => tiers.find((tier) => tier.id === tierId) ?? null, [tiers, tierId]);
-  const previewMonthly = selected?.monthlyFee ?? currentMonthly;
+  const previewMonthly = selected
+    ? subscriptionTotalWithGst(selected.monthlyFee)
+    : currentMonthly;
   const hasChanges = Boolean(selected && selected.id !== currentTierId);
 
   async function onSchedule(event: React.FormEvent) {
@@ -287,7 +290,10 @@ export function HospitalSeatSubscriptionForm({
                     </p>
                     <p className="text-xs text-slate-500">{tier.tagline}</p>
                   </div>
-                  <p className="text-sm font-semibold text-teal-800">{inr(tier.monthlyFee)}/mo</p>
+                  <p className="text-sm font-semibold text-teal-800">
+                    {inr(tier.monthlyFee)}
+                    <span className="font-normal text-slate-500"> +GST</span>/mo
+                  </p>
                 </div>
                 <p className="mt-2 text-xs text-slate-600">{tier.roleSuggestion}</p>
               </button>
@@ -295,7 +301,10 @@ export function HospitalSeatSubscriptionForm({
           })}
         </div>
         <div className="rounded-xl bg-slate-50 p-3 text-sm">
-          <p className="text-slate-500">{hasSubscription ? "Next-cycle monthly total" : "Monthly auto-debit amount"}</p>
+          <p className="text-slate-500">
+            {hasSubscription ? "Next-cycle monthly total" : "Monthly auto-debit amount"} (incl. {SUBSCRIPTION_GST_PERCENT}%
+            GST)
+          </p>
           <p className="text-lg font-semibold">{inr(previewMonthly)}</p>
         </div>
         <label className="flex items-start gap-2 text-sm text-slate-700">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass } from "@/components/auth-shell";
+import { subscriptionTotalWithGst } from "@/lib/platform-pricing";
 
 type TierInfo = {
   id: string;
@@ -74,7 +75,8 @@ export function HospitalSubscriptionForm({
         <select className={fieldClass} value={tierId} onChange={(event) => setTierId(event.target.value)}>
           {tiers.map((tier) => (
             <option key={tier.id} value={tier.id}>
-              {tier.name} — {inr(tier.monthlyFee)}/mo ({tier.roleSuggestion})
+              {tier.name} — {inr(tier.monthlyFee)} +GST = {inr(subscriptionTotalWithGst(tier.monthlyFee))}/mo (
+              {tier.roleSuggestion})
             </option>
           ))}
         </select>

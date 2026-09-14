@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { HospitalRegistrationError, prepareHospitalRegistration } from "@/lib/hospital-registration";
+import { trialEndsAtFromNow } from "@/lib/hospital-access";
 import {
   createRazorpaySubscription,
+  deferredSubscriptionStartAtUnix,
   resolveOrCreatePlan,
+  unixToDate,
 } from "@/lib/hospital-subscription";
 import {
-  getRazorpayClient,
   razorpayConfigured,
   razorpayErrorMessage,
   razorpayKeyId,
@@ -54,27 +56,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Payable amount is too small for Razorpay." }, { status: 400 });
     }
 
-    const base = {
-      amount: amountPaise,
-      currency: "INR",
-      keyId: razorpayKeyId(),
-      quote: {
-        total: prepared.quote.total,
-        lines: prepared.quote.lines,
-      },
-      prefill: {
-        name: prepared.adminUsername,
-        contact: prepared.adminMobile,
-        email: prepared.adminEmail,
-      },
-      hospitalName: prepared.name,
-    };
+    const startAt = deferredSubscriptionStartAtUnix();
+    const trialEndsAt = unixToDate(startAt) ?? trialEndsAtFromNow();
 
     try {
       const plan = await resolveOrCreatePlan({
         hospitalCode: prepared.code,
         amountInr: prepared.quote.total,
         description: `MedERP monthly · ${prepared.code}`,
+        tierId: prepared.tierId,
       });
       const subscription = await createRazorpaySubscription({
         planId: plan.id,
@@ -82,59 +72,44 @@ export async function POST(request: Request) {
         adminUsername: prepared.adminUsername,
         adminEmail: prepared.adminEmail,
         adminMobile: prepared.adminMobile,
+        startAt,
       });
 
       return NextResponse.json({
-        ...base,
+        amount: amountPaise,
+        currency: "INR",
+        keyId: razorpayKeyId(),
+        quote: {
+          total: prepared.quote.total,
+          lines: prepared.quote.lines,
+        },
+        prefill: {
+          name: prepared.adminUsername,
+          contact: prepared.adminMobile,
+          email: prepared.adminEmail,
+        },
+        hospitalName: prepared.name,
         mode: "subscription",
         subscriptionId: subscription.id,
         planId: plan.id,
         shortUrl: (subscription as { short_url?: string }).short_url ?? null,
         recurring: true,
+        deferredBilling: true,
+        startAt,
+        trialEndsAt: trialEndsAt.toISOString(),
+        notice:
+          "Add your card now to start the 1-month free trial. The plan amount is charged automatically from next month — nothing is billed today except a small bank authentication hold (if any), which Razorpay refunds.",
       });
     } catch (subscriptionError) {
-      // Plans/Subscriptions may be disabled or return 401 while Orders still work.
-      console.warn(
-        "Razorpay subscription path failed; trying one-time Order for registration.",
-        razorpayErrorMessage(subscriptionError),
-      );
-    }
-
-    try {
-      const razorpay = getRazorpayClient();
-      const order = await razorpay.orders.create({
-        amount: amountPaise,
-        currency: "INR",
-        receipt: `reg_${prepared.code}_${Date.now()}`.slice(0, 40),
-        notes: {
-          purpose: "hospital_registration",
-          hospitalCode: prepared.code,
-          adminUsername: prepared.adminUsername,
-        },
-      });
-
-      return NextResponse.json({
-        ...base,
-        mode: "order",
-        orderId: order.id,
-        recurring: false,
-        notice:
-          "Razorpay Subscriptions is not available with these keys yet, so this payment is one-time. After registration, link monthly auto-debit from Subscription once Razorpay enables Subscriptions.",
-      });
-    } catch (orderError) {
-      console.error("Razorpay registration Order fallback failed", orderError);
-      const razorpayMessage = razorpayErrorMessage(orderError);
-      const authFailed =
-        razorpayMessage.toLowerCase().includes("expired") ||
-        razorpayMessage.toLowerCase().includes("authentication failed") ||
-        razorpayMessage.toLowerCase().includes("regenerate");
+      console.error("Razorpay deferred subscription for registration failed", subscriptionError);
+      const razorpayMessage = razorpayErrorMessage(subscriptionError);
       return NextResponse.json(
         {
           error: razorpayMessage
-            ? `Could not start online payment: ${razorpayMessage}`
-            : "Could not start online payment. Check Razorpay keys in apps/web/.env and restart the server.",
+            ? `Could not start card setup: ${razorpayMessage}`
+            : "Could not start card setup. Razorpay Subscriptions must be enabled for trial-then-charge registration.",
         },
-        { status: authFailed ? 401 : 500 },
+        { status: 500 },
       );
     }
   } catch (error) {

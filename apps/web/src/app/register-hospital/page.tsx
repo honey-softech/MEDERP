@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AuthShell, buttonClass, fieldClass, secondaryButtonClass, textareaClass } from "@/components/auth-shell";
+import { AuthShell, buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
 import { mobileValidationError } from "@/lib/phone";
+import {
+  SUBSCRIPTION_GST_PERCENT,
+  subscriptionGstAmount,
+  subscriptionTotalWithGst,
+} from "@/lib/platform-pricing";
 import {
   clearRegisterHospitalDraft,
   loadRegisterHospitalDraft,
@@ -17,7 +22,6 @@ import {
   loadRazorpayCheckoutScript,
   type RazorpayCheckoutSuccess,
 } from "@/lib/razorpay-checkout";
-
 type TierInfo = {
   id: string;
   name: string;
@@ -166,9 +170,14 @@ export default function RegisterHospitalPage() {
 
   const quote = useMemo(() => {
     if (!selectedTier) return null;
+    const subtotal = selectedTier.monthlyFee;
+    const gstAmount = subscriptionGstAmount(subtotal);
     return {
-      lines: [{ description: `${selectedTier.name} plan`, amount: selectedTier.monthlyFee }],
-      total: selectedTier.monthlyFee,
+      lines: [
+        { description: `${selectedTier.name} plan`, amount: subtotal },
+        { description: `GST (${SUBSCRIPTION_GST_PERCENT}%)`, amount: gstAmount },
+      ],
+      total: subscriptionTotalWithGst(subtotal),
       maxStaff: selectedTier.seatLimit,
     };
   }, [selectedTier]);
@@ -276,32 +285,6 @@ export default function RegisterHospitalPage() {
     return true;
   }
 
-  async function startTrial() {
-    setError("");
-    setNotice("");
-    if (!validateForm()) return;
-    setPending(true);
-    try {
-      const response = await fetch("/api/public/register-hospital/trial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(registrationPayload),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setPending(false);
-        setError(data.error ?? "Could not start the free trial.");
-        return;
-      }
-      clearRegisterHospitalDraft();
-      router.push(data.redirectTo || "/");
-      router.refresh();
-    } catch (err) {
-      setPending(false);
-      setError(err instanceof Error ? err.message : "Could not start the free trial.");
-    }
-  }
-
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -310,10 +293,15 @@ export default function RegisterHospitalPage() {
     setPending(true);
 
     try {
-      if (!pkg?.razorpayEnabled) {
+      if (pkg != null && !pkg.razorpayEnabled) {
         setError(
-          "Online payment is not configured on the server. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and NEXT_PUBLIC_RAZORPAY_KEY_ID in Railway → MEDERP → Variables, then redeploy.",
+          "Online payment is not configured on the server. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and NEXT_PUBLIC_RAZORPAY_KEY_ID to apps/web/.env, then restart/redeploy.",
         );
+        setPending(false);
+        return;
+      }
+      if (pkg == null) {
+        setError("Could not load billing package. Refresh the page and try Pay again.");
         setPending(false);
         return;
       }
@@ -360,7 +348,7 @@ export default function RegisterHospitalPage() {
         name: "MedERP",
         description:
           mode === "subscription"
-            ? `Monthly subscription — ${String(orderData.hospitalName || name)}`
+            ? `Card setup · first charge after 1-month trial — ${String(orderData.hospitalName || name)}`
             : `Hospital registration — ${String(orderData.hospitalName || name)}`,
         prefill: {
           name: String((orderData.prefill as { name?: string } | undefined)?.name || adminUsername),
@@ -532,8 +520,8 @@ export default function RegisterHospitalPage() {
           <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6">
             <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
             <p className="mt-1 text-sm text-slate-600">
-              1-month trial with no card on every plan. Super admin is free and does not use a seat.
-              Plans cover OPD staff seats only.
+              Add your card now to start. You get 1 month free; the plan amount is debited automatically from next
+              month. Super admin is free and does not use a seat.
             </p>
             <div className="mt-3 grid gap-2">
               {(pkg?.tiers ?? []).map((tier) => {
@@ -554,7 +542,11 @@ export default function RegisterHospitalPage() {
                         <p className="font-semibold text-slate-900">{tier.name}</p>
                         <p className="text-xs text-slate-500">{tier.tagline}</p>
                       </div>
-                      <p className="shrink-0 text-sm font-semibold text-teal-800">{inr(tier.monthlyFee)}/mo</p>
+                      <p className="shrink-0 text-sm font-semibold text-teal-800">
+                        {inr(tier.monthlyFee)}
+                        <span className="font-normal text-slate-500"> +GST</span>
+                        <span className="block text-right text-[10px] font-normal text-slate-500">/mo</span>
+                      </p>
                     </div>
                     {selected ? (
                       <>
@@ -581,7 +573,7 @@ export default function RegisterHospitalPage() {
                   </li>
                 ))}
                 <li className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
-                  <span>Monthly total</span>
+                  <span>Monthly total (incl. GST)</span>
                   <span>{inr(quote.total)}</span>
                 </li>
               </ul>
@@ -605,7 +597,7 @@ export default function RegisterHospitalPage() {
             <Link href="/terms" target="_blank" className="font-medium text-teal-700 underline">
               Terms &amp; Conditions
             </Link>
-            . A 1-month trial includes the selected plan. After that, pay monthly to keep using MedERP.
+            . Add a card to start the 1-month trial. The selected plan is charged automatically from next month.
           </span>
         </label>
 
@@ -614,24 +606,25 @@ export default function RegisterHospitalPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button
             className={`${buttonClass} sm:w-auto sm:min-w-56`}
-            type="button"
-            disabled={pending || !termsAccepted}
-            onClick={() => void startTrial()}
-          >
-            {pending ? "Starting trial…" : "Start 1-month free trial"}
-          </button>
-          <button
-            className={`${secondaryButtonClass} sm:w-auto sm:min-w-40`}
             type="submit"
             disabled={pending || !termsAccepted || (pkg != null && !pkg.razorpayEnabled)}
           >
             {pending
-              ? "Opening payment…"
+              ? "Opening Razorpay…"
               : quote
-                ? `Pay ${inr(quote.total)} now`
-                : "Pay now"}
+                ? `Add card · ${inr(quote.total)}/mo from next month`
+                : "Add card · charge from next month"}
           </button>
         </div>
+        <p className="text-xs text-slate-500">
+          Razorpay will ask for card details to authorise auto-debit. Monthly total includes {SUBSCRIPTION_GST_PERCENT}%
+          GST. The plan is not charged today — first debit is after the free trial month.
+        </p>
+        {pkg != null && !pkg.razorpayEnabled ? (
+          <p className="text-sm text-amber-800">
+            Razorpay keys are missing on this server, so card setup is disabled. Add keys and restart.
+          </p>
+        ) : null}
       </form>
       <p className="mt-4 text-center text-sm text-slate-500">
         Already registered?{" "}

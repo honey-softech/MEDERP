@@ -15,19 +15,43 @@ export type PricingLine = {
   amount: number;
 };
 
+/** GST on MedERP SaaS subscription (monthly plan fee). */
+export const SUBSCRIPTION_GST_PERCENT = 18;
+
+/** Round GST to nearest rupee (Indian invoicing convention for whole-rupee plans). */
+export function subscriptionGstAmount(baseInr: number) {
+  const base = Math.max(0, Math.round(Number(baseInr) || 0));
+  return Math.round((base * SUBSCRIPTION_GST_PERCENT) / 100);
+}
+
+export function subscriptionTotalWithGst(baseInr: number) {
+  const base = Math.max(0, Math.round(Number(baseInr) || 0));
+  return base + subscriptionGstAmount(base);
+}
+
 export function pricingFromTier(tierId: string) {
   const tier = requireSubscriptionTier(tierId);
   const seatLabel =
     tier.seatLimit == null ? "unlimited staff seats" : `${tier.seatLimit} staff seats (any roles)`;
+  const subtotal = tier.monthlyFee;
+  const gstAmount = subscriptionGstAmount(subtotal);
+  const total = subtotal + gstAmount;
   const lines: PricingLine[] = [
     {
       description: `${tier.name} plan — ${seatLabel}`,
-      amount: tier.monthlyFee,
+      amount: subtotal,
+    },
+    {
+      description: `GST (${SUBSCRIPTION_GST_PERCENT}%)`,
+      amount: gstAmount,
     },
   ];
   return {
     lines,
-    total: tier.monthlyFee,
+    subtotal,
+    gstPercent: SUBSCRIPTION_GST_PERCENT,
+    gstAmount,
+    total,
     tier,
     includedStaffSlots: tier.seatLimit ?? 0,
     extraStaffSlots: 0,

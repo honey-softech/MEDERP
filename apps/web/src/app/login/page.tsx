@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthShell, buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { DeveloperCredit, PasswordField } from "@/components/auth-branding";
 import { isValidIndianMobile, mobileValidationError, normalizeMobile } from "@/lib/phone";
 
 const LOGIN_MOBILE_KEY = "mederp.login.mobile";
@@ -92,17 +93,7 @@ function LoginForm() {
             required
           />
         </label>
-        <label className="block text-sm font-medium text-slate-700">
-          Password
-          <input
-            className={fieldClass}
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
+        <PasswordField value={password} onChange={setPassword} required />
         {searchParams.get("reset") === "1" ? (
           <p className="text-sm text-teal-700">Password updated. Sign in with your new password.</p>
         ) : null}
@@ -135,6 +126,7 @@ function LoginForm() {
           Create an account
         </Link>
       </p>
+      <DeveloperCredit />
     </AuthShell>
   );
 }

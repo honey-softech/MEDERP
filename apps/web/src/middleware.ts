@@ -3,7 +3,15 @@ import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE = "mederp_session";
 
-const publicPaths = ["/login", "/signup", "/signup/verify", "/forgot-password", "/register-hospital", "/terms"];
+const publicPaths = [
+  "/login",
+  "/signup",
+  "/signup/verify",
+  "/forgot-password",
+  "/register-hospital",
+  "/terms",
+  "/help",
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

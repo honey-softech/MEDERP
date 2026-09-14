@@ -7,6 +7,12 @@ const publicPaths = ["/login", "/signup", "/signup/verify", "/forgot-password", 
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Socket.IO is handled by the custom Node server — never redirect or rewrite it.
+  if (pathname.startsWith("/socket.io")) {
+    return NextResponse.next();
+  }
+
   const isPublicPage = publicPaths.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
@@ -36,5 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|socket\\.io|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

@@ -1,8 +1,17 @@
 {
-	email admin@mederp.co.in
+	email {$ACME_EMAIL:admin@mederp.co.in}
 }
 
-mederp.co.in, www.mederp.co.in {
+www.mederp.co.in {
+	redir https://mederp.co.in{uri} permanent
+}
+
+mederp.co.in {
 	encode gzip
-	reverse_proxy web:3000
+	reverse_proxy web:3000 {
+		# Keep WebSocket / Socket.IO upgrades streaming (notification live light)
+		flush_interval -1
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
 }

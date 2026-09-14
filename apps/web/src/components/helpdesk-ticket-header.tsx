@@ -8,6 +8,7 @@ import type { HelpdeskTicketStatus } from "@prisma/client";
 import { io } from "socket.io-client";
 
 function socketUrl() {
+  if (typeof window !== "undefined") return window.location.origin;
   return process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
 }
 
@@ -41,7 +42,7 @@ export function HelpdeskTicketHeader({
     const socket = io(socketUrl(), {
       path: "/socket.io",
       withCredentials: true,
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
     });
 
     socket.on(REALTIME_EVENTS.helpdeskTicket, (payload: HelpdeskTicketUpdate) => {

@@ -21,6 +21,10 @@ export function useRealtime() {
 }
 
 function socketUrl() {
+  // Same-origin only so the httpOnly session cookie is sent (SameSite=strict).
+  // A baked NEXT_PUBLIC_SOCKET_URL that points at apex while the user is on www
+  // (or the reverse) breaks auth and keeps the green live light off.
+  if (typeof window !== "undefined") return window.location.origin;
   return process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
 }
 
@@ -93,11 +97,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const socket: Socket = io(socketUrl(), {
       path: "/socket.io",
       withCredentials: true,
-      transports: ["websocket", "polling"],
+      // Polling first is more reliable behind Caddy/HTTPS reverse proxies.
+      transports: ["polling", "websocket"],
     });
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
+    socket.on("connect_error", () => setConnected(false));
     socket.on(REALTIME_EVENTS.notification, (notice: StaffNotice) => {
       setItems((current) => [notice, ...current.filter((item) => item.id !== notice.id)].slice(0, 40));
       if (!notice.isRead) setUnreadCount((current) => current + 1);

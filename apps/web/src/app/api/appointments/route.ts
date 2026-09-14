@@ -120,6 +120,11 @@ export async function POST(request: Request) {
       }
       doctorId = myStaffId;
     }
+  } else if (scoped.user.role === "SUPER_ADMIN" && queueType === "WALK_IN") {
+    const myStaffId = await staffIdForAppUser(scoped.user.id, scoped.user.hospitalId);
+    if (myStaffId && !doctorId) {
+      doctorId = myStaffId;
+    }
   }
 
   const [patient, doctor, department] = await Promise.all([

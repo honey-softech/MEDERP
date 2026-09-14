@@ -20,7 +20,7 @@ export function LoadDrugCatalog({ initialCount }: { initialCount: number }) {
   useEffect(() => {
     if (!job?.running) return;
     const timer = window.setInterval(() => {
-      void fetch("/api/hospital/drug-catalog")
+      void fetch("/api/platform/drug-catalog")
         .then(async (response) => {
           const data = (await response.json()) as { catalogSize?: number; job?: Job | null };
           if (typeof data.catalogSize === "number") setCount(data.catalogSize);
@@ -35,7 +35,7 @@ export function LoadDrugCatalog({ initialCount }: { initialCount: number }) {
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/hospital/drug-catalog", { method: "POST" });
+      const response = await fetch("/api/platform/drug-catalog", { method: "POST" });
       const data = (await response.json()) as { error?: string; alreadyLoaded?: boolean; catalogSize?: number; job?: Job };
       if (!response.ok) {
         setError(data.error || "Could not start import.");
@@ -52,11 +52,7 @@ export function LoadDrugCatalog({ initialCount }: { initialCount: number }) {
   }
 
   if (count > 0 && !job?.running) {
-    return (
-      <p className="mb-4 text-sm text-text-secondary">
-        Medicine catalog: <span className="font-medium text-text-primary">{count.toLocaleString("en-IN")}</span> drugs.
-      </p>
-    );
+    return null;
   }
 
   return (

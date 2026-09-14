@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, normalizeHospitalCode } from "@/lib/auth";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
+import { isValidHospitalCode } from "@/lib/hospital-code";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -32,10 +33,13 @@ export async function PATCH(request: Request, context: Ctx) {
 
   const data: {
     name?: string;
+    code?: string;
     address?: string | null;
     phone?: string | null;
     opdFee?: number;
     isActive?: boolean;
+    extraStaffSlots?: number;
+    trialEndsAt?: Date | null;
   } = {};
 
   if (body.name != null) {
@@ -44,6 +48,23 @@ export async function PATCH(request: Request, context: Ctx) {
       return NextResponse.json({ error: "Hospital name is required." }, { status: 400 });
     }
     data.name = name;
+  }
+  if (body.code != null) {
+    const code = normalizeHospitalCode(String(body.code));
+    if (!isValidHospitalCode(code)) {
+      return NextResponse.json(
+        { error: "Hospital code must be 3–12 letters, numbers, or hyphens." },
+        { status: 400 },
+      );
+    }
+    const clash = await prisma.hospital.findFirst({
+      where: { code, id: { not: id } },
+      select: { id: true },
+    });
+    if (clash) {
+      return NextResponse.json({ error: "That hospital code is already used." }, { status: 409 });
+    }
+    data.code = code;
   }
   if (body.address !== undefined) {
     data.address = String(body.address ?? "").trim() || null;
@@ -76,6 +97,24 @@ export async function PATCH(request: Request, context: Ctx) {
   }
   if (body.isActive !== undefined) {
     data.isActive = Boolean(body.isActive);
+  }
+  if (body.extraStaffSlots !== undefined) {
+    const extraStaffSlots = Number(body.extraStaffSlots);
+    if (!Number.isInteger(extraStaffSlots) || extraStaffSlots < 0 || extraStaffSlots > 500) {
+      return NextResponse.json({ error: "Extra seats must be a whole number from 0 to 500." }, { status: 400 });
+    }
+    data.extraStaffSlots = extraStaffSlots;
+  }
+  if (body.trialEndsAt !== undefined) {
+    if (body.trialEndsAt === null || body.trialEndsAt === "") {
+      data.trialEndsAt = null;
+    } else {
+      const trialEndsAt = new Date(String(body.trialEndsAt));
+      if (Number.isNaN(trialEndsAt.getTime())) {
+        return NextResponse.json({ error: "Enter a valid trial end date." }, { status: 400 });
+      }
+      data.trialEndsAt = trialEndsAt;
+    }
   }
 
   if (Object.keys(data).length === 0) {
@@ -112,6 +151,7 @@ export async function PATCH(request: Request, context: Ctx) {
           : `${actor.username} updated hospital ${hospital.code} details.`,
     metadata: {
       ...data,
+      trialEndsAt: data.trialEndsAt?.toISOString?.() ?? data.trialEndsAt ?? undefined,
       changes: diffAuditFields(
         existing as unknown as Record<string, unknown>,
         hospital as unknown as Record<string, unknown>,

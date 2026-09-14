@@ -409,3 +409,125 @@ export async function upsertEmployeeStaff(params: {
     });
   }
 }
+
+/** Link a SUPER_ADMIN AppUser to a DOCTOR Staff profile (admin-as-doctor). */
+export async function upsertAdminDoctorStaff(params: {
+  hospitalId: string;
+  appUser: {
+    id: string;
+    username: string;
+    mobile: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  input: EmployeeInput;
+  isActive: boolean;
+}) {
+  const { appUser, hospitalId, input, isActive } = params;
+  const data = staffDataFromEmployee(hospitalId, { ...input, role: "DOCTOR" });
+  data.role = "DOCTOR";
+  data.isActive = isActive;
+  data.firstName = input.firstName || appUser.firstName || appUser.username;
+  data.lastName = input.lastName || appUser.lastName || "";
+  data.phone = appUser.mobile;
+  const localEmail =
+    appUser.email?.trim() ||
+    `${appUser.username.toLowerCase().replace(/\s+/g, ".")}@hospital.local`;
+  data.email = localEmail.includes("@") ? localEmail : `${hospitalId.slice(-6)}.${localEmail}`;
+
+  const existing = await prisma.staff.findUnique({ where: { appUserId: appUser.id } });
+  if (existing) {
+    return prisma.staff.update({
+      where: { id: existing.id },
+      data: { ...data, appUserId: appUser.id, role: "DOCTOR", isActive },
+    });
+  }
+  try {
+    return await prisma.staff.create({
+      data: { ...data, appUserId: appUser.id, role: "DOCTOR", isActive },
+    });
+  } catch {
+    return prisma.staff.create({
+      data: {
+        ...data,
+        appUserId: appUser.id,
+        role: "DOCTOR",
+        isActive,
+        email: `${hospitalId.slice(-6)}.${appUser.username.toLowerCase()}@hospital.local`,
+      },
+    });
+  }
+}
+
+/**
+ * Point an existing DOCTOR Staff row at the super admin login.
+ * Previous doctor AppUser (if any) is unlinked and deactivated so appointments stay on the same staff id.
+ */
+export async function linkAdminToExistingDoctorStaff(params: {
+  hospitalId: string;
+  adminUserId: string;
+  staffId: string;
+}) {
+  const staff = await prisma.staff.findFirst({
+    where: {
+      id: params.staffId,
+      hospitalId: params.hospitalId,
+      role: "DOCTOR",
+    },
+    include: {
+      appUser: { select: { id: true, role: true, username: true, isActive: true } },
+    },
+  });
+  if (!staff) {
+    return { ok: false as const, error: "Select a valid doctor from this hospital.", status: 404 };
+  }
+
+  if (staff.appUserId === params.adminUserId) {
+    const updated = await prisma.staff.update({
+      where: { id: staff.id },
+      data: { isActive: true },
+    });
+    return { ok: true as const, staff: updated, previousDoctorUserId: null as string | null };
+  }
+
+  if (staff.appUser && staff.appUser.role === "SUPER_ADMIN" && staff.appUser.id !== params.adminUserId) {
+    return {
+      ok: false as const,
+      error: "That doctor profile is already linked to another hospital admin.",
+      status: 409,
+    };
+  }
+
+  const previousDoctorUserId =
+    staff.appUser && staff.appUser.role === "DOCTOR" ? staff.appUser.id : null;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const currentAdminStaff = await tx.staff.findUnique({ where: { appUserId: params.adminUserId } });
+    if (currentAdminStaff && currentAdminStaff.id !== staff.id) {
+      // Admin already had a different doctor profile — free that login link.
+      await tx.staff.update({
+        where: { id: currentAdminStaff.id },
+        data: { appUserId: null, isActive: false },
+      });
+    }
+
+    if (previousDoctorUserId) {
+      await tx.staff.update({
+        where: { id: staff.id },
+        data: { appUserId: null },
+      });
+      await tx.appUser.update({
+        where: { id: previousDoctorUserId },
+        data: { isActive: false },
+      });
+    }
+
+    return tx.staff.update({
+      where: { id: staff.id },
+      data: { appUserId: params.adminUserId, isActive: true, role: "DOCTOR" },
+    });
+  });
+
+  return { ok: true as const, staff: result, previousDoctorUserId };
+}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
+import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
 import { suggestedUsername } from "@/lib/usernames";
 
 const roles = [
@@ -373,26 +374,10 @@ export default function HospitalUserForm({
           onToggle={() => setProfessionalOpen((open) => !open)}
           hint="Registration, fees, and qualifications"
         >
-          <Field label="Medical registration number" value={values.medicalRegNo} onChange={(v) => setField("medicalRegNo", v)} />
-          <Field label="Registration council" value={values.regCouncil} onChange={(v) => setField("regCouncil", v)} />
-          <Field label="Registration state / country" value={values.regRegion} onChange={(v) => setField("regRegion", v)} />
-          <Field label="Registration issue date" type="date" value={values.regIssuedAt} onChange={(v) => setField("regIssuedAt", v)} />
-          <Field label="Registration expiry date" type="date" value={values.regExpiresAt} onChange={(v) => setField("regExpiresAt", v)} />
-          <Field label="Medical degree" value={values.medicalDegree} onChange={(v) => setField("medicalDegree", v)} placeholder="MBBS" />
-          <Field label="University" value={values.university} onChange={(v) => setField("university", v)} />
-          <Field label="Graduation year" value={values.graduationYear} onChange={(v) => setField("graduationYear", v)} />
-          <Field label="Postgraduate qualification" value={values.postgraduate} onChange={(v) => setField("postgraduate", v)} placeholder="MD – Cardiology" />
-          <Field label="Fellowship" value={values.fellowship} onChange={(v) => setField("fellowship", v)} />
-          <Field label="Specialization" value={values.specialization} onChange={(v) => setField("specialization", v)} />
-          <Field label="Sub-specialization" value={values.subSpecialization} onChange={(v) => setField("subSpecialization", v)} />
-          <Field label="Years of experience" value={values.yearsExperience} onChange={(v) => setField("yearsExperience", v)} />
-          <Field label="Areas of expertise" value={values.areasOfExpertise} onChange={(v) => setField("areasOfExpertise", v)} />
-          <Field label="Languages spoken" value={values.languagesSpoken} onChange={(v) => setField("languagesSpoken", v)} />
-          <Field label="Consultation type" value={values.consultationType} onChange={(v) => setField("consultationType", v)} placeholder="OPD / Inpatient / Both" />
-          <Field label="Consultation fee" value={values.consultationFee} onChange={(v) => setField("consultationFee", v)} />
-          <Field label="Follow-up fee" value={values.followUpFee} onChange={(v) => setField("followUpFee", v)} />
-          <Check label="Teleconsultation enabled" checked={Boolean(values.teleconsultEnabled)} onChange={(v) => setField("teleconsultEnabled", v)} />
-          <Check label="Emergency duty enabled" checked={Boolean(values.emergencyDutyEnabled)} onChange={(v) => setField("emergencyDutyEnabled", v)} />
+          <DoctorProfessionalFields
+            values={values}
+            onChange={(key, value) => setField(key, value)}
+          />
         </FormSection>
       ) : null}
 

@@ -27,6 +27,7 @@ export function AddHospitalForm() {
   const [phone, setPhone] = useState("");
   const [adminUsername, setAdminUsername] = useState("");
   const [adminMobile, setAdminMobile] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [tierId, setTierId] = useState("CLINIC");
   const paymentMethod: "UPI" = "UPI";
@@ -98,6 +99,7 @@ export function AddHospitalForm() {
         phone,
         adminUsername,
         adminMobile,
+        adminEmail: adminEmail.trim() || undefined,
         adminPassword,
         tierId,
         paymentMethod,
@@ -152,8 +154,14 @@ export function AddHospitalForm() {
         />
       </label>
       <label className="text-sm font-medium text-slate-700">
-        Super admin username
-        <input className={fieldClass} value={adminUsername} onChange={(event) => setAdminUsername(event.target.value)} required />
+        Super admin name
+        <input
+          className={fieldClass}
+          value={adminUsername}
+          onChange={(event) => setAdminUsername(event.target.value)}
+          placeholder="Any name — login uses mobile"
+          required
+        />
       </label>
       <label className="text-sm font-medium text-slate-700">
         Super admin mobile
@@ -165,6 +173,16 @@ export function AddHospitalForm() {
           onChange={(event) => setAdminMobile(event.target.value.replace(/[^\d+]/g, ""))}
           placeholder="10-digit mobile — used to sign in"
           required
+        />
+      </label>
+      <label className="text-sm font-medium text-slate-700">
+        Super admin email
+        <input
+          className={fieldClass}
+          type="email"
+          value={adminEmail}
+          onChange={(event) => setAdminEmail(event.target.value)}
+          placeholder="Optional — defaults from mobile if blank"
         />
       </label>
       <label className="md:col-span-2 text-sm font-medium text-slate-700">

@@ -2,6 +2,7 @@ import { AppShellFrame, type NavSection } from "@/components/app-shell-frame";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { hospitalAccessBlocked, isExpiredTrialAllowedPath } from "@/lib/hospital-access";
+import { resolveViewContext } from "@/lib/view-mode";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -158,6 +159,8 @@ const helpdeskNav: NavSection[] = [
     items: [
       { href: "/", label: "Dashboard" },
       { href: "/helpdesk", label: "Helpdesk" },
+      { href: "/helpdesk/canned-replies", label: "Canned replies" },
+      { href: "/medicine-catalog", label: "Medicine catalog" },
     ],
   },
 ];
@@ -174,12 +177,14 @@ const softwareAdminNav: NavSection[] = [
       { href: "/platform/billing-settings", label: "Billing settings" },
       { href: "/platform/users", label: "All users" },
       { href: "/platform/join-requests", label: "Join requests" },
+      { href: "/medicine-catalog", label: "Medicine catalog" },
     ],
   },
   {
     title: "Support",
     items: [
       { href: "/helpdesk", label: "Helpdesk" },
+      { href: "/helpdesk/canned-replies", label: "Canned replies" },
       { href: "/platform/helpdesk-team", label: "Helpdesk team" },
       { href: "/platform/audit-log", label: "Audit log" },
     ],
@@ -352,6 +357,9 @@ export async function AppShell({
     wardsEnabled: hospitalHasWardsModule(user?.hospital),
   };
 
+  const view = await resolveViewContext(user);
+  const useDoctorNav = view.canActAsDoctor && view.mode === "doctor";
+
   let nav: NavSection[] =
     user?.role === "SOFTWARE_ADMIN"
       ? softwareAdminNav
@@ -359,34 +367,44 @@ export async function AppShell({
         ? helpdeskNav
         : user && !user.hospitalId && !isPlatformRole(user.role)
           ? unaffiliatedNav
-          : user?.role === "SUPER_ADMIN"
-            ? superAdminNav
-            : user?.role === "RECEPTIONIST"
-              ? receptionistNav
-              : user?.role === "ACCOUNTANT"
-                ? accountantNav
-                : user?.role === "NURSE"
-                  ? nurseNav
-                  : user?.role === "LAB_TECH"
-                    ? labTechNav
-                    : user?.role === "PHARMACIST"
-                      ? pharmacistNav
-                      : user?.role === "DOCTOR"
-                        ? doctorNav
-                        : staffNav;
+          : useDoctorNav
+            ? doctorNav
+            : user?.role === "SUPER_ADMIN"
+              ? superAdminNav
+              : user?.role === "RECEPTIONIST"
+                ? receptionistNav
+                : user?.role === "ACCOUNTANT"
+                  ? accountantNav
+                  : user?.role === "NURSE"
+                    ? nurseNav
+                    : user?.role === "LAB_TECH"
+                      ? labTechNav
+                      : user?.role === "PHARMACIST"
+                        ? pharmacistNav
+                        : user?.role === "DOCTOR"
+                          ? doctorNav
+                          : staffNav;
 
   if (user?.hospitalId && !isPlatformRole(user.role)) {
     nav = filterNavByModules(nav, modules);
   }
+
+  const displayName = user
+    ? useDoctorNav
+      ? `Dr. ${[user.firstName, user.lastName].filter(Boolean).join(" ") || user.username}`
+      : user.username
+    : undefined;
+  const roleLabel = useDoctorNav ? "Doctor" : user?.role.replace(/_/g, " ");
 
   return (
     <AppShellFrame
       title={title}
       brand={user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK" ? "SaaS console" : "Hospital ERP"}
       hospitalLabel={user?.hospital ? `${user.hospital.name} · ${user.hospital.code}` : undefined}
-      userLabel={user ? `${user.username} · ${user.role.replace(/_/g, " ")}` : undefined}
+      userLabel={user && displayName ? `${displayName} · ${roleLabel}` : undefined}
       nav={nav}
       dense={dense}
+      viewMode={view.canActAsDoctor ? view.mode : undefined}
     >
       {children}
     </AppShellFrame>

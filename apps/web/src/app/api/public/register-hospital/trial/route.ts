@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSession, homeForRole } from "@/lib/auth";
-import { HospitalRegistrationError, prepareHospitalRegistration, registerHospital } from "@/lib/hospital-registration";
+import { HospitalRegistrationError, prepareHospitalRegistration, registerHospital, doctorProfileFromBody } from "@/lib/hospital-registration";
 import { trialEndsAtFromNow } from "@/lib/hospital-access";
 
 export async function POST(request: Request) {
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       paymentNotes: "1-month free trial — pay before the trial ends to keep using MedERP.",
       termsAccepted: true,
       trialEndsAt: trialEndsAtFromNow(),
+      ...doctorProfileFromBody(body),
       actor: {
         username: prepared.adminUsername,
         role: "SUPER_ADMIN",

@@ -3,14 +3,27 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
-import type { HelpdeskTicketStatus } from "@prisma/client";
+import { renderCannedReply } from "@/lib/helpdesk-canned";
+import type { HelpdeskMessageKind, HelpdeskTicketStatus } from "@prisma/client";
 
 type Message = {
   id: string;
   body: string;
+  kind?: HelpdeskMessageKind | string;
   createdAt: string | Date;
   author: { id: string; username: string; role: string };
 };
+
+type Canned = { id: string; title: string; body: string; category: string | null };
+
+const STATUS_ACTIONS: HelpdeskTicketStatus[] = [
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_REPLY",
+  "ESCALATED",
+  "RESOLVED",
+  "CLOSED",
+];
 
 export function HelpdeskThread({
   ticketId,
@@ -18,24 +31,43 @@ export function HelpdeskThread({
   canManage,
   status,
   messages,
+  ticketNumber,
+  requesterName,
+  agentName,
+  hospitalName,
 }: {
   ticketId: string;
   currentUserId: string;
   canManage: boolean;
   status: HelpdeskTicketStatus;
   messages: Message[];
+  ticketNumber?: string;
+  requesterName?: string;
+  agentName?: string;
+  hospitalName?: string;
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
-  const [nextStatus, setNextStatus] = useState(status);
+  const [kind, setKind] = useState<"PUBLIC" | "INTERNAL">("PUBLIC");
   const [liveStatus, setLiveStatus] = useState(status);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [canned, setCanned] = useState<Canned[]>([]);
+  const [cannedId, setCannedId] = useState("");
 
   useEffect(() => {
-    setNextStatus(status);
     setLiveStatus(status);
   }, [status]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    void fetch("/api/helpdesk/canned-replies")
+      .then(async (response) => {
+        const data = (await response.json()) as { replies?: Canned[] };
+        if (response.ok) setCanned(Array.isArray(data.replies) ? data.replies : []);
+      })
+      .catch(() => undefined);
+  }, [canManage]);
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
@@ -44,7 +76,7 @@ export function HelpdeskThread({
     const response = await fetch(`/api/helpdesk/tickets/${ticketId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body, kind: canManage ? kind : "PUBLIC" }),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -57,21 +89,39 @@ export function HelpdeskThread({
     router.refresh();
   }
 
-  async function saveStatus() {
+  async function setStatus(next: HelpdeskTicketStatus) {
     setPending(true);
     const response = await fetch(`/api/helpdesk/tickets/${ticketId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: nextStatus }),
+      body: JSON.stringify({ status: next }),
     });
     const data = await response.json();
     if (response.ok && data.ticket?.status) {
-      const updated = data.ticket.status as HelpdeskTicketStatus;
-      setLiveStatus(updated);
-      setNextStatus(updated);
+      setLiveStatus(data.ticket.status as HelpdeskTicketStatus);
     }
     setPending(false);
     router.refresh();
+  }
+
+  async function applyCanned(id: string) {
+    const item = canned.find((row) => row.id === id);
+    if (!item) return;
+    setCannedId(id);
+    setBody(
+      renderCannedReply(item.body, {
+        ticket_number: ticketNumber,
+        requester_name: requesterName,
+        agent_name: agentName,
+        hospital_name: hospitalName,
+      }),
+    );
+    setKind("PUBLIC");
+    void fetch(`/api/helpdesk/canned-replies/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bumpUse: true }),
+    }).catch(() => undefined);
   }
 
   return (
@@ -79,14 +129,33 @@ export function HelpdeskThread({
       <ol className="space-y-3">
         {messages.map((item) => {
           const mine = item.author.id === currentUserId;
+          const messageKind = (item.kind ?? "PUBLIC") as string;
+          const isInternal = messageKind === "INTERNAL";
+          const isSystem = messageKind === "SYSTEM";
           return (
             <li
               key={item.id}
               className={`max-w-xl rounded-2xl border px-4 py-3 ${
-                mine ? "ml-auto border-teal-100 bg-teal-50" : "border-slate-200 bg-white"
+                isInternal
+                  ? "border-amber-200 bg-amber-50"
+                  : isSystem
+                    ? "border-slate-200 bg-slate-50"
+                    : mine
+                      ? "ml-auto border-teal-100 bg-teal-50"
+                      : "border-slate-200 bg-white"
               }`}
             >
               <p className="text-xs font-medium text-slate-500">
+                {isInternal ? (
+                  <span className="mr-1 inline-flex items-center rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-950">
+                    Internal
+                  </span>
+                ) : null}
+                {isSystem ? (
+                  <span className="mr-1 inline-flex items-center rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-700">
+                    System
+                  </span>
+                ) : null}
                 {item.author.username} · {item.author.role.replace(/_/g, " ")} ·{" "}
                 {new Date(item.createdAt).toLocaleString("en-IN")}
               </p>
@@ -95,6 +164,7 @@ export function HelpdeskThread({
           );
         })}
       </ol>
+
       {liveStatus === "CLOSED" ? (
         <p className="text-sm text-slate-500">This request is closed.</p>
       ) : liveStatus === "RESOLVED" && !canManage ? (
@@ -103,8 +173,51 @@ export function HelpdeskThread({
         </p>
       ) : (
         <form onSubmit={send} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          {canManage ? (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  kind === "PUBLIC"
+                    ? "border-teal-600 bg-teal-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600"
+                }`}
+                onClick={() => setKind("PUBLIC")}
+              >
+                Reply
+              </button>
+              <button
+                type="button"
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  kind === "INTERNAL"
+                    ? "border-amber-600 bg-amber-500 text-white"
+                    : "border-slate-200 bg-white text-slate-600"
+                }`}
+                onClick={() => setKind("INTERNAL")}
+              >
+                Internal note
+              </button>
+              {canned.length > 0 && kind === "PUBLIC" ? (
+                <label className="ml-auto block min-w-48 text-xs font-medium text-slate-600">
+                  Canned reply
+                  <select
+                    className={fieldClass}
+                    value={cannedId}
+                    onChange={(e) => void applyCanned(e.target.value)}
+                  >
+                    <option value="">Insert…</option>
+                    {canned.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+          ) : null}
           <label className="block text-sm font-medium text-slate-700">
-            Reply
+            {kind === "INTERNAL" ? "Internal note (not visible to requester)" : "Reply"}
             <textarea
               className={fieldClass}
               rows={4}
@@ -115,29 +228,29 @@ export function HelpdeskThread({
           </label>
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
           <button className={`${buttonClass} mt-3`} type="submit" disabled={pending}>
-            {pending ? "Sending…" : "Send reply"}
+            {pending ? "Sending…" : kind === "INTERNAL" ? "Add note" : "Send reply"}
           </button>
         </form>
       )}
+
       {canManage ? (
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <label className="block min-w-40 flex-1 text-sm font-medium text-slate-700">
-            Status
-            <select
-              className={fieldClass}
-              value={nextStatus}
-              onChange={(event) => setNextStatus(event.target.value as HelpdeskTicketStatus)}
-            >
-              {["OPEN", "IN_PROGRESS", "WAITING_REPLY", "RESOLVED", "CLOSED"].map((item) => (
-                <option key={item} value={item}>
-                  {item.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className={secondaryButtonClass} type="button" disabled={pending} onClick={() => void saveStatus()}>
-            Update status
-          </button>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="mb-2 text-sm font-medium text-slate-700">Status</p>
+          <div className="flex flex-wrap gap-2">
+            {STATUS_ACTIONS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                disabled={pending || liveStatus === item}
+                className={`${secondaryButtonClass} ${
+                  liveStatus === item ? "border-teal-600 bg-teal-50 text-teal-900" : ""
+                }`}
+                onClick={() => void setStatus(item)}
+              >
+                {item.replace(/_/g, " ")}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

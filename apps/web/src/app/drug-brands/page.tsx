@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/app-shell";
 import { DrugBrandForm } from "@/components/drug-brand-form";
-import { LoadDrugCatalog } from "@/components/load-drug-catalog";
 import { listManufacturersForPicker } from "@/lib/drug-brands";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +11,7 @@ export default async function DrugBrandsPage() {
 
   const catalogSize = await prisma.drugCatalog.count();
   const manufacturerCount = await prisma.drugManufacturer.count();
-  if (manufacturerCount === 0) {
+  if (manufacturerCount === 0 && catalogSize > 0) {
     await prisma.$executeRaw`
       INSERT INTO "DrugManufacturer" ("id", "name", "medicineCount", "searchText")
       SELECT
@@ -41,9 +40,20 @@ export default async function DrugBrandsPage() {
     <AppShell title="Medicine brands">
       <p className="mb-6 max-w-3xl text-sm text-text-secondary">
         Choose which manufacturers appear in the doctor’s prescription autosuggest for this hospital. Only the hospital
-        super admin can change this list. Leave empty to allow the full catalog.
+        super admin can change this list. Leave empty to allow the full catalog. Loading new medicines onto the server
+        is done by MedERP software admin, not from here.
       </p>
-      <LoadDrugCatalog initialCount={catalogSize} />
+      {catalogSize === 0 ? (
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+          The medicine catalog is empty on this server. Ask MedERP support or software admin to import it from{" "}
+          <span className="font-medium">Medicine catalog</span> in the SaaS console.
+        </p>
+      ) : (
+        <p className="mb-4 text-sm text-text-secondary">
+          Medicine catalog: <span className="font-medium text-text-primary">{catalogSize.toLocaleString("en-IN")}</span>{" "}
+          drugs available on this server.
+        </p>
+      )}
       <DrugBrandForm
         initialSelected={selected.map((row) => row.manufacturer)}
         initialSuggestions={suggestions}

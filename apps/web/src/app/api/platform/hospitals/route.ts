@@ -44,7 +44,10 @@ export async function POST(request: Request) {
       adminEmail:
         body?.adminEmail != null && String(body.adminEmail).trim()
           ? String(body.adminEmail)
-          : `${String(body?.adminUsername ?? "admin").trim().toLowerCase() || "admin"}@mederp.local`,
+          : // Prefer mobile-based placeholder so display names never collide on email uniqueness
+            `${String(body?.adminMobile ?? "")
+              .replace(/\D/g, "")
+              .slice(-10) || "admin"}@mederp.local`,
       adminPassword: String(body?.adminPassword ?? ""),
       tierId: body?.tierId != null ? String(body.tierId) : undefined,
       extraStaffSlots: Number(body?.extraStaffSlots ?? 0),

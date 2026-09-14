@@ -9,12 +9,12 @@ import {
   slugFromHospitalName,
 } from "@/lib/hospital-code";
 import { mobileValidationError } from "@/lib/phone";
-import { allocateHospitalUserIdentity } from "@/lib/employee";
+import { allocateHospitalUserIdentity, parseEmployeeBody, uniqueUsername, upsertAdminDoctorStaff } from "@/lib/employee";
 import { seedHospitalDepartments } from "@/lib/front-desk";
 import { seedHospitalWards } from "@/lib/wards";
 import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platform-billing";
 import { upsertHospitalSubscription, unixToDate } from "@/lib/hospital-subscription";
-import { isSubscriptionTierId, type SubscriptionTierId } from "@/lib/subscription-tiers";
+import { hospitalFieldsFromTier, isSubscriptionTierId, type SubscriptionTierId } from "@/lib/subscription-tiers";
 import { pricingFromSettings } from "@/lib/platform-pricing";
 
 export class HospitalRegistrationError extends Error {
@@ -25,6 +25,20 @@ export class HospitalRegistrationError extends Error {
     super(message);
   }
 }
+
+export type AdminDoctorRegistrationProfile = {
+  firstName?: string | null;
+  lastName?: string | null;
+  medicalRegNo: string;
+  specialization: string;
+  medicalDegree?: string | null;
+  regCouncil?: string | null;
+  postgraduate?: string | null;
+  consultationFee?: string | number | null;
+  followUpFee?: string | number | null;
+  teleconsultEnabled?: boolean;
+  emergencyDutyEnabled?: boolean;
+};
 
 export type RegisterHospitalInput = {
   name: string;
@@ -47,6 +61,8 @@ export type RegisterHospitalInput = {
   paymentMethod?: PaymentMethod | null;
   paymentNotes?: string | null;
   termsAccepted?: boolean;
+  adminAsDoctor?: boolean;
+  doctorProfile?: AdminDoctorRegistrationProfile | null;
   razorpayPlanId?: string | null;
   razorpaySubscriptionId?: string | null;
   razorpayPaymentId?: string | null;
@@ -85,7 +101,10 @@ export type PreparedRegistration = {
   code: string;
   address: string | null;
   phone: string | null;
+  /** System username (unique, auto-allocated). Login uses mobile, not this. */
   adminUsername: string;
+  /** Display name entered on the form (any text). */
+  adminDisplayName: string;
   adminMobile: string;
   adminEmail: string;
   adminPassword: string;
@@ -116,6 +135,14 @@ function resolveTierId(input: {
   }).tier.id;
 }
 
+/** Build an internal login handle — login itself uses mobile; username is storage-only. */
+function usernameBaseFromAdmin(displayName: string, email: string, mobile: string) {
+  const fromName = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fromEmail = email.split("@")[0]?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
+  const base = (fromName || fromEmail || `admin${mobile.slice(-4)}`).slice(0, 40);
+  return `${base}adm`.slice(0, 48);
+}
+
 /** Validate registration fields and compute quote without creating the hospital. */
 export async function prepareHospitalRegistration(
   input: Omit<
@@ -136,7 +163,8 @@ export async function prepareHospitalRegistration(
   const name = input.name.trim();
   const address = input.address?.trim() || null;
   const phone = normalizeMobile(String(input.phone ?? ""));
-  const adminUsername = input.adminUsername.trim();
+  // Display name only — not used for login. Any text is fine; we mint a unique system username.
+  const adminDisplayName = input.adminUsername.trim();
   const adminMobile = normalizeMobile(input.adminMobile);
   const adminEmail = normalizeEmail(String(input.adminEmail ?? ""));
   const adminPassword = input.adminPassword;
@@ -145,6 +173,7 @@ export async function prepareHospitalRegistration(
   if (!name) {
     throw new HospitalRegistrationError("Hospital name is required.", 400);
   }
+  // Hospital names may repeat; uniqueness is via hospital code (auto-allocated) + hospital mobile.
   const hospitalPhoneError = mobileValidationError(phone, "Hospital mobile");
   if (hospitalPhoneError) {
     throw new HospitalRegistrationError(hospitalPhoneError, 400);
@@ -156,11 +185,8 @@ export async function prepareHospitalRegistration(
   if (!isValidEmail(adminEmail)) {
     throw new HospitalRegistrationError("Enter a valid super admin email for payment receipts.", 400);
   }
-  if (adminUsername.length < 3 || !/^[a-zA-Z0-9._]+$/.test(adminUsername)) {
-    throw new HospitalRegistrationError(
-      "Super admin username must be at least 3 letters, numbers, dots, or underscores.",
-      400,
-    );
+  if (!adminDisplayName) {
+    throw new HospitalRegistrationError("Super admin name is required.", 400);
   }
   if (passwordValidationError(adminPassword)) {
     throw new HospitalRegistrationError(
@@ -176,17 +202,29 @@ export async function prepareHospitalRegistration(
     throw new HospitalRegistrationError("That hospital mobile number is already registered.", 409);
   }
 
-  const userTaken = await prisma.appUser.findFirst({
-    where: { OR: [{ username: adminUsername }, { mobile: adminMobile }] },
+  const mobileTaken = await prisma.appUser.findFirst({
+    where: { mobile: adminMobile },
+    select: { id: true },
   });
-  if (userTaken) {
+  if (mobileTaken) {
     throw new HospitalRegistrationError(
-      userTaken.mobile === adminMobile
-        ? "That super admin mobile number is already registered. Sign in with this number, or use another."
-        : "Super admin username is already in use.",
+      "That super admin mobile number is already registered. Sign in with this number, or use another.",
       409,
     );
   }
+
+  const emailTaken = await prisma.appUser.findFirst({
+    where: { email: { equals: adminEmail, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (emailTaken) {
+    throw new HospitalRegistrationError(
+      "That super admin email is already registered. Sign in, or use another email.",
+      409,
+    );
+  }
+
+  const adminUsername = await uniqueUsername(usernameBaseFromAdmin(adminDisplayName, adminEmail, adminMobile));
 
   const quote = await calculateRegistrationTotal({ tierId });
 
@@ -205,12 +243,27 @@ export async function prepareHospitalRegistration(
     adminPassword,
     tierId,
     quote,
+    adminDisplayName,
   };
 }
 
 export async function registerHospital(input: RegisterHospitalInput) {
   if (input.termsAccepted === false) {
     throw new HospitalRegistrationError("You must accept the Terms & Conditions to register.", 400);
+  }
+
+  if (input.adminAsDoctor) {
+    const specialization = String(input.doctorProfile?.specialization ?? "").trim();
+    const medicalRegNo = String(input.doctorProfile?.medicalRegNo ?? "").trim();
+    if (!specialization) {
+      throw new HospitalRegistrationError("Specialization is required when admin practices as a doctor.", 400);
+    }
+    if (!medicalRegNo) {
+      throw new HospitalRegistrationError(
+        "Medical registration number is required when admin practices as a doctor.",
+        400,
+      );
+    }
   }
 
   const prepared = await prepareHospitalRegistration(input);
@@ -223,13 +276,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
       code: prepared.code,
       address: prepared.address,
       phone: prepared.phone,
-      subscriptionTier: tier.id,
-      includedStaffSlots: prepared.quote.includedStaffSlots,
-      extraStaffSlots: 0,
-      unlimitedStaffSeats: prepared.quote.unlimitedStaffSeats,
-      pharmacyEnabled: tier.pharmacyEnabled,
-      labEnabled: tier.labEnabled,
-      inventoryEnabled: tier.inventoryEnabled,
+      ...hospitalFieldsFromTier(tier),
       trialEndsAt: input.trialEndsAt ?? null,
       users: {
         create: {
@@ -256,10 +303,74 @@ export async function registerHospital(input: RegisterHospitalInput) {
   const superAdmin = hospital.users[0];
   if (superAdmin) {
     const identity = await allocateHospitalUserIdentity(hospital.id, "SUPER_ADMIN", hospital.code);
+    const nameParts = prepared.adminDisplayName.split(/\s+/).filter(Boolean);
+    const firstName =
+      String(input.doctorProfile?.firstName ?? "").trim() || nameParts[0] || prepared.adminDisplayName;
+    const lastName =
+      String(input.doctorProfile?.lastName ?? "").trim() || nameParts.slice(1).join(" ") || "";
     await prisma.appUser.update({
       where: { id: superAdmin.id },
-      data: identity,
+      data: {
+        ...identity,
+        firstName,
+        lastName: lastName || null,
+        email: prepared.adminEmail,
+      },
     });
+
+    if (input.adminAsDoctor && input.doctorProfile) {
+      const parsed = parseEmployeeBody(
+        {
+          firstName,
+          lastName,
+          mobile: prepared.adminMobile,
+          email: prepared.adminEmail,
+          username: prepared.adminUsername,
+          medicalRegNo: input.doctorProfile.medicalRegNo,
+          specialization: input.doctorProfile.specialization,
+          medicalDegree: input.doctorProfile.medicalDegree,
+          regCouncil: input.doctorProfile.regCouncil,
+          postgraduate: input.doctorProfile.postgraduate,
+          consultationFee: input.doctorProfile.consultationFee,
+          followUpFee: input.doctorProfile.followUpFee,
+          teleconsultEnabled: Boolean(input.doctorProfile.teleconsultEnabled),
+          emergencyDutyEnabled: Boolean(input.doctorProfile.emergencyDutyEnabled),
+          isActive: true,
+        },
+        "DOCTOR",
+      );
+      if ("error" in parsed) {
+        throw new HospitalRegistrationError(parsed.error, 400);
+      }
+      const staff = await upsertAdminDoctorStaff({
+        hospitalId: hospital.id,
+        appUser: {
+          id: superAdmin.id,
+          username: prepared.adminUsername,
+          mobile: prepared.adminMobile,
+          email: prepared.adminEmail,
+          firstName,
+          lastName: lastName || null,
+        },
+        input: parsed.value,
+        isActive: true,
+      });
+      await writeAuditLog({
+        request: input.request,
+        hospitalId: hospital.id,
+        actorUserId: superAdmin.id,
+        actorUsername: prepared.adminUsername,
+        actorRole: "SUPER_ADMIN",
+        action: "ADMIN_DOCTOR_ENABLED",
+        entity: "Staff",
+        entityId: staff.id,
+        summary: `${prepared.adminDisplayName} enabled admin-as-doctor during hospital registration.`,
+        metadata: {
+          specialization: parsed.value.specialization,
+          medicalRegNo: parsed.value.medicalRegNo,
+        },
+      });
+    }
   }
 
   const invoice = await createPlatformInvoice({
@@ -301,15 +412,44 @@ export async function registerHospital(input: RegisterHospitalInput) {
       hospitalCode: hospital.code,
       superAdmin: prepared.adminUsername,
       tierId: prepared.tierId,
-      pharmacyEnabled: tier.pharmacyEnabled,
-      labEnabled: tier.labEnabled,
-      inventoryEnabled: tier.inventoryEnabled,
+      pharmacyEnabled: false,
+      labEnabled: false,
+      inventoryEnabled: false,
       invoiceNo: invoice.invoiceNo,
       total: prepared.quote.total,
       invoiceStatus,
       razorpaySubscriptionId: input.razorpaySubscriptionId ?? null,
+      adminAsDoctor: Boolean(input.adminAsDoctor),
     },
   });
 
   return { hospital, superAdmin, invoice, quote: prepared.quote };
+}
+
+/** Parse optional admin-as-doctor payload from a public registration request body. */
+export function doctorProfileFromBody(body: Record<string, unknown> | null): {
+  adminAsDoctor: boolean;
+  doctorProfile: AdminDoctorRegistrationProfile | null;
+} {
+  const adminAsDoctor = Boolean(body?.adminAsDoctor);
+  if (!adminAsDoctor) {
+    return { adminAsDoctor: false, doctorProfile: null };
+  }
+  const profile = (body?.doctorProfile ?? body) as Record<string, unknown>;
+  return {
+    adminAsDoctor: true,
+    doctorProfile: {
+      firstName: profile.firstName != null ? String(profile.firstName) : null,
+      lastName: profile.lastName != null ? String(profile.lastName) : null,
+      medicalRegNo: String(profile.medicalRegNo ?? "").trim(),
+      specialization: String(profile.specialization ?? "").trim(),
+      medicalDegree: profile.medicalDegree != null ? String(profile.medicalDegree) : null,
+      regCouncil: profile.regCouncil != null ? String(profile.regCouncil) : null,
+      postgraduate: profile.postgraduate != null ? String(profile.postgraduate) : null,
+      consultationFee: profile.consultationFee != null ? String(profile.consultationFee) : null,
+      followUpFee: profile.followUpFee != null ? String(profile.followUpFee) : null,
+      teleconsultEnabled: Boolean(profile.teleconsultEnabled),
+      emergencyDutyEnabled: Boolean(profile.emergencyDutyEnabled),
+    },
+  };
 }

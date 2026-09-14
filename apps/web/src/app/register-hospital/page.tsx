@@ -9,7 +9,9 @@ import {
   clearRegisterHospitalDraft,
   loadRegisterHospitalDraft,
   saveRegisterHospitalDraft,
+  type RegisterDoctorDraft,
 } from "@/lib/register-hospital-draft";
+import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
 import {
   isOrderCheckoutSuccess,
   loadRazorpayCheckoutScript,
@@ -23,9 +25,6 @@ type TierInfo = {
   monthlyFee: number;
   seatLimit: number | null;
   roleSuggestion: string;
-  pharmacyEnabled: boolean;
-  labEnabled: boolean;
-  inventoryEnabled: boolean;
   features: string[];
 };
 
@@ -57,6 +56,20 @@ export default function RegisterHospitalPage() {
   const [adminPassword, setAdminPassword] = useState("");
   const [tierId, setTierId] = useState("CLINIC");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [adminAsDoctor, setAdminAsDoctor] = useState(false);
+  const [doctorProfile, setDoctorProfile] = useState<RegisterDoctorDraft>({
+    firstName: "",
+    lastName: "",
+    medicalRegNo: "",
+    specialization: "",
+    medicalDegree: "",
+    regCouncil: "",
+    postgraduate: "",
+    consultationFee: "",
+    followUpFee: "",
+    teleconsultEnabled: false,
+    emergencyDutyEnabled: false,
+  });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
@@ -76,6 +89,8 @@ export default function RegisterHospitalPage() {
       setAdminEmail(draft.adminEmail || "");
       setTierId(draft.tierId || "CLINIC");
       setTermsAccepted(draft.termsAccepted);
+      setAdminAsDoctor(Boolean(draft.adminAsDoctor));
+      if (draft.doctorProfile) setDoctorProfile(draft.doctorProfile);
       skipCodeFetch.current = /^[A-Z0-9]{8}$/i.test(draft.code || "");
       lastFetchedName.current = draft.name.trim();
     }
@@ -100,8 +115,23 @@ export default function RegisterHospitalPage() {
       adminEmail,
       tierId,
       termsAccepted,
+      adminAsDoctor,
+      doctorProfile,
     });
-  }, [draftReady, name, code, address, phone, adminUsername, adminMobile, adminEmail, tierId, termsAccepted]);
+  }, [
+    draftReady,
+    name,
+    code,
+    address,
+    phone,
+    adminUsername,
+    adminMobile,
+    adminEmail,
+    tierId,
+    termsAccepted,
+    adminAsDoctor,
+    doctorProfile,
+  ]);
 
   async function assignHospitalCode(hospitalName: string, keep?: string) {
     if (hospitalName.trim().length < 2) return;
@@ -155,8 +185,23 @@ export default function RegisterHospitalPage() {
       adminPassword,
       tierId,
       termsAccepted,
+      adminAsDoctor,
+      doctorProfile: adminAsDoctor ? doctorProfile : null,
     }),
-    [name, code, address, phone, adminUsername, adminMobile, adminEmail, adminPassword, tierId, termsAccepted],
+    [
+      name,
+      code,
+      address,
+      phone,
+      adminUsername,
+      adminMobile,
+      adminEmail,
+      adminPassword,
+      tierId,
+      termsAccepted,
+      adminAsDoctor,
+      doctorProfile,
+    ],
   );
 
   async function completeRegistration(
@@ -217,6 +262,16 @@ export default function RegisterHospitalPage() {
     if (!adminPassword || adminPassword.length < 8) {
       setError("Super admin password must be at least 8 characters.");
       return false;
+    }
+    if (adminAsDoctor) {
+      if (!doctorProfile.specialization.trim()) {
+        setError("Enter specialization for the admin doctor profile.");
+        return false;
+      }
+      if (!doctorProfile.medicalRegNo.trim()) {
+        setError("Enter medical registration number for the admin doctor profile.");
+        return false;
+      }
     }
     return true;
   }
@@ -380,12 +435,13 @@ export default function RegisterHospitalPage() {
               />
             </label>
             <label className="text-sm font-medium text-slate-700">
-              Super admin username
+              Super admin name
               <input
                 className={fieldClass}
                 value={adminUsername}
                 onChange={(event) => setAdminUsername(event.target.value)}
-                autoComplete="username"
+                autoComplete="name"
+                placeholder="Any name — login uses mobile, not username"
                 required
               />
             </label>
@@ -424,12 +480,60 @@ export default function RegisterHospitalPage() {
                 required
               />
             </label>
+
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-4">
+              <label className="flex items-start gap-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={adminAsDoctor}
+                  onChange={(event) => setAdminAsDoctor(event.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">Admin is also a doctor</span>
+                  <span className="mt-0.5 block text-slate-500">
+                    Same mobile and login for hospital admin and clinical practice. Fill doctor details
+                    below — enabled automatically after registration.
+                  </span>
+                </span>
+              </label>
+
+              {adminAsDoctor ? (
+                <div className="mt-4 grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Doctor first name
+                    <input
+                      className={fieldClass}
+                      value={doctorProfile.firstName}
+                      onChange={(e) => setDoctorProfile((c) => ({ ...c, firstName: e.target.value }))}
+                      placeholder="Defaults to admin name if blank"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Doctor last name
+                    <input
+                      className={fieldClass}
+                      value={doctorProfile.lastName}
+                      onChange={(e) => setDoctorProfile((c) => ({ ...c, lastName: e.target.value }))}
+                    />
+                  </label>
+                  <DoctorProfessionalFields
+                    values={doctorProfile}
+                    onChange={(key, value) =>
+                      setDoctorProfile((current) => ({ ...current, [key]: value }))
+                    }
+                    requireCore
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6">
             <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
             <p className="mt-1 text-sm text-slate-600">
               1-month trial with no card on every plan. Super admin is free and does not use a seat.
+              Plans cover OPD staff seats only.
             </p>
             <div className="mt-3 grid gap-2">
               {(pkg?.tiers ?? []).map((tier) => {

@@ -10,6 +10,7 @@ import {
   notifyHelpdeskOpened,
   ticketVisibleWhere,
 } from "@/lib/helpdesk";
+import { slaDueDates } from "@/lib/helpdesk-sla";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser(request);
@@ -56,15 +57,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Select a valid priority." }, { status: 400 });
   }
 
+  const due = slaDueDates(priority);
   const ticket = await prisma.helpdeskTicket.create({
     data: {
       number: await nextHelpdeskNumber(),
       hospitalId: user.hospitalId,
       createdById: user.id,
+      contactMobile: user.mobile,
+      contactName: user.username,
       subject,
       category,
       priority,
-      messages: { create: { authorId: user.id, body: message } },
+      firstResponseDueAt: due.firstResponseDueAt,
+      resolutionDueAt: due.resolutionDueAt,
+      messages: { create: { authorId: user.id, body: message, kind: "PUBLIC" } },
     },
   });
 

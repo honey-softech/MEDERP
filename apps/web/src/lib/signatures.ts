@@ -31,6 +31,7 @@ export function signatureNameFor(user: {
   staffProfile?: {
     firstName?: string | null;
     lastName?: string | null;
+    role?: string | null;
     medicalDegree?: string | null;
     postgraduate?: string | null;
     specialization?: string | null;
@@ -38,9 +39,10 @@ export function signatureNameFor(user: {
 }) {
   const firstName = user.staffProfile?.firstName ?? user.firstName ?? "";
   const lastName = user.staffProfile?.lastName ?? user.lastName ?? "";
-  const printed = suggestedSignatureName(firstName, lastName, user.role);
+  const asDoctor = user.role === "DOCTOR" || user.staffProfile?.role === "DOCTOR";
+  const printed = suggestedSignatureName(firstName, lastName, asDoctor ? "DOCTOR" : user.role);
   if (printed) return printed;
-  if (user.role === "DOCTOR") {
+  if (asDoctor) {
     return doctorName({ firstName, lastName, appUser: { username: user.username } });
   }
   return user.username;
@@ -49,6 +51,7 @@ export function signatureNameFor(user: {
 export function signatureCredentialsFor(user: {
   role: string;
   staffProfile?: {
+    role?: string | null;
     medicalDegree?: string | null;
     postgraduate?: string | null;
     specialization?: string | null;
@@ -65,7 +68,8 @@ export function signatureCredentialsFor(user: {
   const staff = user.staffProfile;
   if (!staff) return null;
   const parts: string[] = [];
-  if (user.role === "DOCTOR") {
+  const asDoctor = user.role === "DOCTOR" || staff.role === "DOCTOR";
+  if (asDoctor) {
     parts.push(staff.medicalDegree ?? "", staff.postgraduate ?? "", staff.specialization ?? "");
     if (staff.medicalRegNo) parts.push(`Reg. ${staff.medicalRegNo}`);
   } else if (user.role === "NURSE") {
@@ -92,7 +96,11 @@ export async function countStaffWithoutSignature(hospitalId: string) {
       isActive: true,
       role: { in: ["SUPER_ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST", "PHARMACIST", "LAB_TECH", "ACCOUNTANT"] },
     },
-    select: { id: true, role: true },
+    select: {
+      id: true,
+      role: true,
+      staffProfile: { select: { role: true, isActive: true } },
+    },
   });
   const withSignature = await prisma.userSignature.findMany({
     where: { hospitalId, status: "ACTIVE" },
@@ -100,7 +108,11 @@ export async function countStaffWithoutSignature(hospitalId: string) {
     distinct: ["userId"],
   });
   const covered = new Set(withSignature.map((row) => row.userId));
-  const doctors = signable.filter((row) => row.role === "DOCTOR");
+  const doctors = signable.filter(
+    (row) =>
+      row.role === "DOCTOR" ||
+      (row.role === "SUPER_ADMIN" && row.staffProfile?.role === "DOCTOR" && row.staffProfile.isActive),
+  );
   return {
     total: signable.length,
     missing: signable.filter((row) => !covered.has(row.id)).length,

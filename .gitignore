@@ -49,3 +49,10 @@ Thumbs.db
 # Secrets
 *.pem
 credentials.json
+
+# Local demo seed (do not deploy sample hospital data scripts)
+apps/web/prisma/seed-demo-data.ts
+
+# Test suite local artifacts
+docs/test-suite/__pycache__/
+docs/test-suite/~$*

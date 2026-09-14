@@ -39,6 +39,7 @@ enum HelpdeskTicketStatus {
   OPEN
   IN_PROGRESS
   WAITING_REPLY
+  ESCALATED
   RESOLVED
   CLOSED
 }
@@ -48,6 +49,12 @@ enum HelpdeskTicketPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+enum HelpdeskMessageKind {
+  PUBLIC
+  INTERNAL
+  SYSTEM
 }
 
 enum LeaveStatus {
@@ -462,7 +469,9 @@ model AppUser {
   reviewedJoinRequests HospitalJoinRequest[] @relation("JoinReviewer")
   helpdeskTickets      HelpdeskTicket[]      @relation("TicketCreator")
   assignedTickets      HelpdeskTicket[]      @relation("TicketAssignee")
+  escalatedTickets     HelpdeskTicket[]      @relation("TicketEscalator")
   helpdeskMessages     HelpdeskMessage[]
+  cannedReplies        HelpdeskCannedReply[] @relation("CannedReplyAuthor")
   leaveRequests        StaffLeave[]          @relation("LeaveRequester")
   reviewedLeaves       StaffLeave[]          @relation("LeaveReviewer")
   signatures           UserSignature[]       @relation("UserSignatures")
@@ -912,37 +921,71 @@ model HospitalAnnouncementReply {
 }
 
 model HelpdeskTicket {
-  id           String                 @id @default(cuid())
-  number       String                 @unique
-  hospitalId   String?
-  hospital     Hospital?              @relation(fields: [hospitalId], references: [id])
-  createdById  String
-  createdBy    AppUser                @relation("TicketCreator", fields: [createdById], references: [id])
-  assignedToId String?
-  assignedTo   AppUser?               @relation("TicketAssignee", fields: [assignedToId], references: [id])
-  subject      String
-  category     String
-  status       HelpdeskTicketStatus   @default(OPEN)
-  priority     HelpdeskTicketPriority @default(NORMAL)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  messages     HelpdeskMessage[]
+  id                   String                 @id @default(cuid())
+  number               String                 @unique
+  hospitalId           String?
+  hospital             Hospital?              @relation(fields: [hospitalId], references: [id])
+  createdById          String?
+  createdBy            AppUser?               @relation("TicketCreator", fields: [createdById], references: [id])
+  contactMobile        String?
+  contactName          String?
+  assignedToId         String?
+  assignedTo           AppUser?               @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  escalatedAt          DateTime?
+  escalatedById        String?
+  escalatedBy          AppUser?               @relation("TicketEscalator", fields: [escalatedById], references: [id])
+  escalationReason     String?
+  subject              String
+  category             String
+  status               HelpdeskTicketStatus   @default(OPEN)
+  priority             HelpdeskTicketPriority @default(NORMAL)
+  firstResponseDueAt   DateTime?
+  resolutionDueAt      DateTime?
+  firstResponseAt      DateTime?
+  resolvedAt           DateTime?
+  closedAt             DateTime?
+  lastAgentReplyAt     DateTime?
+  lastRequesterReplyAt DateTime?
+  reopenedCount        Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  messages             HelpdeskMessage[]
 
   @@index([hospitalId, status, updatedAt])
   @@index([createdById, updatedAt])
   @@index([assignedToId, status])
+  @@index([contactMobile, createdAt])
+  @@index([status, escalatedAt])
+  @@index([status, firstResponseDueAt])
 }
 
 model HelpdeskMessage {
-  id        String         @id @default(cuid())
+  id        String              @id @default(cuid())
   ticketId  String
-  ticket    HelpdeskTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket    HelpdeskTicket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   authorId  String
-  author    AppUser        @relation(fields: [authorId], references: [id])
-  body      String         @db.Text
-  createdAt DateTime       @default(now())
+  author    AppUser             @relation(fields: [authorId], references: [id])
+  body      String              @db.Text
+  kind      HelpdeskMessageKind @default(PUBLIC)
+  createdAt DateTime            @default(now())
 
   @@index([ticketId, createdAt])
+  @@index([ticketId, kind, createdAt])
+}
+
+model HelpdeskCannedReply {
+  id          String   @id @default(cuid())
+  title       String
+  body        String   @db.Text
+  category    String?
+  createdById String?
+  createdBy   AppUser? @relation("CannedReplyAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  isActive    Boolean  @default(true)
+  useCount    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, category])
 }
 
 model StaffLeave {

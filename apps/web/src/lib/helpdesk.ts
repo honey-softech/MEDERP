@@ -30,11 +30,13 @@ type TicketNotify = Pick<
 
 async function ticketWatchers(ticket: TicketNotify, actorId: string) {
   const recipients: Array<{ id: string; hospitalId?: string | null }> = [];
-  const creator = await prisma.appUser.findUnique({
-    where: { id: ticket.createdById },
-    select: { id: true, hospitalId: true },
-  });
-  if (creator) recipients.push(creator);
+  if (ticket.createdById) {
+    const creator = await prisma.appUser.findUnique({
+      where: { id: ticket.createdById },
+      select: { id: true, hospitalId: true },
+    });
+    if (creator) recipients.push(creator);
+  }
   if (ticket.hospitalId) {
     recipients.push(...(await hospitalSuperAdmins(ticket.hospitalId)));
   }
@@ -132,6 +134,36 @@ export async function notifyHelpdeskOpened(ticket: TicketNotify, actorId: string
   );
 }
 
+export async function notifyHelpdeskEscalated(params: {
+  ticket: TicketNotify & { status: HelpdeskTicketStatus };
+  actorId: string;
+  reason: string;
+}) {
+  const href = `/helpdesk/${params.ticket.id}`;
+  const admins = await prisma.appUser.findMany({
+    where: { role: "SOFTWARE_ADMIN", isVerified: true, isActive: true },
+    select: { id: true, hospitalId: true },
+  });
+  const preview = params.reason.slice(0, 140);
+  await notifyMany(
+    admins.filter((user) => user.id !== params.actorId),
+    {
+      hospitalId: params.ticket.hospitalId,
+      href,
+      title: "Helpdesk ticket escalated",
+      body: `${params.ticket.number}: ${preview}`,
+    },
+  );
+  pushHelpdeskTicketUpdate(
+    uniqueUserIds([...admins, ...(await ticketWatchers(params.ticket, params.actorId))]),
+    {
+      ticketId: params.ticket.id,
+      status: params.ticket.status,
+      number: params.ticket.number,
+    },
+  );
+}
+
 export async function notifyHelpdeskReply(params: {
   ticket: TicketNotify;
   actorId: string;
@@ -144,7 +176,7 @@ export async function notifyHelpdeskReply(params: {
 
   if (fromHelpdesk) {
     const recipients: Array<{ id: string; hospitalId?: string | null }> = [];
-    if (params.ticket.createdById !== params.actorId) {
+    if (params.ticket.createdById && params.ticket.createdById !== params.actorId) {
       const creator = await prisma.appUser.findUnique({
         where: { id: params.ticket.createdById },
         select: { id: true, hospitalId: true },

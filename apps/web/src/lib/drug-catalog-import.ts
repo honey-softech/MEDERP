@@ -276,3 +276,88 @@ export async function ensureDrugCatalog(prisma: PrismaClient) {
   console.log(`DrugManufacturer rows: ${manufacturers.toLocaleString()}`);
   return { skipped: false, catalogSize: result.catalogSize };
 }
+
+/** Manually add a newly marketed medicine (platform / helpdesk). */
+export async function addMedicineToCatalog(
+  prisma: PrismaClient,
+  input: {
+    name: string;
+    manufacturer?: string | null;
+    packSize?: string | null;
+    saltComposition?: string | null;
+    type?: string | null;
+  },
+) {
+  const name = input.name.trim();
+  if (name.length < 2) {
+    throw new Error("Enter the medicine name.");
+  }
+
+  const manufacturer = input.manufacturer?.trim() || null;
+  const packSize = input.packSize?.trim() || null;
+  const saltComposition = input.saltComposition?.trim() || null;
+  const type = input.type?.trim() || null;
+  const searchText = [name, saltComposition, manufacturer]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Exact duplicate: same name + manufacturer (case-insensitive). Different pack/salt still allowed via new name variants.
+  const existing = await prisma.drugCatalog.findFirst({
+    where: {
+      isDiscontinued: false,
+      name: { equals: name, mode: "insensitive" },
+      ...(manufacturer
+        ? { manufacturer: { equals: manufacturer, mode: "insensitive" } }
+        : { OR: [{ manufacturer: null }, { manufacturer: "" }] }),
+    },
+    select: { id: true, name: true, manufacturer: true },
+  });
+  if (existing) {
+    throw new Error(
+      manufacturer
+        ? `"${existing.name}" from ${manufacturer} is already in the catalog.`
+        : `"${existing.name}" is already in the catalog.`,
+    );
+  }
+
+  const max = await prisma.drugCatalog.aggregate({ _max: { sourceId: true } });
+  const sourceId = Math.max(9_000_000, (max._max.sourceId ?? 0) + 1);
+
+  const row = await prisma.drugCatalog.create({
+    data: {
+      id: cuidLike(),
+      sourceId,
+      name,
+      manufacturer,
+      packSize,
+      saltComposition,
+      type,
+      searchText,
+      isDiscontinued: false,
+    },
+  });
+
+  if (manufacturer) {
+    const existing = await prisma.drugManufacturer.findUnique({ where: { name: manufacturer } });
+    if (existing) {
+      await prisma.drugManufacturer.update({
+        where: { id: existing.id },
+        data: { medicineCount: { increment: 1 } },
+      });
+    } else {
+      await prisma.drugManufacturer.create({
+        data: {
+          id: `m${cuidLike().slice(1, 13)}`,
+          name: manufacturer,
+          medicineCount: 1,
+          searchText: manufacturer.toLowerCase().replace(/\s+/g, " ").trim(),
+        },
+      });
+    }
+  }
+
+  return row;
+}

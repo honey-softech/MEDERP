@@ -72,30 +72,56 @@ export async function ensureDoctorStaff(params: {
 }
 
 export async function listBookableDoctors(hospitalId: string) {
-  const users = await prisma.appUser.findMany({
-    where: { hospitalId, role: "DOCTOR" },
-    orderBy: { username: "asc" },
-  });
+  const [doctorUsers, adminDoctorStaff] = await Promise.all([
+    prisma.appUser.findMany({
+      where: { hospitalId, role: "DOCTOR", isActive: true },
+      orderBy: { username: "asc" },
+    }),
+    prisma.staff.findMany({
+      where: {
+        hospitalId,
+        role: "DOCTOR",
+        isActive: true,
+        appUser: { role: "SUPER_ADMIN", isActive: true, hospitalId },
+      },
+      include: { appUser: { select: { username: true } } },
+      orderBy: { firstName: "asc" },
+    }),
+  ]);
 
   const doctors = [];
-  for (const user of users) {
+  const seenStaffIds = new Set<string>();
+
+  for (const user of doctorUsers) {
     const staff = await ensureDoctorStaff({
       hospitalId,
       appUserId: user.id,
       username: user.username,
       mobile: user.mobile,
     });
+    if (!staff.isActive) continue;
+    seenStaffIds.add(staff.id);
     doctors.push({
       ...staff,
       appUser: { username: user.username },
     });
   }
-  return doctors;
+
+  for (const staff of adminDoctorStaff) {
+    if (seenStaffIds.has(staff.id)) continue;
+    doctors.push(staff);
+  }
+
+  return doctors.sort((a, b) => {
+    const aName = `${a.firstName} ${a.lastName}`.trim() || a.appUser?.username || "";
+    const bName = `${b.firstName} ${b.lastName}`.trim() || b.appUser?.username || "";
+    return aName.localeCompare(bName);
+  });
 }
 
 export async function staffIdForAppUser(appUserId: string, hospitalId: string) {
   const staff = await prisma.staff.findFirst({
-    where: { appUserId, hospitalId, role: "DOCTOR" },
+    where: { appUserId, hospitalId, role: "DOCTOR", isActive: true },
   });
   return staff?.id ?? null;
 }

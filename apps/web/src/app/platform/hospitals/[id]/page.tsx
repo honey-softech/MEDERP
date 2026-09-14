@@ -113,6 +113,8 @@ export default async function HospitalDetailPage({
             phone: hospital.phone ?? "",
             isActive: hospital.isActive,
             opdFee: Number(hospital.opdFee),
+            extraStaffSlots: hospital.extraStaffSlots,
+            trialEndsAt: hospital.trialEndsAt,
           }}
         />
       </div>

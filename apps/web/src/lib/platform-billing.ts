@@ -140,10 +140,10 @@ export async function assertStaffSeatAvailable(hospitalId: string) {
 
 export async function applyHospitalTier(hospitalId: string, tierId: SubscriptionTierId | string) {
   const quote = await calculateRegistrationTotal({ tierId });
+  // Preserve manually granted extra seats; platform support may add them outside a tier change.
   const fields = {
     subscriptionTier: quote.tier.id,
     includedStaffSlots: quote.includedStaffSlots,
-    extraStaffSlots: 0,
     unlimitedStaffSeats: quote.unlimitedStaffSeats,
     pharmacyEnabled: quote.pharmacyEnabled,
     labEnabled: quote.labEnabled,

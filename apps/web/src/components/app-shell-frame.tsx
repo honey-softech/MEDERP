@@ -6,6 +6,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeProvider } from "@/components/realtime-provider";
+import { ViewModeToggle } from "@/components/view-mode-toggle";
+import type { ViewMode } from "@/lib/view-mode";
 
 export type NavLink = { href: string; label: string };
 export type NavSection = { title?: string; items: NavLink[] };
@@ -176,6 +178,7 @@ export function AppShellFrame({
   nav,
   children,
   dense = false,
+  viewMode,
 }: {
   title: string;
   brand: string;
@@ -184,6 +187,7 @@ export function AppShellFrame({
   nav: NavLink[] | NavSection[];
   children: React.ReactNode;
   dense?: boolean;
+  viewMode?: ViewMode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -355,6 +359,7 @@ export function AppShellFrame({
               <h2 className="truncate text-base font-semibold sm:text-lg">{title}</h2>
               {userLabel ? <p className="truncate text-xs text-text-secondary">{userLabel}</p> : null}
             </div>
+            {viewMode ? <ViewModeToggle mode={viewMode} /> : null}
             <NotificationBell />
             <LogoutButton />
           </header>

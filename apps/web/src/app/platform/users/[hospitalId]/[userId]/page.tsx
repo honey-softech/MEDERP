@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import HospitalUserForm from "@/components/hospital-user-form";
+import { StaffMergePanel } from "@/components/staff-merge-panel";
 import { UserSignatureManager } from "@/components/user-signature-manager";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +17,7 @@ export default async function PlatformEditHospitalUserPage({
   if (!actor || actor.role !== "SOFTWARE_ADMIN") redirect("/login");
 
   const { hospitalId, userId } = await params;
-  const [hospital, user, departments] = await Promise.all([
+  const [hospital, user, departments, mergeCandidates] = await Promise.all([
     prisma.hospital.findUnique({ where: { id: hospitalId }, select: { id: true, name: true, code: true } }),
     prisma.appUser.findFirst({
       where: { id: userId, hospitalId },
@@ -26,6 +27,17 @@ export default async function PlatformEditHospitalUserPage({
       where: { hospitalId },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
+    }),
+    prisma.appUser.findMany({
+      where: {
+        hospitalId,
+        id: { not: userId },
+        role: { notIn: ["SOFTWARE_ADMIN", "HELPDESK"] },
+        isActive: true,
+      },
+      orderBy: { username: "asc" },
+      select: { id: true, username: true, mobile: true, role: true },
+      take: 100,
     }),
   ]);
   if (!hospital || !user || user.role === "SOFTWARE_ADMIN" || user.role === "HELPDESK") notFound();
@@ -56,6 +68,11 @@ export default async function PlatformEditHospitalUserPage({
           role={user.role}
         />
       </div>
+      <StaffMergePanel
+        survivorId={user.id}
+        survivorLabel={`${user.username} (${user.mobile})`}
+        candidates={mergeCandidates}
+      />
     </AppShell>
   );
 }

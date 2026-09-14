@@ -47,14 +47,10 @@ export function pricingFromSettings(
   if ("tierId" in selection && selection.tierId) {
     return pricingFromTier(selection.tierId);
   }
-  // Legacy a la carte → nearest fixed tier for old clients
+  // Legacy a la carte → nearest fixed OPD tier for old clients
   const seats = 3 + Math.max(0, Math.trunc(Number((selection as { extraStaffSlots?: number }).extraStaffSlots ?? 0)));
-  const pharmacy = Boolean((selection as { pharmacyEnabled?: boolean }).pharmacyEnabled);
-  const lab = Boolean((selection as { labEnabled?: boolean }).labEnabled);
   let tierId: SubscriptionTierId = "CLINIC";
-  if (seats >= 50 && pharmacy && lab) tierId = "ENTERPRISE";
-  else if (seats >= 15 && pharmacy && lab) tierId = "PROFESSIONAL";
-  else if (pharmacy || lab) tierId = "GROWTH";
+  if (seats >= 9) tierId = "GROWTH";
   else if (seats >= 6) tierId = "STARTER";
   return pricingFromTier(tierId);
 }
@@ -64,7 +60,6 @@ export function staffSeatLimit(
 ): number | null {
   if (hospital.unlimitedStaffSeats) return null;
   const tier = getSubscriptionTier(hospital.subscriptionTier);
-  if (tier?.seatLimit == null && hospital.subscriptionTier === "ENTERPRISE") return null;
   if (tier?.seatLimit != null) return tier.seatLimit;
   return hospital.includedStaffSlots + hospital.extraStaffSlots;
 }
@@ -87,10 +82,10 @@ export function moduleErrorForRole(
   hospital: Pick<Hospital, "pharmacyEnabled" | "labEnabled">,
 ) {
   if (roleRequiresPharmacyModule(role) && !hospital.pharmacyEnabled) {
-    return "Pharmacy module is not on your plan. Upgrade to Growth or higher.";
+    return "Pharmacy module is not available on your plan yet.";
   }
   if (roleRequiresLabModule(role) && !hospital.labEnabled) {
-    return "Laboratory module is not on your plan. Upgrade to Growth or higher.";
+    return "Laboratory module is not available on your plan yet.";
   }
   return null;
 }

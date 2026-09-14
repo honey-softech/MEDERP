@@ -70,6 +70,7 @@ export function ticketStatusClass(status: string) {
   if (status === "OPEN") return statusBadge.info;
   if (status === "IN_PROGRESS") return statusBadge.warning;
   if (status === "WAITING_REPLY") return statusBadge.warning;
+  if (status === "ESCALATED") return statusBadge.critical;
   if (status === "RESOLVED") return statusBadge.success;
   return statusBadge.neutral;
 }

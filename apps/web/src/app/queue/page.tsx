@@ -29,6 +29,7 @@ import {
   tokenLabel,
 } from "@/lib/front-desk";
 import { statusBadge, statusBadgeBase } from "@/lib/ui";
+import { resolveViewContext } from "@/lib/view-mode";
 import { prisma } from "@/lib/prisma";
 
 export default async function QueuePage({
@@ -49,8 +50,13 @@ export default async function QueuePage({
     month: "short",
     year: "numeric",
   });
+  const view = await resolveViewContext(user);
   const myDoctorId =
-    user.role === "DOCTOR" ? await staffIdForAppUser(user.id, user.hospitalId) : null;
+    user.role === "DOCTOR"
+      ? await staffIdForAppUser(user.id, user.hospitalId)
+      : view.mode === "doctor"
+        ? view.doctorStaffId
+        : null;
 
   const [queue, doctors] = await Promise.all([
     prisma.appointment.findMany({

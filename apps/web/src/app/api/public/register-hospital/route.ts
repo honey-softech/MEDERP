@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { createSession, homeForRole } from "@/lib/auth";
-import { HospitalRegistrationError, prepareHospitalRegistration, registerHospital } from "@/lib/hospital-registration";
+import { HospitalRegistrationError, prepareHospitalRegistration, registerHospital, doctorProfileFromBody } from "@/lib/hospital-registration";
 import {
   getRazorpayClient,
   razorpayConfigured,
@@ -142,6 +142,7 @@ export async function POST(request: Request) {
       paymentMethod: "UPI" as PaymentMethod,
       paymentNotes,
       termsAccepted: true,
+      ...doctorProfileFromBody(body),
       razorpayPlanId: mode === "subscription" ? planId || null : null,
       razorpaySubscriptionId: mode === "subscription" ? razorpaySubscriptionId : null,
       razorpayPaymentId,

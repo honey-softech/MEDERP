@@ -22,16 +22,17 @@ import {
   tokenLabel,
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { resolveViewContext } from "@/lib/view-mode";
 import type { AppRole } from "@prisma/client";
 
-function prettyName(username: string, role: AppRole) {
+function prettyName(username: string, role: AppRole, asDoctor = false) {
   const cleaned = username.replace(/[._]/g, " ");
   const titled = cleaned.replace(/\b\w/g, (letter) => letter.toUpperCase());
-  if (role === "DOCTOR" && !/^dr\b/i.test(titled)) return `Dr. ${titled}`;
+  if ((role === "DOCTOR" || asDoctor) && !/^dr\b/i.test(titled)) return `Dr. ${titled}`;
   return titled;
 }
 
-function bannerCopy(role: AppRole, hospitalName?: string | null) {
+function bannerCopy(role: AppRole, hospitalName?: string | null, asDoctor = false) {
   if (role === "SOFTWARE_ADMIN") {
     return {
       tagline: "Here's what's happening across your hospitals today. Stay aware, stay ahead.",
@@ -41,22 +42,22 @@ function bannerCopy(role: AppRole, hospitalName?: string | null) {
   }
   if (role === "HELPDESK") {
     return {
-      tagline: "Hospital requests land here. Reply and the admin gets a live notification.",
+      tagline: "Account fixes stay here. Escalate to software admin when hospital tools are needed.",
       locationTitle: "Helpdesk",
       locationSubtitle: "MedERP support desk",
+    };
+  }
+  if (asDoctor || role === "DOCTOR") {
+    return {
+      tagline: "Here's what's happening in your practice today. Stay aware, stay ahead.",
+      locationTitle: "Clinical care",
+      locationSubtitle: hospitalName ?? "Your hospital",
     };
   }
   if (role === "SUPER_ADMIN") {
     return {
       tagline: "Here's what's happening in your hospital today. Stay aware, stay ahead.",
       locationTitle: "Hospital administration",
-      locationSubtitle: hospitalName ?? "Your hospital",
-    };
-  }
-  if (role === "DOCTOR") {
-    return {
-      tagline: "Here's what's happening in your practice today. Stay aware, stay ahead.",
-      locationTitle: "Clinical care",
       locationSubtitle: hospitalName ?? "Your hospital",
     };
   }
@@ -80,7 +81,9 @@ export default async function Home({
   searchParams: Promise<{ date?: string }>;
 }) {
   const user = await getCurrentUser();
-  const copy = bannerCopy(user?.role ?? "RECEPTIONIST", user?.hospital?.name);
+  const view = await resolveViewContext(user);
+  const asDoctor = view.canActAsDoctor && view.mode === "doctor";
+  const copy = bannerCopy(user?.role ?? "RECEPTIONIST", user?.hospital?.name, asDoctor);
   const { date } = await searchParams;
   const selectedDay = parseLocalDay(date);
   const { start, end } = dayRange(selectedDay);
@@ -96,24 +99,50 @@ export default async function Home({
   });
 
   const platformStats =
-    user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK"
+    user?.role === "SOFTWARE_ADMIN"
       ? await Promise.all([
           prisma.hospital.count(),
           prisma.appUser.count({ where: { role: { notIn: ["SOFTWARE_ADMIN", "HELPDESK"] } } }),
-          prisma.helpdeskTicket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REPLY"] } } }),
+          prisma.helpdeskTicket.count({
+            where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REPLY", "ESCALATED"] } },
+          }),
+          prisma.helpdeskTicket.count({ where: { status: "ESCALATED" } }),
           prisma.hospitalJoinRequest.count({ where: { status: "PENDING" } }),
-        ]).then(([hospitals, users, openTickets, joinRequests]) => [
+        ]).then(([hospitals, users, openTickets, escalatedTickets, joinRequests]) => [
           { label: "Hospitals", value: String(hospitals), href: "/platform/hospitals" },
           { label: "Hospital users", value: String(users), href: "/platform/users" },
           { label: "Open helpdesk", value: String(openTickets), href: "/helpdesk" },
+          { label: "Escalated", value: String(escalatedTickets), href: "/helpdesk" },
           { label: "Join requests", value: String(joinRequests), href: "/platform/join-requests" },
         ])
-      : null;
+      : user?.role === "HELPDESK"
+        ? await prisma.helpdeskTicket
+            .count({
+              where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REPLY", "ESCALATED"] } },
+            })
+            .then((openTickets) => [
+              { label: "Open helpdesk", value: String(openTickets), href: "/helpdesk" },
+            ])
+        : null;
+
+  const escalatedHelpdeskTickets =
+    user?.role === "SOFTWARE_ADMIN"
+      ? await prisma.helpdeskTicket.findMany({
+          where: { status: "ESCALATED" },
+          orderBy: { escalatedAt: "desc" },
+          take: 8,
+          include: {
+            hospital: { select: { name: true, code: true } },
+            createdBy: { select: { username: true, role: true } },
+            escalatedBy: { select: { username: true } },
+          },
+        })
+      : [];
 
   const openHelpdeskTickets =
     user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK"
       ? await prisma.helpdeskTicket.findMany({
-          where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REPLY"] } },
+          where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REPLY", "ESCALATED"] } },
           orderBy: { updatedAt: "desc" },
           take: 8,
           include: {
@@ -124,13 +153,13 @@ export default async function Home({
       : [];
 
   const pendingJoins =
-    user?.role === "SUPER_ADMIN" && user.hospitalId
+    user?.role === "SUPER_ADMIN" && user.hospitalId && !asDoctor
       ? await prisma.hospitalJoinRequest.count({
           where: { hospitalId: user.hospitalId, status: "PENDING" },
         })
       : 0;
   const pendingLeaves =
-    user?.role === "SUPER_ADMIN" && user.hospitalId
+    user?.role === "SUPER_ADMIN" && user.hospitalId && !asDoctor
       ? await prisma.staffLeave.count({
           where: { hospitalId: user.hospitalId, status: "PENDING" },
         })
@@ -140,8 +169,10 @@ export default async function Home({
       ? await listAnnouncements(user.hospitalId, { take: 40, includeReplies: false })
       : [];
   const myDoctorId =
-    user?.role === "DOCTOR" && user.hospitalId
-      ? await staffIdForAppUser(user.id, user.hospitalId)
+    user?.hospitalId && (user.role === "DOCTOR" || asDoctor)
+      ? asDoctor
+        ? view.doctorStaffId
+        : await staffIdForAppUser(user.id, user.hospitalId)
       : null;
   const yesterdayRange = dayRange(addCalendarDays(new Date(), -1));
   const todayRange = dayRange(new Date());
@@ -298,7 +329,7 @@ export default async function Home({
       >
         {user ? (
           <WelcomeBanner
-            displayName={prettyName(user.username, user.role)}
+            displayName={prettyName(user.username, user.role, asDoctor)}
             tagline={copy.tagline}
             locationTitle={copy.locationTitle}
             locationSubtitle={copy.locationSubtitle}
@@ -335,6 +366,45 @@ export default async function Home({
         </section>
       ) : null}
 
+      {escalatedHelpdeskTickets.length > 0 && user?.role === "SOFTWARE_ADMIN" ? (
+        <section className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold text-red-950">
+                {escalatedHelpdeskTickets.length} escalated ticket
+                {escalatedHelpdeskTickets.length === 1 ? "" : "s"}
+              </h3>
+              <p className="mt-1 text-sm text-red-900">
+                Helpdesk asked for software-admin tools (hospital access, seats, trial, merge, or code).
+              </p>
+            </div>
+            <Link href="/helpdesk" className="text-sm font-medium text-teal-800 hover:underline">
+              Open helpdesk →
+            </Link>
+          </div>
+          <ul className="mt-4 space-y-2">
+            {escalatedHelpdeskTickets.map((ticket) => (
+              <li key={ticket.id}>
+                <Link
+                  href={`/helpdesk/${ticket.id}`}
+                  className="block rounded-xl border border-red-100 bg-white px-4 py-3 hover:border-teal-300"
+                >
+                  <p className="font-medium text-slate-900">
+                    {ticket.number} · {ticket.subject}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {ticket.hospital ? `${ticket.hospital.name} · ` : ""}
+                    from {ticket.createdBy?.username ?? ticket.contactName ?? ticket.contactMobile ?? "Unknown"}
+                    {ticket.escalatedBy?.username ? ` · escalated by ${ticket.escalatedBy.username}` : ""}
+                    {ticket.escalationReason ? ` · ${ticket.escalationReason.slice(0, 80)}` : ""}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {openHelpdeskTickets.length > 0 && (user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK") ? (
         <section className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -362,7 +432,8 @@ export default async function Home({
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {ticket.hospital ? `${ticket.hospital.name} · ` : ""}
-                    from {ticket.createdBy.username} · {ticket.status.replace(/_/g, " ").toLowerCase()}
+                    from {ticket.createdBy?.username ?? ticket.contactName ?? ticket.contactMobile ?? "Unknown"} ·{" "}
+                    {ticket.status.replace(/_/g, " ").toLowerCase()}
                   </p>
                 </Link>
               </li>
@@ -456,7 +527,7 @@ export default async function Home({
                 number: ticket.number,
                 subject: ticket.subject,
                 hospital: ticket.hospital?.name ?? "Platform",
-                from: ticket.createdBy.username,
+                from: ticket.createdBy?.username ?? ticket.contactName ?? ticket.contactMobile ?? "Unknown",
                 status: ticket.status.replace(/_/g, " "),
                 updated: ticket.updatedAt.toLocaleString("en-IN"),
                 href: `/helpdesk/${ticket.id}`,

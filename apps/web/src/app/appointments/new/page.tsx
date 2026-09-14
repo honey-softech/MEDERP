@@ -9,6 +9,7 @@ import {
   staffIdForAppUser,
   canAddWalkIn,
 } from "@/lib/front-desk";
+import { resolveViewContext } from "@/lib/view-mode";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -18,19 +19,20 @@ export default async function NewAppointmentPage({
   searchParams: Promise<{ walkin?: string; patientId?: string }>;
 }) {
   const user = await requireHospitalPage();
-  const canFrontDesk = FRONT_DESK_ROLES.includes(user.role);
+  const view = await resolveViewContext(user);
+  const canFrontDesk = FRONT_DESK_ROLES.includes(user.role) && view.mode !== "doctor";
   const canWalkIn = canAddWalkIn(user);
   if (!canWalkIn) redirect("/appointments");
 
   const { walkin, patientId } = await searchParams;
-  const doctorWalkIn = user.role === "DOCTOR";
+  const doctorWalkIn = user.role === "DOCTOR" || (view.canActAsDoctor && view.mode === "doctor");
   const nurseWalkIn = user.role === "NURSE";
   const staffWalkIn = doctorWalkIn || nurseWalkIn;
   if (staffWalkIn && !walkin) {
     redirect(patientId ? `/appointments/new?walkin=1&patientId=${patientId}` : "/appointments/new?walkin=1");
   }
 
-  if (doctorWalkIn) {
+  if (user.role === "DOCTOR") {
     await ensureDoctorStaff({
       hospitalId: user.hospitalId,
       appUserId: user.id,
@@ -38,7 +40,9 @@ export default async function NewAppointmentPage({
       mobile: user.mobile,
     });
   }
-  const myStaffId = doctorWalkIn ? await staffIdForAppUser(user.id, user.hospitalId) : null;
+  const myStaffId = doctorWalkIn
+    ? view.doctorStaffId ?? (await staffIdForAppUser(user.id, user.hospitalId))
+    : null;
   const [doctors, departments, patient, myStaff] = await Promise.all([
     listBookableDoctors(user.hospitalId),
     prisma.department.findMany({
@@ -72,7 +76,7 @@ export default async function NewAppointmentPage({
       </p>
       {doctorWalkIn && !myStaffId ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Your doctor profile is not linked. Ask the hospital admin to assign the Doctor role to your user.
+          Your doctor profile is not linked. Set it up under Hospital settings → Admin as doctor.
         </p>
       ) : (
         <AppointmentForm

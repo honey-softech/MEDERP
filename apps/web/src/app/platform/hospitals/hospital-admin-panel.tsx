@@ -4,6 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 
+function toDateInput(value?: string | Date | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
 export function HospitalAdminPanel({
   hospitalId,
   initial,
@@ -16,13 +23,18 @@ export function HospitalAdminPanel({
     phone: string;
     isActive: boolean;
     opdFee: number;
+    extraStaffSlots: number;
+    trialEndsAt?: string | Date | null;
   };
 }) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
+  const [code, setCode] = useState(initial.code);
   const [address, setAddress] = useState(initial.address);
   const [phone, setPhone] = useState(initial.phone);
   const [opdFee, setOpdFee] = useState(String(initial.opdFee));
+  const [extraStaffSlots, setExtraStaffSlots] = useState(String(initial.extraStaffSlots));
+  const [trialEndsAt, setTrialEndsAt] = useState(toDateInput(initial.trialEndsAt));
   const [isActive, setIsActive] = useState(initial.isActive);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -38,9 +50,12 @@ export function HospitalAdminPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
+        code,
         address,
         phone,
         opdFee: Number(opdFee),
+        extraStaffSlots: Number(extraStaffSlots),
+        trialEndsAt: trialEndsAt ? new Date(`${trialEndsAt}T23:59:59.000Z`).toISOString() : null,
         isActive,
       }),
     });
@@ -50,6 +65,7 @@ export function HospitalAdminPanel({
       setError(data.error ?? "Could not update hospital.");
       return;
     }
+    if (data.hospital?.code) setCode(data.hospital.code);
     setMessage(isActive ? "Hospital details saved. Access is enabled." : "Hospital details saved. Access is disabled.");
     router.refresh();
   }
@@ -81,7 +97,7 @@ export function HospitalAdminPanel({
         <div>
           <h3 className="font-semibold">Hospital details & access</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Software admin can edit hospital profile and stop or restore access for the whole hospital.
+            Software admin can edit hospital profile, grant extra seats, extend trial, and stop or restore access.
           </p>
         </div>
         <button
@@ -101,7 +117,12 @@ export function HospitalAdminPanel({
         </label>
         <label className="text-sm font-medium text-slate-700">
           Hospital code
-          <input className={`${fieldClass} bg-slate-50`} value={initial.code} readOnly />
+          <input
+            className={fieldClass}
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            required
+          />
         </label>
         <label className="text-sm font-medium text-slate-700">
           Address
@@ -120,6 +141,27 @@ export function HospitalAdminPanel({
             step="1"
             value={opdFee}
             onChange={(e) => setOpdFee(e.target.value)}
+          />
+        </label>
+        <label className="text-sm font-medium text-slate-700">
+          Extra staff seats
+          <input
+            className={fieldClass}
+            type="number"
+            min={0}
+            max={500}
+            step="1"
+            value={extraStaffSlots}
+            onChange={(e) => setExtraStaffSlots(e.target.value)}
+          />
+        </label>
+        <label className="text-sm font-medium text-slate-700">
+          Trial ends on
+          <input
+            className={fieldClass}
+            type="date"
+            value={trialEndsAt}
+            onChange={(e) => setTrialEndsAt(e.target.value)}
           />
         </label>
         <label className="flex items-center gap-2 self-end text-sm text-slate-700">

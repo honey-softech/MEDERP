@@ -7,7 +7,14 @@ import { canHandleHelpdesk, notifyHelpdeskStatusChange, ticketVisibleWhere } fro
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const STATUSES: HelpdeskTicketStatus[] = ["OPEN", "IN_PROGRESS", "WAITING_REPLY", "RESOLVED", "CLOSED"];
+const STATUSES: HelpdeskTicketStatus[] = [
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_REPLY",
+  "ESCALATED",
+  "RESOLVED",
+  "CLOSED",
+];
 
 export async function GET(request: Request, context: Ctx) {
   const user = await getCurrentUser(request);
@@ -19,10 +26,25 @@ export async function GET(request: Request, context: Ctx) {
   const ticket = await prisma.helpdeskTicket.findFirst({
     where: { id, ...ticketVisibleWhere(user) },
     include: {
-      hospital: { select: { id: true, name: true, code: true } },
-      createdBy: { select: { id: true, username: true, role: true, mobile: true } },
+      createdBy: { select: { id: true, username: true, role: true, mobile: true, isActive: true, isVerified: true } },
       assignedTo: { select: { id: true, username: true } },
+      hospital: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          subscriptionTier: true,
+          trialEndsAt: true,
+          extraStaffSlots: true,
+          includedStaffSlots: true,
+          unlimitedStaffSeats: true,
+        },
+      },
       messages: {
+        where: canHandleHelpdesk(user.role)
+          ? undefined
+          : { kind: { in: ["PUBLIC", "SYSTEM"] } },
         orderBy: { createdAt: "asc" },
         include: { author: { select: { id: true, username: true, role: true } } },
       },
@@ -69,12 +91,37 @@ export async function PATCH(request: Request, context: Ctx) {
     }
   }
 
+  const now = new Date();
+  const statusData: {
+    status?: HelpdeskTicketStatus;
+    assignedToId?: string | null;
+    resolvedAt?: Date | null;
+    closedAt?: Date | null;
+    firstResponseAt?: Date;
+  } = {
+    ...(status ? { status } : {}),
+    ...(assignedToId !== undefined ? { assignedToId } : {}),
+  };
+
+  if (status && status !== ticket.status) {
+    if (status === "RESOLVED") {
+      statusData.resolvedAt = now;
+      statusData.closedAt = null;
+    } else if (status === "CLOSED") {
+      statusData.closedAt = now;
+      statusData.resolvedAt = ticket.resolvedAt ?? now;
+    } else if (ticket.status === "RESOLVED" || ticket.status === "CLOSED") {
+      statusData.resolvedAt = null;
+      statusData.closedAt = null;
+    }
+    if ((status === "IN_PROGRESS" || status === "WAITING_REPLY") && !ticket.firstResponseAt) {
+      statusData.firstResponseAt = now;
+    }
+  }
+
   const updated = await prisma.helpdeskTicket.update({
     where: { id: ticket.id },
-    data: {
-      ...(status ? { status } : {}),
-      ...(assignedToId !== undefined ? { assignedToId } : {}),
-    },
+    data: statusData,
   });
 
   if (status && status !== ticket.status) {

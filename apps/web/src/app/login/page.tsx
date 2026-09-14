@@ -111,6 +111,16 @@ function LoginForm() {
           {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <p className="mt-4 text-center text-sm text-slate-500">
+        Locked out or account deactivated?{" "}
+        <Link className="font-medium text-teal-700 hover:underline" href="/help">
+          Contact support
+        </Link>
+        {" · "}
+        <Link className="font-medium text-teal-700 hover:underline" href="/help/status">
+          Check status
+        </Link>
+      </p>
       <Link href="/register-hospital" className={`${secondaryButtonClass} mt-4 w-full`}>
         Register hospital
       </Link>

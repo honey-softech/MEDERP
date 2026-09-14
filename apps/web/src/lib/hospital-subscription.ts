@@ -7,6 +7,7 @@ import {
   getSubscriptionTier,
   hospitalFieldsFromTier,
   isSubscriptionTierId,
+  normalizeSubscriptionTierId,
   type SubscriptionTierId,
 } from "@/lib/subscription-tiers";
 
@@ -45,9 +46,8 @@ export async function monthlyAmountForHospital(
   if (hospital.subscriptionTier && isSubscriptionTierId(hospital.subscriptionTier)) {
     return pricingFromTier(hospital.subscriptionTier);
   }
-  const fallback: SubscriptionTierId =
-    hospital.pharmacyEnabled || hospital.labEnabled ? "GROWTH" : "CLINIC";
-  return pricingFromTier(fallback);
+  // Legacy PROFESSIONAL/ENTERPRISE (or missing) → nearest current OPD plan
+  return pricingFromTier(normalizeSubscriptionTierId(hospital.subscriptionTier));
 }
 
 export function configuredRazorpayPlanId() {
@@ -343,9 +343,7 @@ export async function applyPendingEntitlements(subscriptionId: string) {
   const fields = tier
     ? hospitalFieldsFromTier(tier)
     : {
-        ...(sub.pendingPharmacyEnabled ? { pharmacyEnabled: true } : {}),
-        ...(sub.pendingLabEnabled ? { labEnabled: true } : {}),
-        ...(sub.pendingInventoryEnabled ? { inventoryEnabled: true } : {}),
+        // Legacy pending module flags ignored — modules deferred
         ...(sub.pendingExtraStaffSlots > 0
           ? { extraStaffSlots: { increment: sub.pendingExtraStaffSlots } }
           : {}),

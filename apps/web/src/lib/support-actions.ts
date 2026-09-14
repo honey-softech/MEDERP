@@ -19,6 +19,7 @@ export {
   supportActionLabel,
   type SupportActionId,
   type SupportActionTier,
+  type SupportTierActionId,
 } from "@/lib/support-action-options";
 
 /** Support-tier fixes: software admin now, helpdesk agents after the team split. */

@@ -14,7 +14,10 @@ export const SUPPORT_ACTIONS = [
 
 export type SupportActionId = (typeof SUPPORT_ACTIONS)[number]["id"];
 
-export const SUPPORT_TIER_ACTION_IDS = new Set(
+/** Runnable helpdesk support actions (admin-tier catalog items are UI-only for now). */
+export type SupportTierActionId = Extract<(typeof SUPPORT_ACTIONS)[number], { tier: "support" }>["id"];
+
+export const SUPPORT_TIER_ACTION_IDS = new Set<string>(
   SUPPORT_ACTIONS.filter((action) => action.tier === "support").map((action) => action.id),
 );
 
@@ -22,6 +25,6 @@ export function supportActionLabel(id: string) {
   return SUPPORT_ACTIONS.find((action) => action.id === id)?.label ?? id;
 }
 
-export function isSupportTierAction(id: string): id is SupportActionId {
-  return SUPPORT_TIER_ACTION_IDS.has(id as SupportActionId);
+export function isSupportTierAction(id: string): id is SupportTierActionId {
+  return SUPPORT_TIER_ACTION_IDS.has(id);
 }

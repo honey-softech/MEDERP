@@ -186,14 +186,14 @@ async function publishDocument(url: string, row: StoredDocument) {
 function readFromDisk(id: string, now: number): StoredDocument | null {
   const paths = pathsFor(id);
   try {
-    const meta = JSON.parse(readFileSync(paths.meta, "utf8")) as StoredMeta;
+    const meta = JSON.parse(readFileSync(/* turbopackIgnore: true */ paths.meta, "utf8")) as StoredMeta;
     if (!meta.expiresAt || meta.expiresAt <= now) {
       unlinkSync(paths.pdf);
       unlinkSync(paths.meta);
       return null;
     }
     const row: StoredDocument = {
-      buffer: readFileSync(paths.pdf),
+      buffer: readFileSync(/* turbopackIgnore: true */ paths.pdf),
       filename: meta.filename,
       mimeType: meta.mimeType,
       expiresAt: meta.expiresAt,

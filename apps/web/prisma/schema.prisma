@@ -639,11 +639,29 @@ model Staff {
   updatedAt              DateTime           @updatedAt
   appointments           Appointment[]      @relation("DoctorAppointments")
   leaves                 StaffLeave[]
+  availabilityWindows    StaffAvailabilityWindow[]
   admittingAdmissions    Admission[]        @relation("AdmittingDoctor")
   attendingAdmissions    Admission[]        @relation("AttendingDoctor")
   medicalCertificates    MedicalCertificate[]
 
   @@unique([hospitalId, email])
+}
+
+/** Recurring weekly windows when a doctor can be booked (multiple per day allowed). */
+model StaffAvailabilityWindow {
+  id          String   @id @default(cuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  /** 0 = Sunday … 6 = Saturday (JS Date.getDay()). */
+  dayOfWeek   Int
+  /** Minutes from midnight [0, 1440). */
+  startMinute Int
+  /** Minutes from midnight (exclusive end); must be > startMinute. */
+  endMinute   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([staffId, dayOfWeek])
 }
 
 model Patient {

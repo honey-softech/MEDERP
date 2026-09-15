@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { AdminDoctorProfileForm } from "@/components/admin-doctor-profile-form";
+import { DoctorAvailabilityEditor } from "@/components/doctor-availability-editor";
 import { HospitalBrandingForm } from "@/components/hospital-branding-form";
 import { SignaturePolicyForm } from "@/components/signature-policy-form";
 import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
@@ -64,6 +65,7 @@ export default async function HospitalSettingsPage() {
   if (!hospital) redirect("/");
 
   const doctorStaff = staff && staff.role === "DOCTOR" ? staff : null;
+  const activeDoctors = doctors.filter((doctor) => doctor.isActive);
 
   return (
     <AppShell title="Hospital settings">
@@ -153,6 +155,29 @@ export default async function HospitalSettingsPage() {
           walkInByNurse: hospital.walkInByNurse,
         }}
       />
+
+      <section className="mt-8 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Doctor availability hours</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Each doctor has their own schedule. Set windows per doctor (multiple per day allowed). Booking
+            shows only the selected doctor&apos;s times.
+          </p>
+        </div>
+        {activeDoctors.length === 0 ? (
+          <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+            No active doctors yet. Add a doctor under Hospital users first.
+          </p>
+        ) : (
+          activeDoctors.map((doctor) => (
+            <DoctorAvailabilityEditor
+              key={doctor.id}
+              doctorId={doctor.id}
+              doctorLabel={`Dr ${doctor.firstName} ${doctor.lastName}`.trim()}
+            />
+          ))
+        )}
+      </section>
     </AppShell>
   );
 }

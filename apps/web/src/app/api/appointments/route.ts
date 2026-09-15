@@ -153,6 +153,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const { assertDoctorBookableAt } = await import("@/lib/doctor-availability");
+  const availability = await assertDoctorBookableAt({
+    hospitalId: scoped.user.hospitalId,
+    doctorId: doctor.id,
+    at: scheduledAt,
+    queueType,
+  });
+  if (!availability.ok) {
+    return NextResponse.json({ error: availability.error }, { status: availability.status });
+  }
+
   const walkIn = queueType === "WALK_IN";
   const shouldCheckIn = walkIn || checkInNow;
   const tokenNumber = await nextToken(scoped.user.hospitalId, doctor.id, scheduledAt);

@@ -2,6 +2,7 @@ import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { FRONT_DESK_ROLES } from "@/lib/authz/hospital";
 import { doctorName, patientName } from "@/lib/display";
 import { doctorIsOnLeave } from "@/lib/opd/scheduling";
+import { assertDoctorBookableAt } from "@/lib/doctor-availability";
 import { prisma } from "@/lib/prisma";
 import type { AppointmentActionContext, AppointmentActionResult } from "@/lib/appointments/types";
 
@@ -25,6 +26,14 @@ export async function rescheduleAppointment(
       error: `${doctorName(appointment.doctor)} is on leave that day. Choose another date.`,
       status: 409,
     };
+  }
+  const availability = await assertDoctorBookableAt({
+    hospitalId: user.hospitalId,
+    doctorId: appointment.doctorId,
+    at: scheduledAt,
+  });
+  if (!availability.ok) {
+    return { ok: false, error: availability.error, status: availability.status };
   }
   const updated = await prisma.appointment.update({
     where: { id: appointment.id },

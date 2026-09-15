@@ -17,6 +17,20 @@ export default async function HospitalsPage() {
     include: {
       _count: { select: { users: true } },
       users: { where: { role: "SUPER_ADMIN" }, select: { username: true, mobile: true } },
+      subscription: {
+        select: {
+          status: true,
+          razorpaySubscriptionId: true,
+          nextChargeAt: true,
+          cancelAtPeriodEnd: true,
+        },
+      },
+      platformInvoices: {
+        where: { status: "PAID", razorpayPaymentId: { not: null } },
+        orderBy: { paidAt: "desc" },
+        take: 1,
+        select: { paidAt: true, netTotal: true, razorpayPaymentId: true },
+      },
     },
   });
 
@@ -31,34 +45,49 @@ export default async function HospitalsPage() {
         </Link>
       </div>
       <FilterableTable
-        minWidthClass="min-w-[52rem]"
+        minWidthClass="min-w-[60rem]"
         empty="No hospitals yet."
-        rows={hospitals.map((hospital) => ({
-          id: hospital.id,
-          name: hospital.name,
-          code: hospital.code,
-          address: hospital.address ?? "—",
-          superAdmin: hospital.users[0]
-            ? `${hospital.users[0].username} · ${hospital.users[0].mobile}`
-            : "—",
-          plan: hospital.subscriptionTier
-            ? `${hospital.subscriptionTier}${hospital.unlimitedStaffSeats ? " · ∞ seats" : ` · ${hospital.includedStaffSlots} seats`}${hospital.pharmacyEnabled ? " · Rx" : ""}${hospital.labEnabled ? " · Lab" : ""}${hospital.inventoryEnabled ? " · Inv" : ""}`
-            : "—",
-          users: String(hospital._count.users),
-          status: hospital.isActive ? "Active" : "Stopped",
-          openHospital: "Manage",
-          hospitalHref: `/platform/hospitals/${hospital.id}`,
-          openUsers: "Users",
-          usersHref: `/platform/users/${hospital.id}`,
-          openLogs: "Logs",
-          logsHref: `/platform/audit-log/${hospital.id}`,
-        }))}
+        rows={hospitals.map((hospital) => {
+          const sub = hospital.subscription;
+          const linked = Boolean(sub && !["CANCELLED", "COMPLETED", "EXPIRED"].includes(sub.status));
+          const lastPaid = hospital.platformInvoices[0];
+          return {
+            id: hospital.id,
+            name: hospital.name,
+            code: hospital.code,
+            address: hospital.address ?? "—",
+            superAdmin: hospital.users[0]
+              ? `${hospital.users[0].username} · ${hospital.users[0].mobile}`
+              : "—",
+            plan: hospital.subscriptionTier
+              ? `${hospital.subscriptionTier}${hospital.unlimitedStaffSeats ? " · ∞ seats" : ` · ${hospital.includedStaffSlots} seats`}${hospital.pharmacyEnabled ? " · Rx" : ""}${hospital.labEnabled ? " · Lab" : ""}${hospital.inventoryEnabled ? " · Inv" : ""}`
+              : "—",
+            billing: linked
+              ? `${sub?.status ?? "Linked"}${sub?.cancelAtPeriodEnd ? " · cancel queued" : ""}`
+              : "Not linked",
+            lastDebit: lastPaid?.paidAt
+              ? lastPaid.paidAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
+              : linked
+                ? "Pending first charge"
+                : "—",
+            users: String(hospital._count.users),
+            status: hospital.isActive ? "Active" : "Stopped",
+            openHospital: "Manage",
+            hospitalHref: `/platform/hospitals/${hospital.id}`,
+            openUsers: "Users",
+            usersHref: `/platform/users/${hospital.id}`,
+            openLogs: "Logs",
+            logsHref: `/platform/audit-log/${hospital.id}`,
+          };
+        })}
         columns={[
           { key: "name", header: "Hospital", className: "font-medium" },
           { key: "code", header: "Code", className: "font-mono text-xs" },
           { key: "address", header: "Address", className: "text-slate-600" },
           { key: "superAdmin", header: "Super admin" },
           { key: "plan", header: "Plan" },
+          { key: "billing", header: "Razorpay" },
+          { key: "lastDebit", header: "Last autodebit" },
           { key: "users", header: "Users" },
           { key: "status", header: "Access" },
           { key: "openHospital", header: "Details", hrefKey: "hospitalHref" },

@@ -32,6 +32,7 @@ export default async function HospitalSubscriptionPage() {
   const quote = await monthlyAmountForHospital(hospital);
   const sub = hospital.subscription;
   const tier = getSubscriptionTier(hospital.subscriptionTier);
+  const hasSubscription = Boolean(sub && !["CANCELLED", "COMPLETED", "EXPIRED"].includes(sub.status));
 
   return (
     <AppShell title="Subscription">
@@ -39,10 +40,20 @@ export default async function HospitalSubscriptionPage() {
         Manage the monthly MedERP plan for {hospital.name} ({hospital.code}). Auto-debit runs every billing cycle until
         you cancel. Plan changes you schedule here apply from the next cycle.
       </p>
-      {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) ? (
+      {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && hasSubscription ? (
         <p className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
-          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Pay here to keep
-          the clinic open after that date.
+          Card linked for auto-debit. Free trial ends{" "}
+          {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}
+          {sub?.nextChargeAt
+            ? ` · first charge ${sub.nextChargeAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}`
+            : ""}
+          . No need to pay again until then.
+        </p>
+      ) : null}
+      {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && !hasSubscription ? (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Link a card below
+          so auto-debit can keep the clinic open after that date.
         </p>
       ) : null}
       {hospitalAccessBlocked(hospital) ? (
@@ -57,7 +68,7 @@ export default async function HospitalSubscriptionPage() {
         currentTierId={tier?.id ?? hospital.subscriptionTier}
         currentTierName={tier?.name ?? hospital.subscriptionTier}
         tiers={publicSubscriptionTiers()}
-        hasSubscription={Boolean(sub && !["CANCELLED", "COMPLETED", "EXPIRED"].includes(sub.status))}
+        hasSubscription={hasSubscription}
         pendingSubscriptionTier={sub?.pendingSubscriptionTier ?? null}
         pendingMonthlyAmount={sub?.pendingMonthlyAmount != null ? Number(sub.pendingMonthlyAmount) : null}
         nextChargeAt={sub?.nextChargeAt?.toISOString() ?? null}

@@ -36,8 +36,8 @@ export async function POST(request: Request) {
       adminEmail: prepared.adminEmail,
       adminPassword: prepared.adminPassword,
       tierId: prepared.tierId,
-      invoiceStatus: "ISSUED",
-      paymentNotes: "1-month free trial — pay before the trial ends to keep using MedERP.",
+      skipInvoice: true,
+      paymentNotes: "1-month free trial — no invoice until first paid charge.",
       termsAccepted: true,
       trialEndsAt: trialEndsAtFromNow(),
       ...doctorProfileFromBody(body),
@@ -56,12 +56,7 @@ export async function POST(request: Request) {
       ok: true,
       trial: true,
       hospital: { id: result.hospital.id, name: result.hospital.name, code: result.hospital.code },
-      invoice: {
-        id: result.invoice.id,
-        invoiceNo: result.invoice.invoiceNo,
-        total: result.quote.total,
-        status: result.invoice.status,
-      },
+      invoice: null,
       redirectTo: homeForRole("SUPER_ADMIN", result.hospital.id),
     });
   } catch (error) {

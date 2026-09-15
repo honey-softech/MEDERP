@@ -120,14 +120,18 @@ export async function POST(request: Request) {
     if (mode === "subscription") {
       const subscription = await razorpay.subscriptions.fetch(razorpaySubscriptionId);
       planId = planId || String(subscription.plan_id ?? "");
-      if (planId) {
-        const plan = await razorpay.plans.fetch(planId);
-        if (Number(plan.item.amount) !== expectedPaise) {
-          return NextResponse.json(
-            { error: "Paid subscription amount does not match the registration package total." },
-            { status: 400 },
-          );
-        }
+      if (!planId) {
+        return NextResponse.json(
+          { error: "Razorpay plan id missing on subscription. Cannot complete registration." },
+          { status: 400 },
+        );
+      }
+      const plan = await razorpay.plans.fetch(planId);
+      if (Number(plan.item.amount) !== expectedPaise) {
+        return NextResponse.json(
+          { error: "Paid subscription amount does not match the registration package total." },
+          { status: 400 },
+        );
       }
       subscriptionCurrentStart = subscription.current_start;
       subscriptionCurrentEnd = subscription.current_end;
@@ -145,10 +149,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Paid amount does not match the package total." }, { status: 400 });
       }
       trialEndsAt = unixToDate(startAtUnix) ?? trialEndsAtFromNow();
+      // First real charge happens at start_at — do not issue a bill for the trial month.
       invoiceStatus = deferredBilling ? "ISSUED" : "PAID";
       paymentNotes = deferredBilling
         ? `Razorpay card authorised · subscription ${razorpaySubscriptionId} · first charge after trial · payment ${razorpayPaymentId}`
         : `Razorpay subscription ${razorpaySubscriptionId} · payment ${razorpayPaymentId}`;
+      // Prefer charge_at, else deferred start_at, for nextChargeAt display.
+      subscriptionChargeAt =
+        typeof subscription.charge_at === "number"
+          ? subscription.charge_at
+          : typeof startAtUnix === "number"
+            ? startAtUnix
+            : subscriptionChargeAt;
     } else {
       if (Number(payment.amount) !== expectedPaise) {
         return NextResponse.json({ error: "Paid amount does not match the package total." }, { status: 400 });
@@ -173,6 +185,7 @@ export async function POST(request: Request) {
       adminPassword: prepared.adminPassword,
       tierId: prepared.tierId,
       invoiceStatus,
+      skipInvoice: mode === "subscription" && deferredBilling,
       paymentMethod: "UPI" as PaymentMethod,
       paymentNotes,
       termsAccepted: true,
@@ -201,12 +214,14 @@ export async function POST(request: Request) {
       mode,
       deferredBilling,
       hospital: { id: result.hospital.id, name: result.hospital.name, code: result.hospital.code },
-      invoice: {
-        id: result.invoice.id,
-        invoiceNo: result.invoice.invoiceNo,
-        total: result.quote.total,
-        status: result.invoice.status,
-      },
+      invoice: result.invoice
+        ? {
+            id: result.invoice.id,
+            invoiceNo: result.invoice.invoiceNo,
+            total: result.quote.total,
+            status: result.invoice.status,
+          }
+        : null,
       payment: {
         razorpaySubscriptionId: mode === "subscription" ? razorpaySubscriptionId : null,
         razorpayOrderId: mode === "order" ? razorpayOrderId : null,

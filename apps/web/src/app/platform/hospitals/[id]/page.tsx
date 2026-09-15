@@ -49,6 +49,7 @@ export default async function HospitalDetailPage({
           },
         },
       },
+      subscription: true,
       platformInvoices: {
         orderBy: { issuedAt: "desc" },
         take: 10,
@@ -60,6 +61,11 @@ export default async function HospitalDetailPage({
 
   const staffUsed = await countHospitalStaffSeats(hospital.id);
   const staffLimit = staffSeatLimit(hospital);
+  const sub = hospital.subscription;
+  const linked = Boolean(sub && !["CANCELLED", "COMPLETED", "EXPIRED"].includes(sub.status));
+  const lastAutodebit = hospital.platformInvoices.find(
+    (inv) => inv.status === "PAID" && inv.razorpayPaymentId,
+  );
 
   return (
     <AppShell title={hospital.name}>
@@ -103,6 +109,46 @@ export default async function HospitalDetailPage({
         </article>
       </section>
 
+      <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="font-semibold">Razorpay billing</h3>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <dt className="text-slate-500">Card / auto-debit</dt>
+            <dd className={`mt-1 font-semibold ${linked ? "text-teal-700" : "text-amber-700"}`}>
+              {linked ? `Linked · ${sub?.status}` : "Not linked"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Subscription id</dt>
+            <dd className="mt-1 font-mono text-xs">{sub?.razorpaySubscriptionId ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Next charge</dt>
+            <dd className="mt-1 font-medium">
+              {sub?.nextChargeAt ? formatDate(sub.nextChargeAt) : hospital.trialEndsAt ? formatDate(hospital.trialEndsAt) : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Last autodebit</dt>
+            <dd className="mt-1 font-medium">
+              {lastAutodebit
+                ? `${inr(Number(lastAutodebit.netTotal))} · ${formatDate(lastAutodebit.paidAt ?? lastAutodebit.issuedAt)}`
+                : linked
+                  ? "Pending first charge (trial)"
+                  : "—"}
+            </dd>
+          </div>
+        </dl>
+        {sub?.cancelAtPeriodEnd ? (
+          <p className="mt-3 text-sm text-amber-800">Hospital scheduled cancel at period end.</p>
+        ) : null}
+        {hospital.trialEndsAt ? (
+          <p className="mt-2 text-sm text-slate-600">
+            Trial ends {formatDate(hospital.trialEndsAt)}.
+          </p>
+        ) : null}
+      </section>
+
       <div className="mb-8">
         <HospitalAdminPanel
           hospitalId={hospital.id}
@@ -129,7 +175,7 @@ export default async function HospitalDetailPage({
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h4 className="font-semibold">Platform invoices</h4>
           {hospital.platformInvoices.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-500">No invoices yet.</p>
+            <p className="mt-2 text-sm text-slate-500">No invoices yet (trial has no bill until first autodebit).</p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
               {hospital.platformInvoices.map((invoice) => (
@@ -141,6 +187,7 @@ export default async function HospitalDetailPage({
                     {invoice.invoiceNo}
                   </Link>
                   <span>{inr(Number(invoice.netTotal))}</span>
+                  <span className="text-slate-500">{invoice.status}</span>
                   <span className="text-slate-500">{formatDate(invoice.issuedAt)}</span>
                 </li>
               ))}

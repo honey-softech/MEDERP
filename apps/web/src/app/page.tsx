@@ -355,12 +355,12 @@ export default async function Home({
           </h3>
           <p className="mt-1 text-sm text-teal-900">
             Your clinic can use the selected plan until{" "}
-            {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Pay from Subscription to
-            keep working after that.
+            {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Link payment on
+            Subscription before then so auto-debit continues after the trial.
           </p>
           {user.role === "SUPER_ADMIN" ? (
             <Link href="/hospital/subscription" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
-              Subscribe now →
+              Open subscription →
             </Link>
           ) : null}
         </section>

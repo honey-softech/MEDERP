@@ -57,6 +57,8 @@ export type RegisterHospitalInput = {
   /** @deprecated use tierId */
   labEnabled?: boolean;
   invoiceStatus?: "PAID" | "ISSUED";
+  /** When true, no PlatformInvoice is created (trial / deferred card-auth). Bills only on real charge. */
+  skipInvoice?: boolean;
   trialEndsAt?: Date | null;
   paymentMethod?: PaymentMethod | null;
   paymentNotes?: string | null;
@@ -268,6 +270,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
   }
 
   const prepared = await prepareHospitalRegistration(input);
+  const skipInvoice = Boolean(input.skipInvoice);
   const invoiceStatus = input.invoiceStatus ?? "ISSUED";
   const tier = prepared.quote.tier;
 
@@ -374,28 +377,37 @@ export async function registerHospital(input: RegisterHospitalInput) {
     }
   }
 
-  const invoice = await createPlatformInvoice({
-    hospitalId: hospital.id,
-    lines: prepared.quote.lines,
-    total: prepared.quote.total,
-    paymentMethod: input.paymentMethod ?? null,
-    notes: input.paymentNotes ?? `Hospital registration — ${hospital.code} — ${tier.name}`,
-    status: invoiceStatus,
-    razorpayPaymentId: input.razorpayPaymentId ?? null,
-    razorpaySubscriptionId: input.razorpaySubscriptionId ?? null,
-  });
+  const invoice = skipInvoice
+    ? null
+    : await createPlatformInvoice({
+        hospitalId: hospital.id,
+        lines: prepared.quote.lines,
+        total: prepared.quote.total,
+        paymentMethod: input.paymentMethod ?? null,
+        notes: input.paymentNotes ?? `Hospital registration — ${hospital.code} — ${tier.name}`,
+        status: invoiceStatus,
+        razorpayPaymentId: input.razorpayPaymentId ?? null,
+        razorpaySubscriptionId: input.razorpaySubscriptionId ?? null,
+      });
 
-  if (input.razorpaySubscriptionId && input.razorpayPlanId) {
+  if (input.razorpaySubscriptionId) {
+    const planId = String(input.razorpayPlanId ?? "").trim();
+    if (!planId) {
+      throw new HospitalRegistrationError(
+        "Razorpay plan id is missing after card link. Cannot save subscription.",
+        400,
+      );
+    }
     await upsertHospitalSubscription({
       hospitalId: hospital.id,
-      razorpayPlanId: input.razorpayPlanId,
+      razorpayPlanId: planId,
       razorpaySubscriptionId: input.razorpaySubscriptionId,
       monthlyAmount: prepared.quote.total,
-      status: input.subscriptionStatus ?? "ACTIVE",
+      status: input.subscriptionStatus ?? "AUTHENTICATED",
       termsAcceptedAt: new Date(),
       currentPeriodStart: unixToDate(input.subscriptionCurrentStart),
       currentPeriodEnd: unixToDate(input.subscriptionCurrentEnd),
-      nextChargeAt: unixToDate(input.subscriptionChargeAt),
+      nextChargeAt: unixToDate(input.subscriptionChargeAt) ?? input.trialEndsAt ?? null,
     });
   }
 
@@ -408,7 +420,9 @@ export async function registerHospital(input: RegisterHospitalInput) {
     action: "HOSPITAL_CREATED",
     entity: "Hospital",
     entityId: hospital.id,
-    summary: `${input.actor.username} registered hospital ${hospital.name} (${hospital.code}); invoice ${invoice.invoiceNo}.`,
+    summary: invoice
+      ? `${input.actor.username} registered hospital ${hospital.name} (${hospital.code}); invoice ${invoice.invoiceNo}.`
+      : `${input.actor.username} registered hospital ${hospital.name} (${hospital.code}); no invoice (trial / deferred billing).`,
     metadata: {
       hospitalCode: hospital.code,
       superAdmin: prepared.adminUsername,
@@ -416,9 +430,9 @@ export async function registerHospital(input: RegisterHospitalInput) {
       pharmacyEnabled: false,
       labEnabled: false,
       inventoryEnabled: false,
-      invoiceNo: invoice.invoiceNo,
+      invoiceNo: invoice?.invoiceNo ?? null,
       total: prepared.quote.total,
-      invoiceStatus,
+      invoiceStatus: skipInvoice ? "SKIPPED" : invoiceStatus,
       razorpaySubscriptionId: input.razorpaySubscriptionId ?? null,
       adminAsDoctor: Boolean(input.adminAsDoctor),
     },

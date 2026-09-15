@@ -88,8 +88,8 @@ RAZORPAY_PLAN_ID_CLINIC="plan_...."
 RAZORPAY_PLAN_ID_STARTER="plan_...."
 RAZORPAY_PLAN_ID_GROWTH="plan_...."
 
-# Optional webhook secret from Razorpay Dashboard → Webhooks
-# RAZORPAY_WEBHOOK_SECRET="...."
+# REQUIRED for autodebit tracking (Razorpay Dashboard → Webhooks → signing secret)
+RAZORPAY_WEBHOOK_SECRET="...."
 
 # WhatsApp / AskEva
 ASKEVA_API_URL="https://backend.askeva.io/v1"
@@ -235,13 +235,18 @@ Startup also ensures this admin exists when the server boots.
 1. Dashboard in **Test Mode** (or Live when you go live — recreate plans + keys).
 2. Keys in `apps/web/.env` match the same mode as the plans.
 3. Three plan amounts = MedERP totals **including 18% GST**.
-4. Webhook (recommended):
+4. Webhook (**required** to record monthly autodebit as PAID invoices):
 
    - URL: `https://mederp.co.in/api/public/razorpay/webhook`
    - Events: `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`
-   - Put signing secret in `RAZORPAY_WEBHOOK_SECRET`
+   - Put signing secret in `RAZORPAY_WEBHOOK_SECRET` on the server, then recreate `web`
+   - Without this, card can be linked but MedERP will not create invoices when Razorpay charges the card
 
-5. Register flow: card auth now → ~₹5 token may authorize and **refund** → first plan debit after 1-month trial.
+5. Register flow: card auth now → ~₹5 token may authorize and **refund** → **no trial invoice** → first plan debit + PAID invoice after 1-month trial (via webhook).
+
+6. Software admin: **Hospital list / detail** shows Razorpay linked status, next charge, and last autodebit.
+
+7. Hospital SUPER_ADMIN: **Subscription** page → **Cancel at period end** stops future auto-debit after the current cycle.
 
 ---
 

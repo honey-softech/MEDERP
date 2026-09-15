@@ -16,6 +16,10 @@ export function hospitalHasActivePaidSubscription(
 ) {
   if (!subscription) return false;
   if (!PAID_STATUSES.has(subscription.status)) return false;
+  // Card linked / first charge pending — Razorpay period end is often unset or stale.
+  if (subscription.status === "AUTHENTICATED" || subscription.status === "PENDING") {
+    return true;
+  }
   if (subscription.currentPeriodEnd && subscription.currentPeriodEnd.getTime() < Date.now()) return false;
   return true;
 }

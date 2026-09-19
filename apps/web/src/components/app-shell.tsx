@@ -1,5 +1,6 @@
 import { AppShellFrame, type NavSection } from "@/components/app-shell-frame";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
+import { isNurseReceptionist } from "@/lib/authz/hospital";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { hospitalAccessBlocked, isExpiredTrialAllowedPath } from "@/lib/hospital-access";
 import { resolveViewContext } from "@/lib/view-mode";
@@ -76,6 +77,37 @@ const nurseNav: NavSection[] = [
       { href: "/patients", label: "Patients" },
       { href: "/appointments", label: "Appointments" },
       { href: "/queue", label: "OPD queue" },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { href: "/leave", label: "Leave" },
+      { href: "/helpdesk", label: "Helpdesk" },
+    ],
+  },
+];
+
+const nurseReceptionistNav: NavSection[] = [
+  {
+    items: [
+      { href: "/", label: "Dashboard" },
+      { href: "/nurse", label: "Nurse station" },
+      { href: "/staff", label: "Staff" },
+      { href: "/patients", label: "Patients" },
+      { href: "/appointments", label: "Appointments" },
+      { href: "/queue", label: "OPD queue" },
+      { href: "/wards", label: "Wards" },
+    ],
+  },
+  {
+    title: "Billing",
+    items: [
+      { href: "/billing", label: "Billing" },
+      { href: "/billing/collections", label: "Collections" },
+      { href: "/billing/reports", label: "Reports" },
+      { href: "/billing/lab", label: "Lab collections" },
+      { href: "/pharmacy/prescriptions", label: "Pharmacy bills" },
     ],
   },
   {
@@ -376,7 +408,9 @@ export async function AppShell({
                 : user?.role === "ACCOUNTANT"
                   ? accountantNav
                   : user?.role === "NURSE"
-                    ? nurseNav
+                    ? isNurseReceptionist(user)
+                      ? nurseReceptionistNav
+                      : nurseNav
                     : user?.role === "LAB_TECH"
                       ? labTechNav
                       : user?.role === "PHARMACIST"

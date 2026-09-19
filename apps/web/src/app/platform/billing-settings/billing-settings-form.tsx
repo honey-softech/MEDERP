@@ -115,7 +115,10 @@ export function PlatformBillingSettingsForm() {
     <form onSubmit={onSubmit} className="grid max-w-4xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:grid-cols-2">
       <h3 className="md:col-span-2 font-semibold">Company billing details</h3>
       <p className="md:col-span-2 text-sm text-slate-600">
-        These details appear on platform invoices issued to hospitals. Online payment and auto-renew will use this later.
+        These company details are printed on every subscription invoice PDF. On each successful monthly
+        renewal, MedERP WhatsApps that bill to the hospital SUPER_ADMIN number (including when the
+        admin also works as a doctor). Company phone here is seller contact on the invoice — not the
+        WhatsApp recipient.
       </p>
       {field("companyName", "Company name")}
       {field("invoicePrefix", "Invoice prefix")}

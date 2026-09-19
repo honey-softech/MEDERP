@@ -128,6 +128,26 @@ export function billReceiptComponents(params: {
   ];
 }
 
+export function subscriptionBillComponents(params: {
+  vars: Record<string, string>;
+  documentMediaId?: string;
+  documentFilename?: string;
+}): WhatsAppComponent[] | { error: string } {
+  if (!params.documentMediaId) {
+    return { error: "Subscription bill PDF media id is missing." };
+  }
+  return [
+    documentHeader(params.documentMediaId, params.documentFilename || "subscription-bill.pdf"),
+    namedBody([
+      { name: "admin_name", value: params.vars.admin },
+      { name: "hospital_name", value: params.vars.hospital },
+      { name: "invoice_no", value: params.vars.invoiceNo },
+      { name: "total_amount", value: params.vars.total },
+      { name: "billing_period", value: params.vars.period },
+    ]),
+  ];
+}
+
 export const META_PATIENT_TEMPLATES = {
   otp: {
     category: "UTILITY" as const,
@@ -149,5 +169,9 @@ export const META_PATIENT_TEMPLATES = {
   visit_summary: {
     category: "UTILITY" as const,
     defaultName: "visit_summary_",
+  },
+  subscription_bill: {
+    category: "UTILITY" as const,
+    defaultName: "subscription_bill",
   },
 };

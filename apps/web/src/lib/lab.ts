@@ -2,7 +2,7 @@ import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front-desk";
 import { ALL_LAB_CATALOG, investigationLineName, type InvestigationPick } from "@/lib/lab-catalog";
-import { notifyHospitalRole, notifyUser } from "@/lib/notifications";
+import { notifyFrontDesk, notifyHospitalRole, notifyUser } from "@/lib/notifications";
 import { activeSignatureFor } from "@/lib/signatures";
 
 export const LAB_WORK_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH"];
@@ -182,9 +182,8 @@ export async function upsertVisitLabOrder(params: {
 
   if (inHouseLab) {
     const body = `${params.orderedByUsername} ordered ${selected.length} ${label}. Collect payment, then laboratory is notified.`;
-    await notifyHospitalRole({
+    await notifyFrontDesk({
       hospitalId: params.hospitalId,
-      role: "RECEPTIONIST",
       appointmentId: params.appointmentId,
       href: `/billing/lab/${order.id}`,
       title: "Lab tests to collect",
@@ -200,9 +199,8 @@ export async function upsertVisitLabOrder(params: {
     });
   } else {
     const body = `${params.orderedByUsername} recommended ${selected.length} ${label} to be done outside. Share the list with the patient (WhatsApp/SMS later). Attach the report when they bring it.`;
-    await notifyHospitalRole({
+    await notifyFrontDesk({
       hospitalId: params.hospitalId,
-      role: "RECEPTIONIST",
       appointmentId: params.appointmentId,
       href: `/appointments/${params.appointmentId}`,
       title: "Outside tests / scans recommended",

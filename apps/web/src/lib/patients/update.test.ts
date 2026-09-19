@@ -22,6 +22,18 @@ describe("patient update payload", () => {
     expect(result.data).not.toHaveProperty("hospitalId");
   });
 
+  it("lets front desk replace a Baby of name with the given name", () => {
+    const result = buildPatientUpdatePayload({
+      isFrontDesk: true,
+      existing: { firstName: "Baby of Ramesh Kumar", lastName: "" },
+      body: { firstName: "Aarav", lastName: "Kumar" },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.firstName).toBe("Aarav");
+    expect(result.data.lastName).toBe("Kumar");
+  });
+
   it("lets front desk clear an optional last name", () => {
     const result = buildPatientUpdatePayload({
       isFrontDesk: true,

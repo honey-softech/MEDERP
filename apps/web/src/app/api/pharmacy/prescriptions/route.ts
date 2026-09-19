@@ -5,7 +5,7 @@ import { listPendingPharmacyRx, PHARMACY_BILLING_ROLES } from "@/lib/pharmacy-rx
 export async function GET() {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, PHARMACY_BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, PHARMACY_BILLING_ROLES);
   if (denied) return denied;
 
   const orders = await listPendingPharmacyRx(scoped.user.hospitalId);

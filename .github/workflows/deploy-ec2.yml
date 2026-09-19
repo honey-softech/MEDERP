@@ -63,6 +63,7 @@ jobs:
             ensure_env WHATSAPP_INVESTIGATION_TEMPLATE "investigation_list"
             ensure_env WHATSAPP_VISIT_SUMMARY_TEMPLATE "visit_summary_"
             ensure_env WHATSAPP_BILL_RECEIPT_TEMPLATE "billpreceipt"
+            ensure_env WHATSAPP_SUBSCRIPTION_BILL_TEMPLATE "subscription_bill"
             if [ -n "$PUBLIC_API_URL" ]; then
               ensure_env WHATSAPP_MEDIA_BASE_URL "$PUBLIC_API_URL"
             fi

@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, BILLING_ROLES);
   if (denied) return denied;
 
   const parsed = await parseJsonBody(request, sendInvoiceSchema);

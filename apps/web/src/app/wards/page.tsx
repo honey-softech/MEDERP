@@ -8,6 +8,7 @@ import {
   inr,
   patientName,
   prettyEnum,
+  hasRoleAccess,
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { bedStatusClass, statusBadgeBase } from "@/lib/ui";
@@ -58,7 +59,7 @@ export default async function WardsPage() {
   const housekeeping = beds.filter((bed) => bed.status === "HOUSEKEEPING").length;
   const inHouse = beds.reduce((sum, bed) => sum + bed.admissions.length, 0);
 
-  const canAdmit = WARD_ADMIT_ROLES.includes(user.role);
+  const canAdmit = hasRoleAccess(user, WARD_ADMIT_ROLES);
   const canHousekeep = WARD_HOUSEKEEPING_ROLES.includes(user.role);
   const canSetup = WARD_MASTER_ROLES.includes(user.role);
 

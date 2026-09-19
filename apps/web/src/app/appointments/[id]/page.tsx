@@ -14,11 +14,9 @@ import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell"
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
 import {
-  BILLING_ROLES,
   CLINICAL_VIEW_ROLES,
   DOCTOR_VISIT_ROLES,
   EXTERNAL_REPORT_UPLOAD_ROLES,
-  FRONT_DESK_ROLES,
   LAB_REPORT_VIEW_ROLES,
   LAB_VIEW_ROLES,
   LAB_WORK_ROLES,
@@ -28,6 +26,9 @@ import {
   canNurseRecordVitals,
   dayRange,
   doctorName,
+  hasBillingAccess,
+  hasFrontDeskAccess,
+  hasRoleAccess,
   patientName,
   prettyEnum,
   requireHospitalPage,
@@ -148,12 +149,12 @@ export default async function AppointmentDetailPage({
   const previousId = queueIndex > 0 ? dayQueue[queueIndex - 1]?.id ?? null : null;
   const nextId = queueIndex >= 0 && queueIndex < dayQueue.length - 1 ? dayQueue[queueIndex + 1]?.id ?? null : null;
 
-  const canManage = FRONT_DESK_ROLES.includes(user.role);
+  const canManage = hasFrontDeskAccess(user);
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
   const canDoctorVisit = user.role === "DOCTOR" || user.role === "SUPER_ADMIN";
   const canAssess = DOCTOR_VISIT_ROLES.includes(user.role);
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
-  const canCollectLab = BILLING_ROLES.includes(user.role);
+  const canCollectLab = hasBillingAccess(user);
   const canWorkLab = LAB_WORK_ROLES.includes(user.role);
   const canViewLab = LAB_VIEW_ROLES.includes(user.role);
   const canViewLabReport = LAB_REPORT_VIEW_ROLES.includes(user.role);
@@ -257,7 +258,7 @@ export default async function AppointmentDetailPage({
               Certificate
             </Link>
           ) : null}
-          {WARD_ADMIT_ROLES.includes(user.role) && !activeStay ? (
+          {hasRoleAccess(user, WARD_ADMIT_ROLES) && !activeStay ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -316,7 +317,7 @@ export default async function AppointmentDetailPage({
               Certificate
             </Link>
           ) : null}
-          {WARD_ADMIT_ROLES.includes(user.role) && !activeStay ? (
+          {hasRoleAccess(user, WARD_ADMIT_ROLES) && !activeStay ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}

@@ -48,7 +48,12 @@ export async function PATCH(request: Request) {
     if ("walkInByNurse" in body) data.walkInByNurse = Boolean(body.walkInByNurse);
   }
 
-  if (!brandingSent && !policySent && !walkInSent) {
+  const nurseReceptionSent = body != null && "nurseAsReceptionist" in body;
+  if (nurseReceptionSent) {
+    data.nurseAsReceptionist = Boolean(body.nurseAsReceptionist);
+  }
+
+  if (!brandingSent && !policySent && !walkInSent && !nurseReceptionSent) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -75,11 +80,14 @@ export async function PATCH(request: Request) {
         "requireSignatureForApproval",
         "walkInByDoctor",
         "walkInByNurse",
+        "nurseAsReceptionist",
       ],
     },
   );
 
-  const action = walkInSent && !brandingSent && !policySent
+  const action = nurseReceptionSent && !brandingSent && !policySent && !walkInSent
+    ? "HOSPITAL_NURSE_RECEPTIONIST_POLICY_UPDATED"
+    : walkInSent && !brandingSent && !policySent
     ? "HOSPITAL_WALK_IN_POLICY_UPDATED"
     : policySent && !brandingSent
       ? "HOSPITAL_SIGNATURE_POLICY_UPDATED"
@@ -94,7 +102,9 @@ export async function PATCH(request: Request) {
     action,
     entity: "Hospital",
     entityId: hospital.id,
-    summary: walkInSent && !brandingSent && !policySent
+    summary: nurseReceptionSent && !brandingSent && !policySent && !walkInSent
+      ? `${scoped.user.username} ${data.nurseAsReceptionist ? "let nurses cover receptionist work." : "stopped nurses covering receptionist work."}`
+      : walkInSent && !brandingSent && !policySent
       ? `${scoped.user.username} updated who can add walk-ins.`
       : policySent && !brandingSent
         ? `${scoped.user.username} ${data.requireSignatureForApproval ? "required" : "stopped requiring"} signatures for visit summary approval.`

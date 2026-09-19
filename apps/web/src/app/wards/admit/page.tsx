@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AdmitForm } from "@/components/admit-form";
 import { WardCapacityCards } from "@/components/ward-capacity-cards";
-import { doctorName, listBookableDoctors } from "@/lib/front-desk";
+import { doctorName, hasRoleAccess, listBookableDoctors } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { WARD_ADMIT_ROLES, listWardCapacity, requireWardsPage, seedHospitalWards } from "@/lib/wards";
 
@@ -12,7 +12,7 @@ export default async function AdmitPage({
   searchParams: Promise<{ patientId?: string; bedId?: string; appointmentId?: string }>;
 }) {
   const user = await requireWardsPage();
-  if (!WARD_ADMIT_ROLES.includes(user.role)) redirect("/wards");
+  if (!hasRoleAccess(user, WARD_ADMIT_ROLES)) redirect("/wards");
   await seedHospitalWards(user.hospitalId);
 
   const { patientId, bedId, appointmentId } = await searchParams;

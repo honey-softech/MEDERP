@@ -10,7 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PatientVisitHistory } from "@/components/patient-visit-history";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
-import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, FRONT_DESK_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageYears, inr, patientName, prettyEnum } from "@/lib/front-desk";
+import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageLabel, hasFrontDeskAccess, hasRoleAccess, inr, patientName, prettyEnum } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 
@@ -77,9 +77,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       })
     : [patient];
 
-  const canEdit = FRONT_DESK_ROLES.includes(user.role) && !patient.mergedIntoId;
+  const canEdit = hasFrontDeskAccess(user) && !patient.mergedIntoId;
   const canWalkIn = canAddWalkIn(user) && !patient.mergedIntoId;
-  const canAdmit = WARD_ADMIT_ROLES.includes(user.role) && !patient.mergedIntoId;
+  const canAdmit = hasRoleAccess(user, WARD_ADMIT_ROLES) && !patient.mergedIntoId;
   const activeStay = patient.admissions[0];
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
   const canIssueCertificate = DOCTOR_VISIT_ROLES.includes(user.role) && !patient.mergedIntoId;
@@ -103,7 +103,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           <span className="rounded-full bg-teal-50 px-3 py-1 text-xs text-teal-800">{patient.familyGroupCode}</span>
         ) : null}
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
-          {prettyEnum(patient.gender)} · {ageYears(patient.dateOfBirth)} yrs
+          {prettyEnum(patient.gender)} · {ageLabel(patient.dateOfBirth)}
         </span>
         <span className="rounded-full bg-teal-50 px-3 py-1 text-xs text-teal-800">
           Advance {inr(patient.advanceBalance)}
@@ -194,6 +194,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             <PatientForm
               submitLabel="Add family member"
               familyOfPatientId={patient.id}
+              familyHeadName={patientName(patient)}
               familyRelationDefault="CHILD"
               initial={{
                 firstName: "",

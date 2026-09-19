@@ -5,12 +5,12 @@ import { AppointmentActions } from "@/components/appointment-actions";
 import { LeaveForm } from "@/components/leave-form";
 import { compactButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import {
-  FRONT_DESK_ROLES,
   canAddWalkIn,
   canRegisterPatient,
   addCalendarDays,
   dayRange,
   doctorName,
+  hasFrontDeskAccess,
   listBookableDoctors,
   localDayKey,
   patientName,
@@ -124,7 +124,7 @@ export default async function AppointmentsPage({
     }),
   ]);
 
-  const canManage = FRONT_DESK_ROLES.includes(user.role);
+  const canManage = hasFrontDeskAccess(user);
   const filterBase = {
     doctorId: params.doctorId,
     departmentId: params.departmentId,

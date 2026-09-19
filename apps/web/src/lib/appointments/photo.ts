@@ -1,5 +1,5 @@
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { FRONT_DESK_ROLES } from "@/lib/authz/hospital";
+import { hasFrontDeskAccess } from "@/lib/authz/hospital";
 import { patientName } from "@/lib/display";
 import { sanitizePhotoData } from "@/lib/opd/patients";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +9,7 @@ export async function captureVisitPhoto(
   ctx: AppointmentActionContext,
 ): Promise<AppointmentActionResult> {
   const { request, user, appointment, body } = ctx;
-  if (!FRONT_DESK_ROLES.includes(user.role)) {
+  if (!hasFrontDeskAccess(user)) {
     return { ok: false, error: "You do not have access to this action.", status: 403 };
   }
   const photoData = sanitizePhotoData(body?.photoData);

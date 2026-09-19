@@ -12,10 +12,10 @@ import { OpdDayNav } from "@/components/opd-day-nav";
 import {
   CLINICAL_VIEW_ROLES,
   DOCTOR_VISIT_ROLES,
-  FRONT_DESK_ROLES,
   NURSE_VITALS_ROLES,
   PRINT_SUMMARY_ROLES,
   canAddWalkIn,
+  hasFrontDeskAccess,
   dayRange,
   doctorName,
   groupByDoctor,
@@ -94,7 +94,7 @@ export default async function QueuePage({
             lastToken: 0,
           }));
   const doctorQueues = isToday ? [...grouped, ...emptyDoctors] : grouped;
-  const canManage = FRONT_DESK_ROLES.includes(user.role);
+  const canManage = hasFrontDeskAccess(user);
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
   const canDoctorVisit = DOCTOR_VISIT_ROLES.includes(user.role);
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);

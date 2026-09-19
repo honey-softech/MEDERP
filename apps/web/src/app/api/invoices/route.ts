@@ -10,7 +10,7 @@ import { parseJsonBody } from "@/lib/validation/parse";
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, BILLING_ROLES);
   if (denied) return denied;
 
   const { searchParams } = new URL(request.url);
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, BILLING_ROLES);
   if (denied) return denied;
 
   const parsed = await parseJsonBody(request, createInvoiceSchema);

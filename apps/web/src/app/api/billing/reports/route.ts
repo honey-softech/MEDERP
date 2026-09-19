@@ -5,7 +5,7 @@ import { csvEscape, loadBillingReport, monthRange, parseYearMonth } from "@/lib/
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, BILLING_ROLES);
   if (denied) return denied;
 
   const url = new URL(request.url);

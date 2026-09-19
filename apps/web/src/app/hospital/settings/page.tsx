@@ -4,6 +4,7 @@ import { DoctorAvailabilityEditor } from "@/components/doctor-availability-edito
 import { HospitalBrandingForm } from "@/components/hospital-branding-form";
 import { SignaturePolicyForm } from "@/components/signature-policy-form";
 import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
+import { NurseReceptionistForm } from "@/components/nurse-receptionist-form";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { countStaffWithoutSignature } from "@/lib/signatures";
 import { prisma } from "@/lib/prisma";
@@ -37,6 +38,7 @@ export default async function HospitalSettingsPage() {
         requireSignatureForApproval: true,
         walkInByDoctor: true,
         walkInByNurse: true,
+        nurseAsReceptionist: true,
       },
     }),
     countStaffWithoutSignature(user.hospitalId),
@@ -70,8 +72,8 @@ export default async function HospitalSettingsPage() {
   return (
     <AppShell title="Hospital settings">
       <p className="mb-4 text-sm text-slate-500">
-        Branding, admin-as-doctor, document policy, and who can add walk-ins. Changes are recorded in the
-        audit log.
+        Branding, admin-as-doctor, document policy, nurses as receptionists, and who can add walk-ins. Changes are
+        recorded in the audit log.
       </p>
       <div className="mb-6">
         <AdminDoctorProfileForm
@@ -149,10 +151,12 @@ export default async function HospitalSettingsPage() {
         initial={{ requireSignatureForApproval: hospital.requireSignatureForApproval }}
         coverage={coverage}
       />
+      <NurseReceptionistForm initial={{ nurseAsReceptionist: hospital.nurseAsReceptionist }} />
       <WalkInPolicyForm
         initial={{
           walkInByDoctor: hospital.walkInByDoctor,
           walkInByNurse: hospital.walkInByNurse,
+          nurseAsReceptionist: hospital.nurseAsReceptionist,
         }}
       />
 

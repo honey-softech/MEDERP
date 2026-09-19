@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PharmacyRxCollectForm } from "@/components/pharmacy-rx-collect-form";
 import { secondaryButtonClass } from "@/components/auth-shell";
-import { doctorName, inr, patientName, requireHospitalPage } from "@/lib/front-desk";
+import { doctorName, hasRoleAccess, inr, patientName, requireHospitalPage } from "@/lib/front-desk";
 import { getPharmacyRxForAppointment, PHARMACY_BILLING_ROLES } from "@/lib/pharmacy-rx";
 import { prisma } from "@/lib/prisma";
 
@@ -11,7 +11,7 @@ type Props = { params: Promise<{ appointmentId: string }> };
 
 export default async function PharmacyPrescriptionDetailPage({ params }: Props) {
   const user = await requireHospitalPage();
-  if (!PHARMACY_BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasRoleAccess(user, PHARMACY_BILLING_ROLES)) redirect("/");
 
   const { appointmentId } = await params;
   const appointment = await prisma.appointment.findFirst({

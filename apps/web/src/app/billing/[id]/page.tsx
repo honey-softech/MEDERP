@@ -8,10 +8,10 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { SignatureBlock } from "@/components/signature-block";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
-  BILLING_ROLES,
-  FRONT_DESK_ROLES,
   WAIVER_APPROVER_ROLES,
   doctorName,
+  hasBillingAccess,
+  hasFrontDeskAccess,
   inr,
   patientName,
   prettyEnum,
@@ -23,7 +23,7 @@ import { redirect } from "next/navigation";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireHospitalPage();
-  if (!BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasBillingAccess(user)) redirect("/");
   const id = await routeParam(params, "id");
   const invoice = await prisma.invoice.findFirst({
     where: { id, hospitalId: user.hospitalId },
@@ -169,7 +169,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           due={due}
           paid={Number(invoice.paidAmount)}
           canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-          canRequestWaiver={FRONT_DESK_ROLES.includes(user.role)}
+          canRequestWaiver={hasFrontDeskAccess(user)}
           waiverStatus={invoice.waiverStatus}
           fullPaymentRequired={Boolean(invoice.appointmentId)}
         />

@@ -9,7 +9,7 @@ const METHODS: PaymentMethod[] = ["CASH", "CARD", "UPI", "INSURANCE"];
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, BILLING_ROLES);
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);

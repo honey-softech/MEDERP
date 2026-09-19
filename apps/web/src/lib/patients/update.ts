@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { DOCTOR_VISIT_ROLES, FRONT_DESK_ROLES, type HospitalActor } from "@/lib/authz/hospital";
+import { DOCTOR_VISIT_ROLES, hasFrontDeskAccess, type HospitalActor } from "@/lib/authz/hospital";
 import { sanitizePhotoData } from "@/lib/opd/patients";
 import type { PatientActionResult } from "@/lib/patients/types";
 import { prisma } from "@/lib/prisma";
@@ -88,7 +88,7 @@ export async function updatePatient(params: {
   patientId: string;
   body: Record<string, unknown>;
 }): Promise<PatientActionResult> {
-  const isFrontDesk = FRONT_DESK_ROLES.includes(params.user.role);
+  const isFrontDesk = hasFrontDeskAccess(params.user);
   const isClinician = DOCTOR_VISIT_ROLES.includes(params.user.role);
   if (!isFrontDesk && !isClinician) {
     return { ok: false, error: "You do not have access to this action.", status: 403 };

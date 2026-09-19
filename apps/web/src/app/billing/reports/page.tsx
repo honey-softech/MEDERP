@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
 import { secondaryButtonClass } from "@/components/auth-shell";
-import { BILLING_ROLES, inr, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { hasBillingAccess, inr, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { loadBillingReport, monthRange, parseYearMonth, yearMonthKey } from "@/lib/billing-reports";
 import { redirect } from "next/navigation";
 
@@ -12,7 +12,7 @@ export default async function BillingReportsPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const user = await requireHospitalPage();
-  if (!BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasBillingAccess(user)) redirect("/");
   const { month } = await searchParams;
   const selected = parseYearMonth(month);
   const { start, end } = monthRange(selected);

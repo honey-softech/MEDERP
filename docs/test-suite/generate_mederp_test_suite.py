@@ -46,23 +46,23 @@ SUITES = [
     ("TS-01", "Hospital Registration", "Self-registration, free trial, Razorpay paid signup, hospital code, T&C", 22, "P0"),
     ("TS-02", "Authentication & Session", "Login, OTP, forgot/reset password, logout, rate limits, session", 30, "P0"),
     ("TS-03", "Staff Signup & Join Request", "Signup → OTP → login → join → approve/reject/cancel", 18, "P0"),
-    ("TS-04", "Subscription & Tiers", "Tiers, seats, module gating, trial expiry, tier change, webhooks", 20, "P0"),
-    ("TS-05", "Platform Admin Console", "Hospital CRUD, stop access, platform users, invoices, billing settings", 24, "P1"),
-    ("TS-06", "Hospital User Management", "Create/edit staff, codes, seats, deactivate, signatures, merge", 34, "P0"),
-    ("TS-07", "Hospital Settings", "Branding, OPD fee, policies, admin-as-doctor, doctor availability (Everyday/Weekdays/Weekend)", 26, "P1"),
-    ("TS-08", "Staff Leave", "Apply/approve/reject/cancel, overlap, doctor availability impact", 20, "P1"),
-    ("TS-09", "Patient Management", "Register, UHID, duplicates, family, merge, search, edit permissions", 38, "P0"),
-    ("TS-10", "Appointments & Queue", "Booking, walk-in, token, status machine, reschedule, doctor availability slots", 52, "P0"),
+    ("TS-04", "Subscription & Tiers", "Tiers, seats, module gating, trial expiry, tier change, webhooks, monthly subscription bill WhatsApp to SUPER_ADMIN", 23, "P0"),
+    ("TS-05", "Platform Admin Console", "Hospital CRUD, stop access, platform users, invoices, billing settings on every subscription bill", 25, "P1"),
+    ("TS-06", "Hospital User Management", "Create/edit staff, codes, seats, deactivate, signatures, merge; Receptionist + Nurse both remain available", 36, "P0"),
+    ("TS-07", "Hospital Settings", "Branding, OPD fee, walk-in policy, nurses as receptionists, admin-as-doctor, doctor availability", 34, "P1"),
+    ("TS-08", "Staff Leave", "Apply/approve/reject/cancel, overlap, doctor availability impact; nurse record-leave when opted in", 22, "P1"),
+    ("TS-09", "Patient Management", "Register, UHID, unnamed infant Baby of parent, duplicates, family, merge, search, edit permissions; nurse-as-receptionist register/edit", 44, "P0"),
+    ("TS-10", "Appointments & Queue", "Booking, walk-in, token, status machine, reschedule, doctor availability slots; nurse front desk when opted in", 56, "P0"),
     ("TS-11", "Vitals & Nurse Station", "Vital fields, ranges, BMI, fever flag, same-day lock", 26, "P0"),
     ("TS-12", "Doctor Visit & Assessment", "Draft/approve, signature gate, Rx, medicine suggest, summary PDF/send", 32, "P0"),
     ("TS-13", "Medical Certificates", "Sick leave / fitness / general, issue, void ownership, send", 20, "P1"),
-    ("TS-14", "Invoices & OPD Collection", "Invoice numbering, line math, OPD collect, card brand", 28, "P0"),
+    ("TS-14", "Invoices & OPD Collection", "Invoice numbering, line math, OPD collect, card brand; nurse billing when opted in", 30, "P0"),
     ("TS-15", "Discounts, Waivers, Advances, Refunds", "Discount caps, waiver flow, advance apply, refunds", 30, "P0"),
-    ("TS-16", "Billing Reports & Receipts", "Daily collections, monthly report, CSV, outstanding, WhatsApp receipt", 22, "P1"),
+    ("TS-16", "Billing Reports & Receipts", "Daily collections, monthly report, CSV, outstanding, WhatsApp receipt; nurse reports when opted in", 23, "P1"),
     ("TS-17", "Helpdesk", "Ticket lifecycle, escalation, SLA, visibility, support actions", 26, "P1"),
     ("TS-18", "Board & Notifications", "Post/reply/pin/delete, in-app notifications, templates", 18, "P2"),
     ("TS-19", "Audit Log", "Audited actions, record shape, redaction, viewer access", 14, "P2"),
-    ("TS-20", "RBAC & Tenant Isolation", "Role × module negative matrix, cross-hospital access attempts", 30, "P0"),
+    ("TS-20", "RBAC & Tenant Isolation", "Role × module negative matrix, cross-hospital access attempts, nurse-as-receptionist matrix", 32, "P0"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -939,8 +939,9 @@ def build_testdata(wb: Workbook):
         ("U-HD", "Platform", "HELPDESK", "helpdesk01", "9999990001", "Helpdesk@1", "hd@mederp.test", "Create in TS-05 / platform helpdesk-team"),
         ("U-H1-SUPER", "H1", "SUPER_ADMIN", "apexadmin", "9876500002", "ApexAdmin@1", "admin@apexcare.test", "Created by TS-01-012"),
         ("U-H1-DOC", "H1", "DOCTOR", "(auto)", "9876500011", "Doctor@123", "doc@apexcare.test", "Create in TS-06"),
-        ("U-H1-NUR", "H1", "NURSE", "(auto)", "9876500012", "Nurse@123", "nurse@apexcare.test", "Create in TS-06"),
-        ("U-H1-REC", "H1", "RECEPTIONIST", "(auto)", "9876500013", "Recep@123", "rec@apexcare.test", "Create in TS-06"),
+        ("U-H1-NUR", "H1", "NURSE", "(auto)", "9876500012", "Nurse@123", "nurse@apexcare.test", "Create in TS-06. Front desk only if nurseAsReceptionist ON"),
+        ("U-H1-NUR2", "H1", "NURSE", "(auto)", "9876500016", "Nurse2@123", "nurse2@apexcare.test", "Second nurse — TS-07/TS-09 multiple-nurse receptionist"),
+        ("U-H1-REC", "H1", "RECEPTIONIST", "(auto)", "9876500013", "Recep@123", "rec@apexcare.test", "Create in TS-06. Dedicated receptionist remains available with or without the nurse toggle"),
         ("U-H1-ACC", "H1", "ACCOUNTANT", "(auto)", "9876500014", "Account@123", "acc@apexcare.test", "Create in TS-06"),
         ("U-H4-SUPER", "H4", "SUPER_ADMIN", "tenantbadmin", "9876502002", "TenantB@123", "admin@tenantb.test", "Second tenant — TS-20"),
     ]
@@ -990,6 +991,7 @@ def build_testdata(wb: Workbook):
         ("Valid Indian mobile", "10 digits, starts 6–9", "normalize strips 91 / leading 0"),
         ("Valid username", "≥3 chars [a-zA-Z0-9._]", "Staff signup only — hospital register uses display name"),
         ("Card brands (OPD collect)", "Visa / Mastercard / RuPay / Amex / Other", "Required when method=CARD"),
+        ("nurseAsReceptionist", "false (default)", "Hospital settings. Off: nurses stay clinical-only. On: every nurse gets receptionist front desk (register, queue, billing). Dedicated RECEPTIONIST still allowed."),
     ]
     c_headers = ["Name", "Value", "Notes"]
     for c, h in enumerate(c_headers, 1):
@@ -1024,6 +1026,7 @@ def build_env(wb: Workbook):
         ("RAZORPAY_KEY_ID / SECRET", "Required for TS-01 paid path & TS-04", "", ""),
         ("RAZORPAY_WEBHOOK_SECRET", "Required for webhook cases in TS-04", "", ""),
         ("WhatsApp / ASKEVA token", "Optional; without it messaging is console/dummy", "", ""),
+        ("WHATSAPP_SUBSCRIPTION_BILL_TEMPLATE", "subscription_bill — UTILITY + Document header; sent to hospital SUPER_ADMIN on Razorpay renewal", "", ""),
         ("Browser", "Chrome latest + one mobile viewport check", "", ""),
         ("Roles available in env", "SOFTWARE_ADMIN exists (9999999999) or create", "", ""),
         ("Out of scope modules", "Do NOT execute Lab / Pharmacy / Ward scenarios", "", ""),
@@ -1058,6 +1061,7 @@ def build_watchlist(wb: Workbook):
         ("W-08", "Auth", "/forgot-password/reset is NOT in middleware public paths — may require session unexpectedly.", "TS-02", ""),
         ("W-09", "Patients", "Patient phone is NOT validated as Indian mobile on register (unlike login/users).", "TS-09", ""),
         ("W-10", "Fees", "followUpFee=0 does not make follow-up free — falls through to full consultation fee (min ₹500).", "TS-10/TS-14", ""),
+        ("W-11", "RBAC", "Nurses as receptionists is hospital-wide (all nurses), not per-nurse. Dedicated RECEPTIONIST role is still available.", "TS-07/TS-20", ""),
     ]
     for i, row in enumerate(items):
         for c, v in enumerate(row, 1):
@@ -1085,7 +1089,7 @@ def build_traceability(wb: Workbook):
         ("Subscription", "/subscribe, /hospital/subscription", "/api/hospital/subscription*, /api/public/razorpay/webhook", "TS-04"),
         ("Platform Admin", "/platform/**", "/api/platform/**", "TS-05"),
         ("Hospital Users", "/hospital/users, /staff", "/api/hospital/users*", "TS-06"),
-        ("Settings", "/hospital/settings", "/api/hospital/settings, /api/hospital/doctor-profile, /api/hospital/staff/[id]/availability, /api/session/view-mode", "TS-07"),
+        ("Settings", "/hospital/settings", "/api/hospital/settings (branding, walk-in, nurseAsReceptionist), /api/hospital/doctor-profile, /api/hospital/staff/[id]/availability, /api/session/view-mode", "TS-07"),
         ("Leave", "/leave, /hospital/leaves", "/api/leaves*", "TS-08"),
         ("Patients", "/patients/**", "/api/patients*", "TS-09"),
         ("Appointments", "/appointments/**, /queue", "/api/appointments*", "TS-10"),

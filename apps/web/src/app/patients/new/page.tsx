@@ -27,7 +27,7 @@ export default async function NewPatientPage({
           ? next === "admit"
             ? "Register the new patient, then continue to admit them to a ward."
             : "Register the new patient, then continue to book their appointment."
-          : "Enter name, date of birth, and mobile to register. Extra details stay collapsed. If this mobile is already on file, expand Add relative to register a child or family member under that number."}
+          : "Name, date of birth, and mobile are enough. For a newborn without a name, tick Unnamed infant and enter the parent — it saves as Baby of the parent. Extra details stay collapsed and can be added later from Edit."}
       </p>
       <PatientForm
         submitLabel={bookingNext ? "Register and continue booking" : "Register patient"}

@@ -32,7 +32,12 @@ function prettyName(username: string, role: AppRole, asDoctor = false) {
   return titled;
 }
 
-function bannerCopy(role: AppRole, hospitalName?: string | null, asDoctor = false) {
+function bannerCopy(
+  role: AppRole,
+  hospitalName?: string | null,
+  asDoctor = false,
+  nurseAsReceptionist = false,
+) {
   if (role === "SOFTWARE_ADMIN") {
     return {
       tagline: "Here's what's happening across your hospitals today. Stay aware, stay ahead.",
@@ -61,7 +66,7 @@ function bannerCopy(role: AppRole, hospitalName?: string | null, asDoctor = fals
       locationSubtitle: hospitalName ?? "Your hospital",
     };
   }
-  if (role === "RECEPTIONIST") {
+  if (role === "RECEPTIONIST" || (role === "NURSE" && nurseAsReceptionist)) {
     return {
       tagline: "Here's what's happening at the front desk today. Stay aware, stay ahead.",
       locationTitle: "Reception",
@@ -83,7 +88,12 @@ export default async function Home({
   const user = await getCurrentUser();
   const view = await resolveViewContext(user);
   const asDoctor = view.canActAsDoctor && view.mode === "doctor";
-  const copy = bannerCopy(user?.role ?? "RECEPTIONIST", user?.hospital?.name, asDoctor);
+  const copy = bannerCopy(
+    user?.role ?? "RECEPTIONIST",
+    user?.hospital?.name,
+    asDoctor,
+    Boolean(user?.hospital?.nurseAsReceptionist),
+  );
   const { date } = await searchParams;
   const selectedDay = parseLocalDay(date);
   const { start, end } = dayRange(selectedDay);

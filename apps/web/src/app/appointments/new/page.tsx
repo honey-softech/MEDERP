@@ -3,7 +3,7 @@ import { AppointmentForm } from "@/components/appointment-form";
 import {
   doctorName,
   ensureDoctorStaff,
-  FRONT_DESK_ROLES,
+  hasFrontDeskAccess,
   listBookableDoctors,
   requireHospitalPage,
   staffIdForAppUser,
@@ -20,7 +20,7 @@ export default async function NewAppointmentPage({
 }) {
   const user = await requireHospitalPage();
   const view = await resolveViewContext(user);
-  const canFrontDesk = FRONT_DESK_ROLES.includes(user.role) && view.mode !== "doctor";
+  const canFrontDesk = hasFrontDeskAccess(user) && view.mode !== "doctor";
   const canWalkIn = canAddWalkIn(user);
   if (!canWalkIn) redirect("/appointments");
 

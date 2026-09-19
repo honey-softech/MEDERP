@@ -1,7 +1,7 @@
 import type { AppRole, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front-desk";
-import { notifyHospitalRole } from "@/lib/notifications";
+import { notifyFrontDesk, notifyHospitalRole } from "@/lib/notifications";
 import { parseMedications } from "@/lib/prescription-text";
 import { activeSignatureFor } from "@/lib/signatures";
 
@@ -178,7 +178,7 @@ async function notifyPharmacyQueue(hospitalId: string, appointmentId: string, pa
   const href = `/pharmacy/prescriptions/${appointmentId}`;
   const title = "Pharmacy bill pending";
   const body = `Prescription ready for billing/dispense — ${label}.`;
-  await notifyHospitalRole({ hospitalId, role: "RECEPTIONIST", appointmentId, title, body, href });
+  await notifyFrontDesk({ hospitalId, appointmentId, title, body, href });
   await notifyHospitalRole({ hospitalId, role: "PHARMACIST", appointmentId, title, body, href });
   await notifyHospitalRole({ hospitalId, role: "SUPER_ADMIN", appointmentId, title, body, href });
 }

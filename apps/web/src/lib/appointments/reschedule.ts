@@ -1,5 +1,5 @@
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { FRONT_DESK_ROLES } from "@/lib/authz/hospital";
+import { hasFrontDeskAccess } from "@/lib/authz/hospital";
 import { doctorName, patientName } from "@/lib/display";
 import { doctorIsOnLeave } from "@/lib/opd/scheduling";
 import { assertDoctorBookableAt } from "@/lib/doctor-availability";
@@ -10,7 +10,7 @@ export async function rescheduleAppointment(
   ctx: AppointmentActionContext,
 ): Promise<AppointmentActionResult> {
   const { request, user, appointment, body } = ctx;
-  if (!FRONT_DESK_ROLES.includes(user.role)) {
+  if (!hasFrontDeskAccess(user)) {
     return { ok: false, error: "You do not have access to this action.", status: 403 };
   }
   const scheduledAt = new Date(String(body?.scheduledAt ?? ""));

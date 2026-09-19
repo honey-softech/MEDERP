@@ -155,4 +155,62 @@ describe("WhatsApp template builder", () => {
       },
     ]);
   });
+
+  it("builds subscription bill with document header and named body vars", () => {
+    expect(
+      templateComponents(
+        {
+          toPhone: "9876543210",
+          channel: "WHATSAPP",
+          body: "unused",
+          templateKey: "subscription_bill",
+          variables: {
+            admin: "Dr Sharma",
+            hospital: "City Clinic",
+            invoiceNo: "MEDERP-INV-00012",
+            total: "₹4,000.00",
+            period: "19 Sep 2026 – 18 Oct 2026",
+          },
+        },
+        false,
+      ),
+    ).toEqual({ error: "Subscription bill PDF media id is missing." });
+
+    const bill = templateComponents(
+      {
+        toPhone: "9876543210",
+        channel: "WHATSAPP",
+        body: "unused",
+        templateKey: "subscription_bill",
+        variables: {
+          admin: "Dr Sharma",
+          hospital: "City Clinic",
+          invoiceNo: "MEDERP-INV-00012",
+          total: "₹4,000.00",
+          period: "19 Sep 2026 – 18 Oct 2026",
+        },
+        documentMediaId: "media-sub",
+        documentFilename: "subscription-MEDERP-INV-00012.pdf",
+      },
+      false,
+    );
+    expect(bill).toEqual([
+      {
+        type: "header",
+        parameters: [
+          { type: "document", document: { link: "media-sub", filename: "subscription-MEDERP-INV-00012.pdf" } },
+        ],
+      },
+      {
+        type: "body",
+        parameters: [
+          { type: "text", parameter_name: "admin_name", text: "Dr Sharma" },
+          { type: "text", parameter_name: "hospital_name", text: "City Clinic" },
+          { type: "text", parameter_name: "invoice_no", text: "MEDERP-INV-00012" },
+          { type: "text", parameter_name: "total_amount", text: "₹4,000.00" },
+          { type: "text", parameter_name: "billing_period", text: "19 Sep 2026 – 18 Oct 2026" },
+        ],
+      },
+    ]);
+  });
 });

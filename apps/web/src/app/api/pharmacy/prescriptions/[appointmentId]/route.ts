@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ appointmentId: string }> };
 export async function GET(_request: NextRequest, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, PHARMACY_BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, PHARMACY_BILLING_ROLES);
   if (denied) return denied;
 
   const { appointmentId } = await context.params;
@@ -29,7 +29,7 @@ export async function GET(_request: NextRequest, context: Ctx) {
 export async function POST(request: NextRequest, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, PHARMACY_BILLING_ROLES);
+  const denied = forbidUnless(scoped.user, PHARMACY_BILLING_ROLES);
   if (denied) return denied;
 
   const { appointmentId } = await context.params;

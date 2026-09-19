@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, WARD_ADMIT_ROLES);
+  const denied = forbidUnless(scoped.user, WARD_ADMIT_ROLES);
   if (denied) return denied;
 
   try {

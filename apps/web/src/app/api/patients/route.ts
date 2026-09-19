@@ -13,6 +13,7 @@ import {
   requireHospitalActor,
   sanitizePhotoData,
 } from "@/lib/front-desk";
+import { babyOfName, parentNameFromPatient } from "@/lib/patients/infant";
 import { createPatientSchema } from "@/lib/validation/patient";
 import { parseJsonBody } from "@/lib/validation/parse";
 
@@ -107,9 +108,11 @@ export async function POST(request: Request) {
 
   const parsed = await parseJsonBody(request, createPatientSchema);
   if (!parsed.ok) return parsed.response;
-  const {
+  let {
     firstName,
     lastName,
+  } = parsed.data;
+  const {
     dateOfBirth,
     gender,
     phone,
@@ -130,6 +133,8 @@ export async function POST(request: Request) {
     insuranceValidUntil,
     familyOfPatientId,
     familyRelation,
+    unnamedInfant,
+    parentName,
     force,
   } = parsed.data;
   const photoData = sanitizePhotoData(parsed.data.photoData);
@@ -141,6 +146,15 @@ export async function POST(request: Request) {
     : null;
   if (familyOfPatientId && !guardian) {
     return NextResponse.json({ error: "Family head not found." }, { status: 404 });
+  }
+
+  if (unnamedInfant) {
+    const parent = guardian ? parentNameFromPatient(guardian) : parentName || firstName.replace(/^baby of\s+/i, "").trim();
+    firstName = babyOfName(parent);
+    lastName = "";
+    if (!firstName) {
+      return NextResponse.json({ error: "Enter the parent name for an unnamed infant." }, { status: 400 });
+    }
   }
 
   const duplicates = await findDuplicatePatients(scoped.user.hospitalId, {

@@ -7,6 +7,7 @@ import {
   namedBody,
   parseOtpDigits,
   reminderComponents,
+  subscriptionBillComponents,
   utilityAccessCodeComponents,
   type WhatsAppComponent,
 } from "@/lib/messaging/whatsapp-meta-templates";
@@ -64,6 +65,9 @@ function templateName(key: string) {
   if (key === "visit_summary") return env("WHATSAPP_VISIT_SUMMARY_TEMPLATE", META_PATIENT_TEMPLATES.visit_summary.defaultName);
   if (key === "medical_certificate") return env("WHATSAPP_MEDICAL_CERTIFICATE_TEMPLATE", "medical_certificate");
   if (key === "bill_receipt") return env("WHATSAPP_BILL_RECEIPT_TEMPLATE", META_PATIENT_TEMPLATES.bill_receipt.defaultName);
+  if (key === "subscription_bill") {
+    return env("WHATSAPP_SUBSCRIPTION_BILL_TEMPLATE", META_PATIENT_TEMPLATES.subscription_bill.defaultName);
+  }
   return env("WHATSAPP_REMINDER_TEMPLATE", META_PATIENT_TEMPLATES.appointment_reminder.defaultName);
 }
 
@@ -125,6 +129,13 @@ export function templateComponents(payload: ProviderPayload, _includeOtpButton =
   }
   if (payload.templateKey === "bill_receipt") {
     return billReceiptComponents({
+      vars,
+      documentMediaId: payload.documentMediaId,
+      documentFilename: payload.documentFilename,
+    });
+  }
+  if (payload.templateKey === "subscription_bill") {
+    return subscriptionBillComponents({
       vars,
       documentMediaId: payload.documentMediaId,
       documentFilename: payload.documentFilename,

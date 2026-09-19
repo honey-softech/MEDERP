@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
 import { primaryButtonClass } from "@/components/auth-shell";
-import { ageYears, FRONT_DESK_ROLES, canRegisterPatient, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
+import { ageLabel, canRegisterPatient, hasFrontDeskAccess, patientName, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 
 export default async function PatientsPage() {
@@ -35,12 +35,12 @@ export default async function PatientsPage() {
           id: row.id,
           mrn: row.mrn,
           name: patientName(row),
-          age: String(ageYears(row.dateOfBirth)),
+          age: ageLabel(row.dateOfBirth),
           gender: prettyEnum(row.gender),
           phone: row.phone ?? "—",
           family: row.familyGroupCode ?? "—",
           href: `/patients/${row.id}`,
-          ...(FRONT_DESK_ROLES.includes(user.role)
+          ...(hasFrontDeskAccess(user)
             ? { edit: "Edit", editHref: `/patients/${row.id}/edit` }
             : {}),
         }))}
@@ -52,7 +52,7 @@ export default async function PatientsPage() {
           { key: "gender", header: "Gender" },
           { key: "phone", header: "Phone" },
           { key: "family", header: "Family" },
-          ...(FRONT_DESK_ROLES.includes(user.role)
+          ...(hasFrontDeskAccess(user)
             ? [{ key: "edit", header: "Action", filter: false as const, hrefKey: "editHref" }]
             : []),
         ]}

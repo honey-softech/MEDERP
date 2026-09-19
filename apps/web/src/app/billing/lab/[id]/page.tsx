@@ -5,9 +5,9 @@ import { InvoiceAdjustments } from "@/components/billing-forms";
 import { LabPaymentForm } from "@/components/lab-payment-form";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
-  BILLING_ROLES,
-  FRONT_DESK_ROLES,
   WAIVER_APPROVER_ROLES,
+  hasBillingAccess,
+  hasFrontDeskAccess,
   inr,
   patientName,
   requireHospitalPage,
@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 
 export default async function CollectLabPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireHospitalPage();
-  if (!BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasBillingAccess(user)) redirect("/");
   const { id } = await params;
   const order = await prisma.labOrder.findFirst({
     where: { id, hospitalId: user.hospitalId },
@@ -88,7 +88,7 @@ export default async function CollectLabPage({ params }: { params: Promise<{ id:
           invoiceId={invoice.id}
           paid={Number(invoice.paidAmount)}
           canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-          canRequestWaiver={FRONT_DESK_ROLES.includes(user.role)}
+          canRequestWaiver={hasFrontDeskAccess(user)}
           waiverStatus={invoice.waiverStatus}
         />
       </div>

@@ -2,13 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
-import { BILLING_ROLES, inr, patientName, requireHospitalPage } from "@/lib/front-desk";
+import { hasBillingAccess, inr, patientName, requireHospitalPage } from "@/lib/front-desk";
 import { prettyLabStatus } from "@/lib/lab-catalog";
 import { prisma } from "@/lib/prisma";
 
 export default async function LabCollectionsPage() {
   const user = await requireHospitalPage();
-  if (!BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasBillingAccess(user)) redirect("/");
 
   const orders = await prisma.labOrder.findMany({
     where: { hospitalId: user.hospitalId, status: { not: "CANCELLED" }, fulfillment: "HOSPITAL_LAB" },

@@ -62,6 +62,19 @@ export async function notifyHospitalRole(params: {
   return created.length;
 }
 
+export async function notifyFrontDesk(
+  params: Omit<Parameters<typeof notifyHospitalRole>[0], "role">,
+) {
+  const hospital = await prisma.hospital.findUnique({
+    where: { id: params.hospitalId },
+    select: { nurseAsReceptionist: true },
+  });
+  const roles: AppRole[] = ["RECEPTIONIST"];
+  if (hospital?.nurseAsReceptionist) roles.push("NURSE");
+  const counts = await Promise.all(roles.map((role) => notifyHospitalRole({ ...params, role })));
+  return counts.reduce((sum, count) => sum + count, 0);
+}
+
 export async function notifyHospitalStaffExcept(params: {
   hospitalId: string;
   exceptUserId: string;

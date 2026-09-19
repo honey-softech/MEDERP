@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import {
   CLINICAL_VIEW_ROLES,
-  FRONT_DESK_ROLES,
   canAddWalkIn,
   doctorIsOnLeave,
   doctorName,
   forbidUnless,
+  hasFrontDeskAccess,
   nextToken,
   patientName,
   requireHospitalActor,
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const canFrontDesk = FRONT_DESK_ROLES.includes(scoped.user.role);
+  const canFrontDesk = hasFrontDeskAccess(scoped.user);
   const canWalkIn = canAddWalkIn(scoped.user);
   if (!canWalkIn) {
     return NextResponse.json({ error: "You do not have access to this action." }, { status: 403 });

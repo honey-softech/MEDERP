@@ -7,11 +7,12 @@ import { buttonClass } from "@/components/auth-shell";
 export function WalkInPolicyForm({
   initial,
 }: {
-  initial: { walkInByDoctor: boolean; walkInByNurse: boolean };
+  initial: { walkInByDoctor: boolean; walkInByNurse: boolean; nurseAsReceptionist?: boolean };
 }) {
   const router = useRouter();
   const [walkInByDoctor, setWalkInByDoctor] = useState(initial.walkInByDoctor);
   const [walkInByNurse, setWalkInByNurse] = useState(initial.walkInByNurse);
+  const nurseCoversReception = Boolean(initial.nurseAsReceptionist);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
@@ -42,6 +43,9 @@ export function WalkInPolicyForm({
         <h3 className="font-semibold">Walk-in access</h3>
         <p className="mt-1 text-sm text-slate-500">
           Reception and hospital admin can always add walk-ins. Choose whether doctors and nurses can add them too.
+          {nurseCoversReception
+            ? " Nurses already cover reception, so they can add walk-ins even if the nurse walk-in box below is off."
+            : ""}
         </p>
       </div>
 
@@ -62,7 +66,8 @@ export function WalkInPolicyForm({
         <input
           type="checkbox"
           className="mt-0.5"
-          checked={walkInByNurse}
+          checked={nurseCoversReception || walkInByNurse}
+          disabled={nurseCoversReception}
           onChange={(event) => setWalkInByNurse(event.target.checked)}
         />
         <span>

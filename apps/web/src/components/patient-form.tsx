@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
+import { babyOfName, dateInputValue, isUnnamedInfantName } from "@/lib/patients/infant";
 
 const GENDERS = [
   { value: "MALE", label: "Male" },
@@ -71,12 +72,14 @@ export function PatientForm({
   initial,
   submitLabel,
   familyOfPatientId,
+  familyHeadName,
   familyRelationDefault = "CHILD",
   nextHref,
 }: {
   initial?: PatientFormValues;
   submitLabel: string;
   familyOfPatientId?: string;
+  familyHeadName?: string;
   familyRelationDefault?: string;
   nextHref?: string;
 }) {
@@ -94,6 +97,8 @@ export function PatientForm({
   const [idProofOpen, setIdProofOpen] = useState(false);
   const [insuranceOpen, setInsuranceOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [unnamedInfant, setUnnamedInfant] = useState(false);
+  const [parentName, setParentName] = useState(familyHeadName ?? "");
   const [values, setValues] = useState<PatientFormValues>(
     initial ?? {
       firstName: "",
@@ -124,6 +129,31 @@ export function PatientForm({
     setValues((current) => ({ ...current, [field]: value }));
   }
 
+  const selectedFamily = familyHits.find((row) => row.id === familyOf);
+  const resolvedParentName =
+    (selectedFamily ? `${selectedFamily.firstName} ${selectedFamily.lastName}`.trim() : "") ||
+    familyHeadName ||
+    parentName.trim();
+  const infantDisplayName = babyOfName(resolvedParentName);
+  const editingUnnamedInfant = isEdit && isUnnamedInfantName(values.firstName);
+
+  function toggleUnnamedInfant() {
+    setUnnamedInfant((current) => {
+      const next = !current;
+      if (next) {
+        setFamilyRelation("CHILD");
+        setValues((form) => ({ ...form, dateOfBirth: form.dateOfBirth || dateInputValue(), lastName: "" }));
+        if (familyHeadName && !parentName) setParentName(familyHeadName);
+        if (!familyOfPatientId && !familyOf && familyHits[0]) {
+          setFamilyOf(familyHits[0].id);
+          setFamilyOpen(true);
+          if (!parentName) setParentName(`${familyHits[0].firstName} ${familyHits[0].lastName}`.trim());
+        }
+      }
+      return next;
+    });
+  }
+
   useEffect(() => {
     if (isEdit || familyOfPatientId) return;
     const phone = values.phone.replace(/\D/g, "");
@@ -152,6 +182,15 @@ export function PatientForm({
     return () => window.clearTimeout(timer);
   }, [values.phone, isEdit, familyOfPatientId]);
 
+  useEffect(() => {
+    if (!unnamedInfant || isEdit || familyOfPatientId || familyOf || familyHits.length === 0) return;
+    const head = familyHits[0];
+    setFamilyOf(head.id);
+    setFamilyOpen(true);
+    setFamilyRelation("CHILD");
+    setParentName((current) => current || `${head.firstName} ${head.lastName}`.trim());
+  }, [unnamedInfant, isEdit, familyOfPatientId, familyOf, familyHits]);
+
   function toggleFamily() {
     if (familyOpen) {
       setFamilyOpen(false);
@@ -172,6 +211,10 @@ export function PatientForm({
       body: JSON.stringify({
         ...values,
         force,
+        unnamedInfant,
+        parentName: unnamedInfant ? resolvedParentName : undefined,
+        firstName: unnamedInfant ? infantDisplayName : values.firstName,
+        lastName: unnamedInfant ? "" : values.lastName,
         familyOfPatientId: asFamilyId || undefined,
         familyRelation: asFamilyId ? familyRelation : undefined,
       }),
@@ -216,9 +259,61 @@ export function PatientForm({
       className="grid max-w-5xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:grid-cols-2"
     >
       <h3 className="md:col-span-2 font-semibold">Demographics</h3>
-      <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required />
-      <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} />
-      <Field label="Date of birth" type="date" value={values.dateOfBirth} onChange={(v) => setField("dateOfBirth", v)} required />
+      {editingUnnamedInfant ? (
+        <p className="md:col-span-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+          This infant was saved as {values.firstName}. Change the first name here when the child is named — nothing else is required.
+        </p>
+      ) : null}
+      {!isEdit ? (
+        <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={unnamedInfant}
+            onChange={toggleUnnamedInfant}
+          />
+          <span>
+            <span className="font-medium text-slate-800">Unnamed infant / newborn</span>
+            <span className="mt-0.5 block text-slate-600">
+              Saves as “Baby of” the parent. You can add the given name later from Edit — keep the rest of the form collapsed.
+            </span>
+          </span>
+        </label>
+      ) : null}
+      {unnamedInfant ? (
+        familyOfPatientId || familyOf ? (
+          <p className="md:col-span-2 text-sm text-slate-600">
+            Will be saved as <span className="font-medium text-slate-900">{infantDisplayName || "Baby of (select parent)"}</span>
+            . Date of birth defaults to today.
+          </p>
+        ) : (
+          <Field
+            label="Parent name"
+            value={parentName}
+            onChange={setParentName}
+            required
+            placeholder="Mother or father name"
+          />
+        )
+      ) : (
+        <>
+          <Field
+            label={editingUnnamedInfant ? "Given name" : "First name"}
+            value={values.firstName}
+            onChange={(v) => setField("firstName", v)}
+            required
+            placeholder={editingUnnamedInfant ? "Enter the child’s name" : undefined}
+          />
+          <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} />
+        </>
+      )}
+      <Field
+        label="Date of birth"
+        type="date"
+        value={values.dateOfBirth}
+        onChange={(v) => setField("dateOfBirth", v)}
+        required={!unnamedInfant}
+      />
       <label className="text-sm font-medium text-slate-700">
         Gender
         <select className={fieldClass} value={values.gender} onChange={(event) => setField("gender", event.target.value)}>
@@ -267,7 +362,10 @@ export function PatientForm({
                     <button
                       type="button"
                       className={secondaryButtonClass}
-                      onClick={() => setFamilyOf(row.id)}
+                      onClick={() => {
+                        setFamilyOf(row.id);
+                        if (unnamedInfant) setParentName(`${row.firstName} ${row.lastName}`.trim());
+                      }}
                     >
                       {familyOf === row.id ? "Selected as family head" : "Add under this patient"}
                     </button>

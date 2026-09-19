@@ -1,6 +1,7 @@
 import type { Hospital, HospitalSubscription, HospitalSubscriptionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createPlatformInvoice } from "@/lib/platform-billing";
+import { notifySubscriptionRenewalBill } from "@/lib/platform-invoice-whatsapp";
 import { pricingFromTier } from "@/lib/platform-pricing";
 import { getRazorpayClient, toPaise } from "@/lib/razorpay";
 import { trialEndsAtFromNow } from "@/lib/hospital-access";
@@ -422,7 +423,7 @@ export async function recordSubscriptionCharge(params: {
       ? params.lines
       : [{ description: "MedERP monthly subscription", amount: params.amountInr }];
 
-  return createPlatformInvoice({
+  const invoice = await createPlatformInvoice({
     hospitalId: params.hospitalId,
     lines,
     total: params.amountInr,
@@ -432,6 +433,8 @@ export async function recordSubscriptionCharge(params: {
     razorpayPaymentId: params.razorpayPaymentId ?? null,
     razorpaySubscriptionId: params.razorpaySubscriptionId ?? null,
   });
+  await notifySubscriptionRenewalBill(invoice.id);
+  return invoice;
 }
 
 export async function cancelHospitalSubscription(params: {

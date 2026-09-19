@@ -13,8 +13,15 @@ export function canReviewLeave(role: AppRole) {
   return role === "SUPER_ADMIN";
 }
 
-export function canRecordLeave(role: AppRole) {
-  return role === "SUPER_ADMIN" || role === "RECEPTIONIST";
+export function canRecordLeave(
+  role: AppRole,
+  hospital?: { nurseAsReceptionist?: boolean | null } | null,
+) {
+  return (
+    role === "SUPER_ADMIN" ||
+    role === "RECEPTIONIST" ||
+    (role === "NURSE" && Boolean(hospital?.nurseAsReceptionist))
+  );
 }
 
 export function parseLeaveType(value: unknown): LeaveType {

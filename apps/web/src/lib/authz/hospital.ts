@@ -20,24 +20,56 @@ export const LAB_REPORT_VIEW_ROLES: AppRole[] = ["DOCTOR", "NURSE"];
 export const EXTERNAL_REPORT_UPLOAD_ROLES: AppRole[] = ["SUPER_ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"];
 export { PHARMACY_ROLES } from "@/lib/pharmacy";
 
-type WalkInPolicy = {
+export type HospitalRolePolicy = {
   walkInByDoctor?: boolean | null;
   walkInByNurse?: boolean | null;
+  nurseAsReceptionist?: boolean | null;
 };
 
-export function walkInRolesFor(hospital?: WalkInPolicy | null): AppRole[] {
+export function isNurseReceptionist(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
+  return user.role === "NURSE" && Boolean(user.hospital?.nurseAsReceptionist);
+}
+
+/** When Superadmin opts in, every nurse also receives receptionist-capable role lists. */
+export function withNurseReceptionist(
+  roles: readonly AppRole[],
+  hospital?: HospitalRolePolicy | null,
+): AppRole[] {
+  if (!hospital?.nurseAsReceptionist) return [...roles];
+  if (!roles.includes("RECEPTIONIST") || roles.includes("NURSE")) return [...roles];
+  return [...roles, "NURSE"];
+}
+
+export function hasRoleAccess(
+  user: { role: AppRole; hospital?: HospitalRolePolicy | null },
+  roles: readonly AppRole[],
+) {
+  return withNurseReceptionist(roles, user.hospital).includes(user.role);
+}
+
+export function hasFrontDeskAccess(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
+  return hasRoleAccess(user, FRONT_DESK_ROLES);
+}
+
+export function hasBillingAccess(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
+  return hasRoleAccess(user, BILLING_ROLES);
+}
+
+export function walkInRolesFor(hospital?: HospitalRolePolicy | null): AppRole[] {
   const roles: AppRole[] = [...WALK_IN_BASE_ROLES];
   if (hospital?.walkInByDoctor !== false) roles.push("DOCTOR");
-  if (hospital?.walkInByNurse) roles.push("NURSE");
+  if ((hospital?.walkInByNurse || hospital?.nurseAsReceptionist) && !roles.includes("NURSE")) {
+    roles.push("NURSE");
+  }
   return roles;
 }
 
-export function canAddWalkIn(user: { role: AppRole; hospital?: WalkInPolicy | null }) {
+export function canAddWalkIn(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
   return walkInRolesFor(user.hospital).includes(user.role);
 }
 
-export function canRegisterPatient(user: { role: AppRole; hospital?: WalkInPolicy | null }) {
-  return PATIENT_REGISTER_ROLES.includes(user.role) || canAddWalkIn(user);
+export function canRegisterPatient(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
+  return hasRoleAccess(user, PATIENT_REGISTER_ROLES) || canAddWalkIn(user);
 }
 
 export type HospitalActor = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> & {
@@ -80,8 +112,14 @@ export async function requireHospitalPage(options?: { allowExpiredTrial?: boolea
   return user as HospitalActor;
 }
 
-export function forbidUnless(role: AppRole, roles: AppRole[]) {
-  if (!roles.includes(role)) {
+export function forbidUnless(
+  roleOrUser: AppRole | { role: AppRole; hospital?: HospitalRolePolicy | null },
+  roles: readonly AppRole[],
+) {
+  const role = typeof roleOrUser === "string" ? roleOrUser : roleOrUser.role;
+  const allowed =
+    typeof roleOrUser === "string" ? roles : withNurseReceptionist(roles, roleOrUser.hospital);
+  if (!allowed.includes(role)) {
     return NextResponse.json({ error: "You do not have access to this action." }, { status: 403 });
   }
   return null;

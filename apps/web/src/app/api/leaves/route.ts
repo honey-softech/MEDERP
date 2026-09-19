@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const staffId = String(body?.staffId ?? body?.doctorId ?? "").trim();
 
   if (record) {
-    if (!canRecordLeave(scoped.user.role)) {
+    if (!canRecordLeave(scoped.user.role, scoped.user.hospital)) {
       return NextResponse.json({ error: "Only reception or super admin can record leave directly." }, { status: 403 });
     }
     if (!staffId) {

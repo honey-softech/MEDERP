@@ -10,7 +10,9 @@ export default async function PlatformBillingSettingsPage() {
   return (
     <AppShell title="Platform billing settings">
       <p className="mb-6 text-sm text-slate-500">
-        Configure your company details and default subscription pricing for hospital registration bills.
+        Company details printed on every hospital subscription invoice. After a successful monthly
+        Razorpay renewal, that bill is WhatsApped to the hospital SUPER_ADMIN mobile — the same
+        person if the doctor is also the hospital admin.
       </p>
       <PlatformBillingSettingsForm />
     </AppShell>

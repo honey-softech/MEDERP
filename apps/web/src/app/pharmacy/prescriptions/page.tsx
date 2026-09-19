@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
 import { primaryButtonClass } from "@/components/auth-shell";
-import { inr, patientName, requireHospitalPage } from "@/lib/front-desk";
+import { hasRoleAccess, inr, patientName, requireHospitalPage } from "@/lib/front-desk";
 import { listPendingPharmacyRx, PHARMACY_BILLING_ROLES } from "@/lib/pharmacy-rx";
 
 export default async function PharmacyPrescriptionsPage() {
   const user = await requireHospitalPage();
-  if (!PHARMACY_BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasRoleAccess(user, PHARMACY_BILLING_ROLES)) redirect("/");
 
   const orders = await listPendingPharmacyRx(user.hospitalId);
 

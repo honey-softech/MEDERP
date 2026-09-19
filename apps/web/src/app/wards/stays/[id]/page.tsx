@@ -9,6 +9,7 @@ import {
   inr,
   patientName,
   prettyEnum,
+  hasRoleAccess,
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { statusBadge, statusBadgeBase } from "@/lib/ui";
@@ -182,9 +183,9 @@ export default async function AdmissionStayPage({ params }: { params: Promise<{ 
           }))}
           canTransfer={WARD_TRANSFER_ROLES.includes(user.role)}
           canAdvise={WARD_DISCHARGE_ADVICE_ROLES.includes(user.role)}
-          canDischarge={WARD_ADMIT_ROLES.includes(user.role)}
-          canBill={WARD_BILLING_ROLES.includes(user.role)}
-          canCancel={WARD_ADMIT_ROLES.includes(user.role)}
+          canDischarge={hasRoleAccess(user, WARD_ADMIT_ROLES)}
+          canBill={hasRoleAccess(user, WARD_BILLING_ROLES)}
+          canCancel={hasRoleAccess(user, WARD_ADMIT_ROLES)}
         />
       </article>
     </AppShell>

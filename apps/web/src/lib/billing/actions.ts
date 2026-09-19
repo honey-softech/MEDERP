@@ -1,9 +1,9 @@
 import type { Invoice, Patient } from "@prisma/client";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
-  BILLING_ROLES,
-  FRONT_DESK_ROLES,
   WAIVER_APPROVER_ROLES,
+  hasBillingAccess,
+  hasFrontDeskAccess,
   type HospitalActor,
 } from "@/lib/authz/hospital";
 import { invoiceDue, validateDiscount, validatePayment, validateRefund } from "@/lib/billing/rules";
@@ -29,7 +29,7 @@ export async function collectInvoicePayment(params: {
   amount: number;
   notes: string | null;
 }): Promise<BillingActionResult> {
-  if (!BILLING_ROLES.includes(params.user.role)) return noAccess();
+  if (!hasBillingAccess(params.user)) return noAccess();
   const due = invoiceDue(params.invoice.netTotal, params.invoice.paidAmount);
   const labLinked = await prisma.labOrder.count({ where: { invoiceId: params.invoice.id } });
   const requireFull = Boolean(params.invoice.appointmentId || labLinked > 0);
@@ -101,7 +101,7 @@ export async function applyInvoiceDiscount(params: {
   invoice: InvoiceWithPatient;
   amount: number;
 }): Promise<BillingActionResult> {
-  if (!BILLING_ROLES.includes(params.user.role)) return noAccess();
+  if (!hasBillingAccess(params.user)) return noAccess();
   const discountAmount = Math.max(0, params.amount);
   const waiver = params.invoice.waiverStatus === "APPROVED" ? Number(params.invoice.waiverAmount) : 0;
   const valid = validateDiscount({
@@ -157,7 +157,7 @@ export async function requestInvoiceWaiver(params: {
   amount: number;
   reason: string;
 }): Promise<BillingActionResult> {
-  if (!FRONT_DESK_ROLES.includes(params.user.role)) return noAccess();
+  if (!hasFrontDeskAccess(params.user)) return noAccess();
   const waiverAmount = Math.max(0, params.amount);
   const waiverReason = params.reason.trim();
   if (!(waiverAmount > 0) || !waiverReason) {
@@ -283,7 +283,7 @@ export async function refundInvoicePayment(params: {
   amount: number;
   notes: string | null;
 }): Promise<BillingActionResult> {
-  if (!BILLING_ROLES.includes(params.user.role)) return noAccess();
+  if (!hasBillingAccess(params.user)) return noAccess();
   const valid = validateRefund({
     method: params.method,
     amount: params.amount,

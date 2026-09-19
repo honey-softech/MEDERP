@@ -1,5 +1,5 @@
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { DOCTOR_VISIT_ROLES, FRONT_DESK_ROLES } from "@/lib/authz/hospital";
+import { DOCTOR_VISIT_ROLES, hasFrontDeskAccess } from "@/lib/authz/hospital";
 import { doctorName, patientName, tokenLabel } from "@/lib/display";
 import { nextToken } from "@/lib/ids";
 import { notifyNursesOfConsult } from "@/lib/notifications";
@@ -15,7 +15,7 @@ export async function cancelAppointment(
   ctx: AppointmentActionContext,
 ): Promise<AppointmentActionResult> {
   const { request, user, appointment } = ctx;
-  if (!FRONT_DESK_ROLES.includes(user.role)) return noAccess();
+  if (!hasFrontDeskAccess(user)) return noAccess();
   const updated = await prisma.appointment.update({
     where: { id: appointment.id },
     data: { status: "CANCELLED", cancelledAt: new Date() },
@@ -45,7 +45,7 @@ export async function checkInAppointment(
   ctx: AppointmentActionContext,
 ): Promise<AppointmentActionResult> {
   const { request, user, appointment } = ctx;
-  if (!FRONT_DESK_ROLES.includes(user.role)) return noAccess();
+  if (!hasFrontDeskAccess(user)) return noAccess();
   if (["CANCELLED", "COMPLETED"].includes(appointment.status)) {
     return { ok: false, error: "This appointment cannot be checked in.", status: 409 };
   }
@@ -99,7 +99,7 @@ export async function startAppointment(
   ctx: AppointmentActionContext,
 ): Promise<AppointmentActionResult> {
   const { request, user, appointment } = ctx;
-  const isFrontDesk = FRONT_DESK_ROLES.includes(user.role);
+  const isFrontDesk = hasFrontDeskAccess(user);
   const isDoctorVisit = DOCTOR_VISIT_ROLES.includes(user.role);
   if (!isDoctorVisit && !isFrontDesk) return noAccess();
   const owned = await doctorOwnsVisit(ctx);
@@ -140,7 +140,7 @@ export async function closeAppointment(
   action: "checkout" | "complete",
 ): Promise<AppointmentActionResult> {
   const { request, user, appointment } = ctx;
-  const isFrontDesk = FRONT_DESK_ROLES.includes(user.role);
+  const isFrontDesk = hasFrontDeskAccess(user);
   const isDoctorVisit = DOCTOR_VISIT_ROLES.includes(user.role);
   if (action === "checkout" && !isFrontDesk && !isDoctorVisit) return noAccess();
   if (action === "complete" && !isDoctorVisit && !isFrontDesk) return noAccess();
@@ -196,7 +196,7 @@ export async function markNoShow(
   ctx: AppointmentActionContext,
 ): Promise<AppointmentActionResult> {
   const { user, appointment } = ctx;
-  if (!FRONT_DESK_ROLES.includes(user.role)) return noAccess();
+  if (!hasFrontDeskAccess(user)) return noAccess();
   const updated = await prisma.appointment.update({
     where: { id: appointment.id },
     data: { status: "NO_SHOW" },

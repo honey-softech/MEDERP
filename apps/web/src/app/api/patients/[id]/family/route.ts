@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, FRONT_DESK_ROLES);
+  const denied = forbidUnless(scoped.user, FRONT_DESK_ROLES);
   if (denied) return denied;
 
   const { id } = await context.params;

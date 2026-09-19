@@ -17,11 +17,17 @@ export {
   canAddWalkIn,
   canRegisterPatient,
   forbidUnless,
+  hasBillingAccess,
+  hasFrontDeskAccess,
+  hasRoleAccess,
+  isNurseReceptionist,
   requireHospitalActor,
   requireHospitalPage,
   walkInRolesFor,
+  withNurseReceptionist,
   type HospitalActor,
   type HospitalActorResult,
+  type HospitalRolePolicy,
 } from "@/lib/authz/hospital";
 
 export {

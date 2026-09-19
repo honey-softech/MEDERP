@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { forbidUnless, patientName, requireHospitalActor } from "@/lib/front-desk";
-import { notifyHospitalRole } from "@/lib/notifications";
+import { notifyFrontDesk } from "@/lib/notifications";
 import {
   WARD_ADMIT_ROLES,
   WARD_BILLING_ROLES,
@@ -105,9 +105,8 @@ export async function PATCH(request: Request, context: Ctx) {
         admissionId: admission.id,
         notes: body?.notes != null ? String(body.notes) : null,
       });
-      await notifyHospitalRole({
+      await notifyFrontDesk({
         hospitalId: scoped.user.hospitalId,
-        role: "RECEPTIONIST",
         href: `/wards/stays/${admission.id}`,
         title: "Discharge advised",
         body: `${patientName(admission.patient)} (${admission.ipNumber}) is ready for discharge billing.`,
@@ -134,7 +133,7 @@ export async function PATCH(request: Request, context: Ctx) {
     }
 
     if (action === "discharge") {
-      const denied = forbidUnless(scoped.user.role, WARD_ADMIT_ROLES);
+      const denied = forbidUnless(scoped.user, WARD_ADMIT_ROLES);
       if (denied) return denied;
       const dischargeType = String(body?.dischargeType ?? "ROUTINE");
       if (!isDischargeType(dischargeType)) {
@@ -170,7 +169,7 @@ export async function PATCH(request: Request, context: Ctx) {
     }
 
     if (action === "invoice") {
-      const denied = forbidUnless(scoped.user.role, WARD_BILLING_ROLES);
+      const denied = forbidUnless(scoped.user, WARD_BILLING_ROLES);
       if (denied) return denied;
       const invoice = await generateIpdInvoice({
         hospitalId: scoped.user.hospitalId,
@@ -193,7 +192,7 @@ export async function PATCH(request: Request, context: Ctx) {
     }
 
     if (action === "cancel") {
-      const denied = forbidUnless(scoped.user.role, WARD_ADMIT_ROLES);
+      const denied = forbidUnless(scoped.user, WARD_ADMIT_ROLES);
       if (denied) return denied;
       await cancelAdmission({ hospitalId: scoped.user.hospitalId, admissionId: admission.id });
       await writeAuditLog({

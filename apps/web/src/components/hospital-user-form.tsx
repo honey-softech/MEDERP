@@ -238,6 +238,13 @@ export default function HospitalUserForm({
         onChange={(value) => setField("role", value)}
         options={roleLocked ? [{ value: "SUPER_ADMIN", label: "Hospital super admin" }] : roleOptions}
       />
+      {roleLocked ? null : (
+        <p className="md:col-span-2 text-sm text-slate-500">
+          Keep Receptionist if this hospital has a dedicated front desk. If nurses also cover reception, turn on
+          Nurses as receptionists in Hospital settings — every nurse then shares that work, and you can still add a
+          Receptionist user.
+        </p>
+      )}
       {editing && values.employeeId ? (
         <Field label="Employee ID" value={values.employeeId} onChange={() => undefined} disabled />
       ) : (

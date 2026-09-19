@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { babyOfName, startOfLocalDay } from "@/lib/patients/infant";
 
 export const GENDERS = ["MALE", "FEMALE", "OTHER"] as const;
 export const ID_PROOFS = ["AADHAAR", "PAN", "PASSPORT", "DRIVING_LICENSE", "VOTER_ID", "OTHER"] as const;
@@ -44,14 +45,34 @@ export const createPatientSchema = z
     photoData: z.unknown().optional(),
     familyOfPatientId: z.unknown().optional(),
     familyRelation: z.unknown().optional(),
+    unnamedInfant: z.unknown().optional(),
+    parentName: z.unknown().optional(),
     force: z.unknown().optional(),
   })
   .transform((data, ctx) => {
-    const firstName = text(data.firstName);
-    const lastName = text(data.lastName);
-    const dateOfBirth = data.dateOfBirth ? new Date(String(data.dateOfBirth)) : null;
+    const unnamedInfant = Boolean(data.unnamedInfant);
+    const parentName = text(data.parentName);
+    const familyOfPatientId = optionalText(data.familyOfPatientId);
+    let firstName = text(data.firstName);
+    let lastName = text(data.lastName);
+    let dateOfBirth = data.dateOfBirth ? new Date(String(data.dateOfBirth)) : null;
     const gender = text(data.gender);
-    if (!firstName || !dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
+    if (unnamedInfant) {
+      if (parentName) firstName = babyOfName(parentName);
+      else if (familyOfPatientId) firstName = firstName || "Baby of parent";
+      else firstName = babyOfName(firstName.replace(/^baby of\s+/i, ""));
+      lastName = "";
+      if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
+        dateOfBirth = startOfLocalDay();
+      }
+      if (!firstName) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter the parent name for an unnamed infant.",
+        });
+        return z.NEVER;
+      }
+    } else if (!firstName || !dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
       ctx.addIssue({
         code: "custom",
         message: "First name and date of birth are required.",
@@ -67,7 +88,6 @@ export const createPatientSchema = z
       ctx.addIssue({ code: "custom", message: "Select a valid ID proof type." });
       return z.NEVER;
     }
-    const familyOfPatientId = optionalText(data.familyOfPatientId);
     const familyRelation = text(data.familyRelation) || "CHILD";
     if (familyOfPatientId && !(FAMILY_RELATIONS as readonly string[]).includes(familyRelation)) {
       ctx.addIssue({ code: "custom", message: "Select a valid family relation." });
@@ -102,6 +122,8 @@ export const createPatientSchema = z
       photoData: data.photoData,
       familyOfPatientId,
       familyRelation: familyRelation as (typeof FAMILY_RELATIONS)[number],
+      unnamedInfant,
+      parentName: parentName || null,
       force: Boolean(data.force),
     };
   });

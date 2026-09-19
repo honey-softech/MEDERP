@@ -6,7 +6,8 @@ export type MessageTemplateKey =
   | "investigation_list"
   | "visit_summary"
   | "medical_certificate"
-  | "bill_receipt";
+  | "bill_receipt"
+  | "subscription_bill";
 
 /** Keep WhatsApp template variables short — Meta rejects oversized bodies. */
 export function clipWhatsAppVar(value: string, max = 120) {
@@ -35,6 +36,9 @@ export function renderTemplate(
   }
   if (key === "bill_receipt") {
     return `Hi ${variables.patient ?? "patient"}, thank you for visiting ${variables.hospital ?? "the clinic"}. Your bill receipt ${variables.invoiceNo ?? ""} is attached as a PDF. The net total for this visit is ${variables.total ?? ""}. Please keep this receipt for your records. If you have any billing questions, contact the hospital front desk.`;
+  }
+  if (key === "subscription_bill") {
+    return `Hi ${variables.admin ?? "admin"}, the MedERP subscription for ${variables.hospital ?? "the hospital"} renewed successfully. Invoice ${variables.invoiceNo ?? ""} for ${variables.total ?? ""} covering ${variables.period ?? "this billing cycle"} is attached as a PDF. Please keep this bill for your software records.`;
   }
   if (key === "appointment_reminder") {
     const date = variables.date || variables.when || "";

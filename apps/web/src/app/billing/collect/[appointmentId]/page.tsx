@@ -8,9 +8,9 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { secondaryButtonClass } from "@/components/auth-shell";
 import { canSendIssuedInvoice } from "@/lib/billing/rules";
 import {
-  BILLING_ROLES,
   consultationFeeForVisit,
   doctorName,
+  hasBillingAccess,
   inr,
   patientName,
   prettyEnum,
@@ -25,7 +25,7 @@ export default async function CollectVisitPaymentPage({
   params: Promise<{ appointmentId: string }>;
 }) {
   const user = await requireHospitalPage();
-  if (!BILLING_ROLES.includes(user.role)) redirect("/");
+  if (!hasBillingAccess(user)) redirect("/");
   const appointmentId = await routeParam(params, "appointmentId");
 
   const appointment = await prisma.appointment.findFirst({

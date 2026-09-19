@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PatientForm } from "@/components/patient-form";
 import { getCurrentUser } from "@/lib/auth";
-import { FRONT_DESK_ROLES, patientName } from "@/lib/front-desk";
+import { hasFrontDeskAccess, patientName } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 
 function dateInput(value: Date | null | undefined) {
@@ -14,7 +14,7 @@ function dateInput(value: Date | null | undefined) {
 export default async function EditPatientPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user?.hospitalId) redirect("/login");
-  if (!FRONT_DESK_ROLES.includes(user.role)) redirect("/patients");
+  if (!hasFrontDeskAccess(user)) redirect("/patients");
 
   const { id } = await params;
   const patient = await prisma.patient.findFirst({
@@ -32,7 +32,7 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
         <span className="font-mono">{patient.mrn}</span>
         {patient.familyGroupCode ? ` · ${patient.familyGroupCode}` : ""}
         {" · "}
-        Extra details stay collapsed. Expand a section only if you need to change it.
+        Extra details stay collapsed. Expand a section only if you need to change it. If this is “Baby of” a parent, just update the first name when the child is named.
       </p>
       <PatientForm
         submitLabel="Save patient details"

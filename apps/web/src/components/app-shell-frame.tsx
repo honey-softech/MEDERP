@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeProvider } from "@/components/realtime-provider";
+import { SessionKeepAlive } from "@/components/session-keep-alive";
 import { ViewModeToggle } from "@/components/view-mode-toggle";
 import type { ViewMode } from "@/lib/view-mode";
 
@@ -250,6 +251,7 @@ export function AppShellFrame({
 
   return (
     <RealtimeProvider>
+      <SessionKeepAlive />
       <div className="min-h-dvh bg-app-bg text-text-primary print:bg-white">
         {mobileOpen ? (
           <button

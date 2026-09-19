@@ -1,10 +1,10 @@
 import { AppShellFrame, type NavSection } from "@/components/app-shell-frame";
-import { getCurrentUser, isPlatformRole } from "@/lib/auth";
+import { getCurrentUser, isPlatformRole, SESSION_COOKIE } from "@/lib/auth";
 import { isNurseReceptionist } from "@/lib/authz/hospital";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { hospitalAccessBlocked, isExpiredTrialAllowedPath } from "@/lib/hospital-access";
 import { resolveViewContext } from "@/lib/view-mode";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 const staffNav: NavSection[] = [
@@ -372,6 +372,11 @@ export async function AppShell({
   dense?: boolean;
 }) {
   const user = await getCurrentUser();
+  if (!user) {
+    const jar = await cookies();
+    if (jar.get(SESSION_COOKIE)?.value) jar.delete(SESSION_COOKIE);
+    redirect("/login");
+  }
   const pathname = (await headers()).get("x-pathname") ?? "";
   if (
     user?.hospitalId &&

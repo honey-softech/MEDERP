@@ -3,12 +3,12 @@ import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import type { AppRole } from "@prisma/client";
 import { prisma } from "./prisma";
-import { SESSION_COOKIE, getUserBySessionToken } from "./session-user";
+import { SESSION_COOKIE, extraSessionIds, sessionCookieOptions, sessionExpiresAt } from "./session-policy";
+import { getUserBySessionToken, loadSessionByToken } from "./session-user";
 
-export { SESSION_COOKIE, getUserBySessionToken };
+export { SESSION_COOKIE, getUserBySessionToken, loadSessionByToken };
+export { sessionCookieOptions, sessionCookieSecure } from "./session-policy";
 export { normalizeMobile, isValidIndianMobile, mobileValidationError } from "./phone";
-
-const SESSION_DAYS = 7;
 const BCRYPT_ROUNDS = 12;
 export const MIN_PASSWORD_LENGTH = 8;
 
@@ -66,30 +66,26 @@ export function readBearerToken(request?: Request | null) {
   return token || null;
 }
 
-export function sessionCookieSecure() {
-  const explicit = process.env.COOKIE_SECURE?.trim().toLowerCase();
-  if (explicit === "0" || explicit === "false") return false;
-  if (explicit === "1" || explicit === "true") return true;
-  return process.env.NODE_ENV === "production";
-}
-
-export function sessionCookieOptions(expiresAt: Date) {
-  return {
-    httpOnly: true,
-    sameSite: "strict" as const,
-    secure: sessionCookieSecure(),
-    path: "/",
-    expires: expiresAt,
-  };
-}
-
 export async function createSession(userId: string, options?: { setCookie?: boolean }) {
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = hashSessionToken(rawToken);
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const expiresAt = sessionExpiresAt(now);
 
-  await prisma.appSession.create({
-    data: { token: tokenHash, userId, expiresAt },
+  await prisma.$transaction(async (tx) => {
+    await tx.appSession.create({
+      data: { token: tokenHash, userId, expiresAt, lastSeenAt: now } as never,
+    });
+    const sessions = await tx.appSession.findMany({ where: { userId } });
+    const extraIds = extraSessionIds(
+      sessions.map((row) => ({
+        id: row.id,
+        lastSeenAt: (row as { lastSeenAt?: Date }).lastSeenAt ?? row.createdAt,
+      })),
+    );
+    if (extraIds.length > 0) {
+      await tx.appSession.deleteMany({ where: { id: { in: extraIds } } });
+    }
   });
 
   if (options?.setCookie !== false) {
@@ -115,7 +111,12 @@ export async function invalidateUserSessions(userId: string) {
 }
 
 export async function getCurrentUser(request?: Request) {
+  const loaded = await loadCurrentSession(request);
+  return loaded?.user ?? null;
+}
+
+export async function loadCurrentSession(request?: Request) {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value ?? readBearerToken(request);
-  return getUserBySessionToken(token);
+  return loadSessionByToken(token);
 }

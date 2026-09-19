@@ -44,7 +44,7 @@ HEADERS = [
 
 SUITES = [
     ("TS-01", "Hospital Registration", "Self-registration, free trial, Razorpay paid signup, hospital code, T&C", 22, "P0"),
-    ("TS-02", "Authentication & Session", "Login, OTP, forgot/reset password, logout, rate limits, session", 30, "P0"),
+    ("TS-02", "Authentication & Session", "Login, OTP, forgot/reset password, logout, rate limits, 2-device 48h idle session", 33, "P0"),
     ("TS-03", "Staff Signup & Join Request", "Signup → OTP → login → join → approve/reject/cancel", 18, "P0"),
     ("TS-04", "Subscription & Tiers", "Tiers, seats, module gating, trial expiry, tier change, webhooks, monthly subscription bill WhatsApp to SUPER_ADMIN", 23, "P0"),
     ("TS-05", "Platform Admin Console", "Hospital CRUD, stop access, platform users, invoices, billing settings on every subscription bill", 25, "P1"),
@@ -979,7 +979,7 @@ def build_testdata(wb: Workbook):
     constants = [
         ("OTP (dummy mode)", "123456", "When OTP_DUMMY ≠ '0'"),
         ("Password min length", "8", "No complexity rules"),
-        ("Session cookie", "mederp_session", "7 days, httpOnly, SameSite=strict"),
+        ("Session cookie", "mederp_session", "48h idle sliding, max 2 devices, httpOnly, SameSite=strict"),
         ("Default OPD fee fallback", "₹500", "If hospital/doctor/dept fee unset"),
         ("Plan 1 CLINIC", "₹1999 / 3 seats", "1 doctor, 1 nurse, 1 receptionist"),
         ("Plan 2 STARTER", "₹3500 / 6 seats", "2 doctors, 3 nurses, 1 receptionist"),

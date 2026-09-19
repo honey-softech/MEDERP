@@ -1,17 +1,21 @@
 import { createHash } from "crypto";
 import { prisma } from "./prisma";
+import { SESSION_COOKIE, sessionExpiresAt, shouldRefreshSession } from "./session-policy";
 
-export const SESSION_COOKIE = "mederp_session";
+export { SESSION_COOKIE };
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function getUserBySessionToken(token: string | null | undefined) {
-  if (!token) return null;
+export type LoadedSession = {
+  token: string;
+  expiresAt: Date;
+  user: NonNullable<Awaited<ReturnType<typeof loadUserFromSession>>>["user"];
+};
 
-  const tokenHash = hashToken(token);
-  const session = await prisma.appSession.findUnique({
+async function loadUserFromSession(tokenHash: string) {
+  return prisma.appSession.findUnique({
     where: { token: tokenHash },
     include: {
       user: {
@@ -22,6 +26,13 @@ export async function getUserBySessionToken(token: string | null | undefined) {
       },
     },
   });
+}
+
+export async function loadSessionByToken(token: string | null | undefined): Promise<LoadedSession | null> {
+  if (!token) return null;
+
+  const tokenHash = hashToken(token);
+  const session = await loadUserFromSession(tokenHash);
 
   if (!session || session.expiresAt < new Date()) {
     if (session) {
@@ -41,5 +52,23 @@ export async function getUserBySessionToken(token: string | null | undefined) {
     return null;
   }
 
-  return user;
+  let expiresAt = session.expiresAt;
+  const lastSeenAt = (session as typeof session & { lastSeenAt?: Date }).lastSeenAt ?? session.createdAt;
+  if (shouldRefreshSession(lastSeenAt)) {
+    const now = new Date();
+    expiresAt = sessionExpiresAt(now);
+    await prisma.appSession
+      .update({
+        where: { id: session.id },
+        data: { lastSeenAt: now, expiresAt } as never,
+      })
+      .catch(() => undefined);
+  }
+
+  return { token, expiresAt, user };
+}
+
+export async function getUserBySessionToken(token: string | null | undefined) {
+  const loaded = await loadSessionByToken(token);
+  return loaded?.user ?? null;
 }

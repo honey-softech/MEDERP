@@ -16,8 +16,39 @@ import { parseInvestigationPicks } from "@/lib/lab-catalog";
 import { upsertVisitLabOrder } from "@/lib/lab";
 import { syncPharmacyRxFromAssessment } from "@/lib/pharmacy-rx";
 import { activeSignatureFor } from "@/lib/signatures";
+import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
+import {
+  cancelPendingFollowUpReminders,
+  scheduleFollowUpReminder,
+} from "@/lib/appointments/follow-up-reminder-queue";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+async function syncFollowUpReminder(params: {
+  hospitalId: string;
+  appointmentId: string;
+  followUpAt: Date | null;
+  hospital: {
+    followUpReminderEnabled: boolean;
+    followUpReminderDaysBefore: number;
+    name: string;
+  };
+}) {
+  try {
+    if (!params.followUpAt) {
+      await cancelPendingFollowUpReminders(params.appointmentId);
+      return;
+    }
+    await scheduleFollowUpReminder({
+      hospitalId: params.hospitalId,
+      appointmentId: params.appointmentId,
+      visitAt: params.followUpAt,
+      hospital: params.hospital,
+    });
+  } catch (error) {
+    console.error("Failed to schedule follow-up reminder", error);
+  }
+}
 
 const ASSESSMENT_AUDIT_FIELDS = [
   "chiefComplaint",
@@ -50,6 +81,13 @@ export async function POST(request: Request, context: Ctx) {
   if (scoped.error) return scoped.error;
   const denied = forbidUnless(scoped.user.role, DOCTOR_VISIT_ROLES);
   if (denied) return denied;
+  const view = await resolveViewContext(scoped.user);
+  if (!isActingAsDoctor(scoped.user, view.mode)) {
+    return NextResponse.json(
+      { error: "Switch to Doctor view to add or update visit assessments." },
+      { status: 403 },
+    );
+  }
 
   try {
     const { id } = await context.params;
@@ -59,7 +97,14 @@ export async function POST(request: Request, context: Ctx) {
         patient: true,
         doctor: { include: { appUser: { select: { username: true } } } },
         assessment: true,
-        hospital: { select: { requireSignatureForApproval: true } },
+        hospital: {
+          select: {
+            requireSignatureForApproval: true,
+            followUpReminderEnabled: true,
+            followUpReminderDaysBefore: true,
+            name: true,
+          },
+        },
       },
     });
     if (!appointment) {
@@ -68,11 +113,12 @@ export async function POST(request: Request, context: Ctx) {
     if (["CANCELLED", "NO_SHOW"].includes(appointment.status)) {
       return NextResponse.json({ error: "This visit cannot be assessed." }, { status: 409 });
     }
-    if (scoped.user.role === "DOCTOR") {
-      const staffId = await staffIdForAppUser(scoped.user.id, scoped.user.hospitalId);
-      if (!staffId || appointment.doctorId !== staffId) {
-        return NextResponse.json({ error: "You can only assess your own consults." }, { status: 403 });
-      }
+    const myDoctorId =
+      scoped.user.role === "DOCTOR"
+        ? await staffIdForAppUser(scoped.user.id, scoped.user.hospitalId)
+        : view.doctorStaffId;
+    if (!myDoctorId || appointment.doctorId !== myDoctorId) {
+      return NextResponse.json({ error: "You can only assess your own consults." }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);
@@ -121,6 +167,12 @@ export async function POST(request: Request, context: Ctx) {
           metadata: { changes },
         });
       }
+      await syncFollowUpReminder({
+        hospitalId: scoped.user.hospitalId,
+        appointmentId: appointment.id,
+        followUpAt,
+        hospital: appointment.hospital,
+      });
       return NextResponse.json({ ok: true, assessment });
     }
 
@@ -268,6 +320,13 @@ export async function POST(request: Request, context: Ctx) {
         orderedByUsername: scoped.user.username,
       });
     }
+
+    await syncFollowUpReminder({
+      hospitalId: scoped.user.hospitalId,
+      appointmentId: appointment.id,
+      followUpAt,
+      hospital: appointment.hospital,
+    });
 
     return NextResponse.json({ ok: true, assessment });
   } catch (error) {

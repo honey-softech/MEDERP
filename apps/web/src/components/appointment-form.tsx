@@ -35,6 +35,7 @@ export function AppointmentForm({
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [queueType, setQueueType] = useState<"SCHEDULED" | "WALK_IN">(defaultQueueType);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
@@ -43,16 +44,47 @@ export function AppointmentForm({
   const [slotMode, setSlotMode] = useState(false);
   const [slots, setSlots] = useState<{ minute: number; label: string }[]>([]);
   const [windowsHint, setWindowsHint] = useState("");
+  const [walkInWindows, setWalkInWindows] = useState<
+    { startMinute: number; endMinute: number; startTime: string; endTime: string }[]
+  >([]);
+  const [walkInConfigured, setWalkInConfigured] = useState(false);
+  const [walkInWindowStart, setWalkInWindowStart] = useState("");
   const walkInDefault = defaultQueueType === "WALK_IN";
+  const isWalkIn = queueType === "WALK_IN";
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-IN", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }),
+    [],
+  );
+  const remainingWalkInWindows = useMemo(() => {
+    const now = new Date();
+    const minute = now.getHours() * 60 + now.getMinutes();
+    return walkInWindows.filter((window) => window.endMinute > minute);
+  }, [walkInWindows]);
   const lockedDoctor = lockDoctor ? doctors.find((row) => row.id === defaultDoctorId) : null;
   const selectedOnLeave = Boolean(doctorId && onLeaveIds.includes(doctorId));
+  const walkInNoWindowToday = isWalkIn && walkInConfigured && walkInWindows.length === 0;
+  const walkInHoursEnded = isWalkIn && walkInWindows.length > 0 && remainingWalkInWindows.length === 0;
+  const walkInNeedsTimeChoice = isWalkIn && remainingWalkInWindows.length > 1;
 
   const leaveProbe = useMemo(() => {
-    if (walkInDefault) return new Date().toISOString();
+    if (isWalkIn) return new Date().toISOString();
     if (scheduledAt) return new Date(scheduledAt).toISOString();
     if (scheduledDate) return `${scheduledDate}T12:00:00`;
     return "";
-  }, [walkInDefault, scheduledAt, scheduledDate]);
+  }, [isWalkIn, scheduledAt, scheduledDate]);
 
   useEffect(() => {
     if (!leaveProbe) {
@@ -71,18 +103,38 @@ export function AppointmentForm({
   }, [leaveProbe]);
 
   useEffect(() => {
-    if (walkInDefault || !doctorId || !scheduledDate) {
+    const dateIso = isWalkIn ? todayIso : scheduledDate;
+    if (!doctorId || !dateIso) {
       setSlotMode(false);
       setSlots([]);
       setWindowsHint("");
+      setWalkInWindows([]);
+      setWalkInConfigured(false);
       return;
     }
     const handle = window.setTimeout(() => {
       void fetch(
-        `/api/appointments/availability?doctorId=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(scheduledDate)}`,
+        `/api/appointments/availability?doctorId=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(dateIso)}`,
       )
         .then((response) => response.json())
         .then((data) => {
+          const windows = Array.isArray(data.windows) ? data.windows : [];
+          if (isWalkIn) {
+            setWalkInConfigured(Boolean(data.configured));
+            setWalkInWindows(windows);
+            setSlotMode(false);
+            setSlots([]);
+            setWindowsHint(
+              windows.length
+                ? `Today: ${windows.map((w: { startTime: string; endTime: string }) => `${w.startTime}–${w.endTime}`).join(", ")}`
+                : data.configured
+                  ? "No availability windows today."
+                  : "",
+            );
+            return;
+          }
+          setWalkInWindows([]);
+          setWalkInConfigured(false);
           if (!data.configured) {
             setSlotMode(false);
             setSlots([]);
@@ -91,7 +143,6 @@ export function AppointmentForm({
           }
           setSlotMode(true);
           setSlots(Array.isArray(data.slots) ? data.slots : []);
-          const windows = Array.isArray(data.windows) ? data.windows : [];
           setWindowsHint(
             windows.length
               ? `Available ${data.dayLabel}: ${windows.map((w: { startTime: string; endTime: string }) => `${w.startTime}–${w.endTime}`).join(", ")}`
@@ -105,10 +156,12 @@ export function AppointmentForm({
         .catch(() => {
           setSlotMode(false);
           setSlots([]);
+          setWalkInWindows([]);
+          setWalkInConfigured(false);
         });
     }, 150);
     return () => window.clearTimeout(handle);
-  }, [doctorId, scheduledDate, walkInDefault, scheduledTime]);
+  }, [doctorId, scheduledDate, isWalkIn, todayIso, scheduledTime]);
 
   function setDate(value: string) {
     setScheduledDate(value);
@@ -127,11 +180,34 @@ export function AppointmentForm({
     setScheduledAt(combineDateAndTime(scheduledDate, label));
   }
 
+  useEffect(() => {
+    if (!isWalkIn) return;
+    if (remainingWalkInWindows.length === 1) {
+      setWalkInWindowStart(String(remainingWalkInWindows[0].startMinute));
+      return;
+    }
+    if (remainingWalkInWindows.length === 0) {
+      setWalkInWindowStart("");
+      return;
+    }
+    setWalkInWindowStart((current) =>
+      remainingWalkInWindows.some((window) => String(window.startMinute) === current) ? current : "",
+    );
+  }, [isWalkIn, remainingWalkInWindows]);
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     if (selectedOnLeave) {
       setError("This doctor is on leave that day. Choose another doctor or another date.");
+      return;
+    }
+    if (isWalkIn && walkInNoWindowToday) {
+      setError("This doctor has no availability windows today.");
+      return;
+    }
+    if (isWalkIn && walkInNeedsTimeChoice && !walkInWindowStart) {
+      setError("This doctor has more than one session today. Choose a walk-in time.");
       return;
     }
     setPending(true);
@@ -142,8 +218,10 @@ export function AppointmentForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...payload,
-        scheduledAt: walkInDefault ? payload.scheduledAt || new Date().toISOString() : scheduledAt || payload.scheduledAt,
-        checkInNow: payload.checkInNow === "on" || payload.queueType === "WALK_IN",
+        queueType,
+        scheduledAt: isWalkIn ? `${todayIso}T00:00` : scheduledAt || payload.scheduledAt,
+        walkInWindowStartMinute: isWalkIn && walkInWindowStart ? Number(walkInWindowStart) : undefined,
+        checkInNow: payload.checkInNow === "on" || queueType === "WALK_IN",
       }),
     });
     const data = await response.json();
@@ -153,7 +231,7 @@ export function AppointmentForm({
       return;
     }
     const appointmentId = data.appointment?.id as string | undefined;
-    if (payload.queueType === "WALK_IN" && appointmentId && !redirectToVisit) {
+    if (queueType === "WALK_IN" && appointmentId && !redirectToVisit) {
       router.push(`/billing/collect/${appointmentId}`);
     } else {
       router.push(appointmentId ? `/appointments/${appointmentId}` : "/appointments");
@@ -233,11 +311,50 @@ export function AppointmentForm({
         </select>
       </label>
 
-      {walkInDefault ? (
-        <label className="text-sm font-medium text-slate-700">
-          Date and time
-          <input className={fieldClass} type="datetime-local" name="scheduledAt" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-        </label>
+      {isWalkIn ? (
+        <div className="space-y-2 text-sm font-medium text-slate-700">
+          <p>Date and time</p>
+          <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-700">
+            Today — {todayLabel}
+            <span className="mt-0.5 block text-xs text-slate-500">Walk-ins can only be added for today.</span>
+          </p>
+          {!doctorId ? (
+            <p className="text-xs font-normal text-slate-500">Select a doctor to use their hours for today.</p>
+          ) : walkInNoWindowToday ? (
+            <p className="text-xs font-normal text-amber-700">This doctor has no availability windows today.</p>
+          ) : walkInHoursEnded ? (
+            <p className="text-xs font-normal text-slate-500">
+              Clinic hours have ended. Walk-in will still be added now.
+            </p>
+          ) : walkInNeedsTimeChoice ? (
+            <label className="block text-sm font-medium text-slate-700">
+              Session time
+              <select
+                className={fieldClass}
+                required
+                value={walkInWindowStart}
+                onChange={(event) => setWalkInWindowStart(event.target.value)}
+              >
+                <option value="">Select time</option>
+                {remainingWalkInWindows.map((window) => (
+                  <option key={window.startMinute} value={String(window.startMinute)}>
+                    {window.startTime}–{window.endTime}
+                  </option>
+                ))}
+              </select>
+              {windowsHint ? <span className="mt-1 block text-xs font-normal text-slate-500">{windowsHint}</span> : null}
+            </label>
+          ) : remainingWalkInWindows.length === 1 ? (
+            <p className="text-xs font-normal text-slate-500">
+              Walk-in joins today&apos;s {remainingWalkInWindows[0].startTime}–{remainingWalkInWindows[0].endTime}{" "}
+              session.
+            </p>
+          ) : (
+            <p className="text-xs font-normal text-slate-500">
+              {windowsHint || "No availability windows for this doctor yet — walk-in uses the current time."}
+            </p>
+          )}
+        </div>
       ) : (
         <>
           <label className="text-sm font-medium text-slate-700">
@@ -300,7 +417,12 @@ export function AppointmentForm({
       ) : (
         <label className="text-sm font-medium text-slate-700">
           Queue type
-          <select className={fieldClass} name="queueType" defaultValue={defaultQueueType}>
+          <select
+            className={fieldClass}
+            name="queueType"
+            value={queueType}
+            onChange={(event) => setQueueType(event.target.value === "WALK_IN" ? "WALK_IN" : "SCHEDULED")}
+          >
             <option value="SCHEDULED">Scheduled</option>
             <option value="WALK_IN">Walk-in</option>
           </select>
@@ -331,13 +453,13 @@ export function AppointmentForm({
         <input className={fieldClass} name="reason" />
       </label>
       <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-        <input type="checkbox" name="checkInNow" defaultChecked={walkInDefault} />
+        <input type="checkbox" name="checkInNow" defaultChecked={isWalkIn} />
         Check in now and issue token
       </label>
       {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
       <div className="md:col-span-2">
-        <button className={buttonClass} type="submit" disabled={pending || selectedOnLeave}>
-          {pending ? "Saving…" : walkInDefault ? "Add walk-in" : "Book appointment"}
+        <button className={buttonClass} type="submit" disabled={pending || selectedOnLeave || walkInNoWindowToday}>
+          {pending ? "Saving…" : isWalkIn ? "Add walk-in" : "Book appointment"}
         </button>
       </div>
     </form>

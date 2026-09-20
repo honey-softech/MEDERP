@@ -32,27 +32,14 @@ export const loginSchema = z
 
 export const signupSchema = z
   .object({
-    username: z.unknown().optional(),
     mobile: z.unknown().optional(),
     password: z.unknown().optional(),
     role: z.unknown().optional(),
   })
   .transform((data, ctx) => {
-    const username = String(data.username ?? "").trim();
     const mobile = indianMobileFrom(data.mobile);
     const password = String(data.password ?? "");
     const roleRaw = String(data.role ?? "RECEPTIONIST");
-    if (username.length < 3) {
-      ctx.addIssue({ code: "custom", message: "Username must be at least 3 characters." });
-      return z.NEVER;
-    }
-    if (!/^[a-zA-Z0-9._]+$/.test(username)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Username can only contain letters, numbers, dots, and underscores.",
-      });
-      return z.NEVER;
-    }
     if (!isValidIndianMobile(mobile)) {
       ctx.addIssue({ code: "custom", message: "Enter a valid 10-digit mobile number." });
       return z.NEVER;
@@ -67,7 +54,7 @@ export const signupSchema = z
       ctx.addIssue({ code: "custom", message: "Select a valid hospital role." });
       return z.NEVER;
     }
-    return { username, mobile, password, role: roleParsed.data as (typeof STAFF_ROLES)[number] };
+    return { mobile, password, role: roleParsed.data as (typeof STAFF_ROLES)[number] };
   });
 
 export const forgotPasswordSchema = z

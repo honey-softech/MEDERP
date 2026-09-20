@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { suggestedUsername, uniqueUsername } from "@/lib/employee";
 import { issueOtp } from "@/lib/otp";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { signupSchema } from "@/lib/validation/auth";
@@ -23,14 +24,16 @@ export async function POST(request: Request) {
   try {
     const parsed = await parseJsonBody(request, signupSchema);
     if (!parsed.ok) return parsed.response;
-    const { username, mobile, password, role: requestedRole } = parsed.data;
+    const { mobile, password, role: requestedRole } = parsed.data;
 
-    const existing = await prisma.appUser.findFirst({
-      where: { OR: [{ username }, { mobile }] },
+    const existingMobile = await prisma.appUser.findFirst({
+      where: { mobile },
     });
-    if (existing) {
-      return NextResponse.json({ error: "Username or mobile number is already registered." }, { status: 409 });
+    if (existingMobile) {
+      return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
+
+    const username = await uniqueUsername(suggestedUsername("user", mobile.slice(-4), requestedRole));
 
     const user = await prisma.appUser.create({
       data: {
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
       action: "USER_REGISTERED",
       entity: "AppUser",
       entityId: user.id,
-      summary: `${user.username} registered as ${user.role.replace(/_/g, " ")} and must request to join a listed hospital.`,
+      summary: `Mobile ${user.mobile} registered as ${user.role.replace(/_/g, " ")} and must request to join a listed hospital.`,
       metadata: { mobile: user.mobile },
     });
 

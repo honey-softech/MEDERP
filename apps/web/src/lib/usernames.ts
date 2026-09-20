@@ -6,6 +6,7 @@ const USERNAME_ROLE_SUFFIX: Record<string, string> = {
   LAB_TECH: "lab",
   ACCOUNTANT: "acc",
   SUPER_ADMIN: "adm",
+  HELPDESK: "hdk",
 };
 
 function letters(value: string) {

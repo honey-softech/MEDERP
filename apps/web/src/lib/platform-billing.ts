@@ -107,7 +107,7 @@ export async function countHospitalStaffSeats(hospitalId: string) {
     where: {
       hospitalId,
       isActive: true,
-      role: { notIn: ["SUPER_ADMIN", "SOFTWARE_ADMIN", "HELPDESK"] },
+      role: { notIn: ["SOFTWARE_ADMIN", "HELPDESK"] },
     },
   });
 }

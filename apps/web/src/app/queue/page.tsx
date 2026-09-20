@@ -11,7 +11,6 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { OpdDayNav } from "@/components/opd-day-nav";
 import {
   CLINICAL_VIEW_ROLES,
-  DOCTOR_VISIT_ROLES,
   NURSE_VITALS_ROLES,
   PRINT_SUMMARY_ROLES,
   canAddWalkIn,
@@ -29,7 +28,7 @@ import {
   tokenLabel,
 } from "@/lib/front-desk";
 import { statusBadge, statusBadgeBase } from "@/lib/ui";
-import { resolveViewContext } from "@/lib/view-mode";
+import { resolveViewContext, isActingAsDoctor } from "@/lib/view-mode";
 import { prisma } from "@/lib/prisma";
 
 export default async function QueuePage({
@@ -51,6 +50,7 @@ export default async function QueuePage({
     year: "numeric",
   });
   const view = await resolveViewContext(user);
+  const actingAsDoctor = isActingAsDoctor(user, view.mode);
   const myDoctorId =
     user.role === "DOCTOR"
       ? await staffIdForAppUser(user.id, user.hospitalId)
@@ -94,9 +94,9 @@ export default async function QueuePage({
             lastToken: 0,
           }));
   const doctorQueues = isToday ? [...grouped, ...emptyDoctors] : grouped;
-  const canManage = hasFrontDeskAccess(user);
+  const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
-  const canDoctorVisit = DOCTOR_VISIT_ROLES.includes(user.role);
+  const canDoctorVisit = actingAsDoctor;
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
   const waiting = queue.filter((row) => row.status === "SCHEDULED").length;
   const checkedIn = queue.filter((row) => row.status === "CHECKED_IN" || row.status === "IN_PROGRESS").length;

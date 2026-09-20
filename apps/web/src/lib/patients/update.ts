@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { DOCTOR_VISIT_ROLES, hasFrontDeskAccess, type HospitalActor } from "@/lib/authz/hospital";
+import { dateOfBirthFromAge, parsePatientAge } from "@/lib/display";
 import { sanitizePhotoData } from "@/lib/opd/patients";
 import type { PatientActionResult } from "@/lib/patients/types";
 import { prisma } from "@/lib/prisma";
@@ -44,6 +45,12 @@ export function buildPatientUpdatePayload(input: {
         return { ok: false, error: "Invalid date of birth." };
       }
       data.dateOfBirth = dateOfBirth;
+    } else if (input.body.age !== undefined && String(input.body.age ?? "").trim() !== "") {
+      const age = parsePatientAge(input.body.age);
+      if (age === null) {
+        return { ok: false, error: "Enter a valid age in years (0–150)." };
+      }
+      data.dateOfBirth = dateOfBirthFromAge(age);
     }
     if (input.body.gender) {
       const gender = String(input.body.gender);

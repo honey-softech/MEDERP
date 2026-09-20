@@ -5,6 +5,7 @@ import { HospitalBrandingForm } from "@/components/hospital-branding-form";
 import { SignaturePolicyForm } from "@/components/signature-policy-form";
 import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
 import { NurseReceptionistForm } from "@/components/nurse-receptionist-form";
+import { FollowUpReminderPolicyForm } from "@/components/follow-up-reminder-policy-form";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { countStaffWithoutSignature } from "@/lib/signatures";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +40,8 @@ export default async function HospitalSettingsPage() {
         walkInByDoctor: true,
         walkInByNurse: true,
         nurseAsReceptionist: true,
+        followUpReminderEnabled: true,
+        followUpReminderDaysBefore: true,
       },
     }),
     countStaffWithoutSignature(user.hospitalId),
@@ -72,10 +75,60 @@ export default async function HospitalSettingsPage() {
   return (
     <AppShell title="Hospital settings">
       <p className="mb-4 text-sm text-slate-500">
-        Branding, admin-as-doctor, document policy, nurses as receptionists, and who can add walk-ins. Changes are
-        recorded in the audit log.
+        Most-used settings first: branding and OPD fee, doctor hours, follow-up reminders, front-desk coverage, then
+        admin doctor and signature policy. Changes are recorded in the audit log.
       </p>
-      <div className="mb-6">
+      <HospitalBrandingForm
+        initial={{
+          name: hospital.name,
+          code: hospital.code,
+          address: hospital.address ?? "",
+          phone: hospital.phone ?? "",
+          logoData: hospital.logoData ?? "",
+          sealData: hospital.sealData ?? "",
+          opdFee: String(Number(hospital.opdFee ?? 500)),
+        }}
+      />
+
+      <section className="mt-8 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Doctor availability hours</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Each doctor has their own schedule. Set windows per doctor (multiple per day allowed). Booking
+            shows only the selected doctor&apos;s times.
+          </p>
+        </div>
+        {activeDoctors.length === 0 ? (
+          <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+            No active doctors yet. Add a doctor under Hospital users first.
+          </p>
+        ) : (
+          activeDoctors.map((doctor) => (
+            <DoctorAvailabilityEditor
+              key={doctor.id}
+              doctorId={doctor.id}
+              doctorLabel={`Dr ${doctor.firstName} ${doctor.lastName}`.trim()}
+            />
+          ))
+        )}
+      </section>
+
+      <NurseReceptionistForm initial={{ nurseAsReceptionist: hospital.nurseAsReceptionist }} />
+      <FollowUpReminderPolicyForm
+        initial={{
+          followUpReminderEnabled: hospital.followUpReminderEnabled,
+          followUpReminderDaysBefore: hospital.followUpReminderDaysBefore,
+        }}
+      />
+      <WalkInPolicyForm
+        initial={{
+          walkInByDoctor: hospital.walkInByDoctor,
+          walkInByNurse: hospital.walkInByNurse,
+          nurseAsReceptionist: hospital.nurseAsReceptionist,
+        }}
+      />
+
+      <div className="mt-6">
         <AdminDoctorProfileForm
           departments={departments.map((dept) => ({
             id: dept.id,
@@ -136,52 +189,11 @@ export default async function HospitalSettingsPage() {
           }}
         />
       </div>
-      <HospitalBrandingForm
-        initial={{
-          name: hospital.name,
-          code: hospital.code,
-          address: hospital.address ?? "",
-          phone: hospital.phone ?? "",
-          logoData: hospital.logoData ?? "",
-          sealData: hospital.sealData ?? "",
-          opdFee: String(Number(hospital.opdFee ?? 500)),
-        }}
-      />
+
       <SignaturePolicyForm
         initial={{ requireSignatureForApproval: hospital.requireSignatureForApproval }}
         coverage={coverage}
       />
-      <NurseReceptionistForm initial={{ nurseAsReceptionist: hospital.nurseAsReceptionist }} />
-      <WalkInPolicyForm
-        initial={{
-          walkInByDoctor: hospital.walkInByDoctor,
-          walkInByNurse: hospital.walkInByNurse,
-          nurseAsReceptionist: hospital.nurseAsReceptionist,
-        }}
-      />
-
-      <section className="mt-8 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">Doctor availability hours</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Each doctor has their own schedule. Set windows per doctor (multiple per day allowed). Booking
-            shows only the selected doctor&apos;s times.
-          </p>
-        </div>
-        {activeDoctors.length === 0 ? (
-          <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            No active doctors yet. Add a doctor under Hospital users first.
-          </p>
-        ) : (
-          activeDoctors.map((doctor) => (
-            <DoctorAvailabilityEditor
-              key={doctor.id}
-              doctorId={doctor.id}
-              doctorLabel={`Dr ${doctor.firstName} ${doctor.lastName}`.trim()}
-            />
-          ))
-        )}
-      </section>
     </AppShell>
   );
 }

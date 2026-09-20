@@ -14,7 +14,7 @@ export type SubscriptionTier = {
   tagline: string;
   /** Monthly fee in INR */
   monthlyFee: number;
-  /** Total staff seats (any mix of roles). null = unlimited. Super admin is free and does not count. */
+  /** Total hospital login seats (any mix of roles). null = unlimited. Hospital SUPER_ADMIN counts as one seat. */
   seatLimit: number | null;
   /** Suggested role mix for registration UI only — hospitals may allocate seats freely. */
   roleSuggestion: string;
@@ -29,7 +29,9 @@ export type SubscriptionTier = {
 
 /**
  * Three OPD plans. Modules (pharmacy, lab, inventory, wards) are off until offered later.
- * Seats are fungible across doctor / nurse / receptionist / other staff roles.
+ * Seats are fungible across hospital admin / doctor / nurse / receptionist / other staff.
+ * Hospital super admin counts as one seat. Admin-as-doctor and nurse-as-receptionist do not
+ * add seats — they only change what an existing user can do.
  */
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
@@ -38,15 +40,16 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     tagline: "Base OPD clinic",
     monthlyFee: 2_499,
     seatLimit: 3,
-    roleSuggestion: "1 doctor, 1 nurse, 1 receptionist",
+    roleSuggestion: "1 admin doctor + 2 nurses/receptionists",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "3 staff seats (any roles)",
-      "Suggested: 1 doctor, 1 nurse, 1 receptionist",
+      "3 login seats total (hospital admin counts as 1)",
+      "Suggested: 1 admin as doctor + 2 nurses (nurses can cover reception)",
+      "Admin-as-doctor and nurse-as-receptionist do not add seats",
       "OPD, billing, appointments",
       "Nurse station (OPD vitals)",
       "Visit summary and prescription print",
@@ -59,15 +62,15 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     tagline: "Growing OPD",
     monthlyFee: 4_499,
     seatLimit: 6,
-    roleSuggestion: "2 doctors, 3 nurses, 1 receptionist",
+    roleSuggestion: "1 admin doctor + more doctors/nurses/receptionists",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "6 staff seats (any roles)",
-      "Suggested: 2 doctors, 3 nurses, 1 receptionist",
+      "6 login seats total (hospital admin counts as 1)",
+      "Suggested: 1 admin as doctor + doctors, nurses, or receptionists",
       "Everything in Plan 1",
       "Nurse station (OPD vitals)",
       "1-month free trial",
@@ -79,15 +82,15 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     tagline: "Larger OPD team",
     monthlyFee: 5_999,
     seatLimit: 9,
-    roleSuggestion: "3 doctors, 5 nurses, 1 receptionist",
+    roleSuggestion: "1 admin doctor + larger clinical and front-desk team",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "9 staff seats (any roles)",
-      "Suggested: 3 doctors, 5 nurses, 1 receptionist",
+      "9 login seats total (hospital admin counts as 1)",
+      "Suggested: 1 admin as doctor + doctors, nurses, or receptionists",
       "Everything in Plan 2",
       "Nurse station (OPD vitals)",
       "1-month free trial",

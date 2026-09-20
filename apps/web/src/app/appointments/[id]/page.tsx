@@ -15,7 +15,6 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
 import {
   CLINICAL_VIEW_ROLES,
-  DOCTOR_VISIT_ROLES,
   EXTERNAL_REPORT_UPLOAD_ROLES,
   LAB_REPORT_VIEW_ROLES,
   LAB_VIEW_ROLES,
@@ -38,7 +37,9 @@ import { siteFromSnapshot } from "@/lib/lab-catalog";
 import { investigationsEditable } from "@/lib/lab";
 import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
+import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
+import { followUpReminderHint } from "@/lib/appointments/follow-up-reminder";
 
 export default async function AppointmentDetailPage({
   params,
@@ -51,6 +52,8 @@ export default async function AppointmentDetailPage({
   const { id } = await params;
   const { edit } = await searchParams;
   const editing = edit === "1" || edit === "true";
+  const view = await resolveViewContext(user);
+  const actingAsDoctor = isActingAsDoctor(user, view.mode);
   const appointment = await prisma.appointment.findFirst({
     where: { id, hospitalId: user.hospitalId },
     include: {
@@ -149,10 +152,10 @@ export default async function AppointmentDetailPage({
   const previousId = queueIndex > 0 ? dayQueue[queueIndex - 1]?.id ?? null : null;
   const nextId = queueIndex >= 0 && queueIndex < dayQueue.length - 1 ? dayQueue[queueIndex + 1]?.id ?? null : null;
 
-  const canManage = hasFrontDeskAccess(user);
+  const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
-  const canDoctorVisit = user.role === "DOCTOR" || user.role === "SUPER_ADMIN";
-  const canAssess = DOCTOR_VISIT_ROLES.includes(user.role);
+  const canDoctorVisit = actingAsDoctor;
+  const canAssess = actingAsDoctor;
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
   const canCollectLab = hasBillingAccess(user);
   const canWorkLab = LAB_WORK_ROLES.includes(user.role);
@@ -388,6 +391,7 @@ export default async function AppointmentDetailPage({
                 : null
             }
             cockpit
+            followUpReminderNote={followUpReminderHint(user.hospital)}
             initial={{
               chiefComplaint: assessment?.chiefComplaint ?? "",
               examination: assessment?.examination ?? "",

@@ -93,15 +93,13 @@ export async function POST(request: Request) {
       }
     }
 
-    if (role !== "SUPER_ADMIN") {
-      try {
-        await assertStaffSeatAvailable(hospitalId);
-      } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Staff limit reached." },
-          { status: 403 },
-        );
-      }
+    try {
+      await assertStaffSeatAvailable(hospitalId);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Staff limit reached." },
+        { status: 403 },
+      );
     }
 
     const password = String(body?.password ?? "").trim();
@@ -115,16 +113,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const username = await uniqueUsername(
-      input.username || suggestedUsername(input.firstName, input.lastName, role),
-    );
+    const username = await uniqueUsername(suggestedUsername(input.firstName, input.lastName, role));
     const clash = await prisma.appUser.findFirst({
-      where: {
-        OR: [{ username }, { mobile }],
-      },
+      where: { mobile },
     });
     if (clash) {
-      return NextResponse.json({ error: "Username, mobile, or employee ID is already registered." }, { status: 409 });
+      return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
 
     if (input.departmentId) {

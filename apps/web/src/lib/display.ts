@@ -12,12 +12,32 @@ export function inr(value: { toString(): string } | number | string) {
   })}`;
 }
 
-export function ageYears(dob: Date) {
-  const now = new Date();
+export const MAX_PATIENT_AGE_YEARS = 150;
+
+export function ageYears(dob: Date, now = new Date()) {
   let age = now.getFullYear() - dob.getFullYear();
   const month = now.getMonth() - dob.getMonth();
   if (month < 0 || (month === 0 && now.getDate() < dob.getDate())) age -= 1;
   return age;
+}
+
+export function parsePatientAge(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!/^\d+$/.test(raw)) return null;
+  const years = Number(raw);
+  if (years > MAX_PATIENT_AGE_YEARS) return null;
+  return years;
+}
+
+export function dateOfBirthFromAge(years: number, now = new Date()) {
+  return new Date(now.getFullYear() - years, now.getMonth(), now.getDate());
+}
+
+export function ageFromDateInput(value: string, now = new Date()) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const age = ageYears(new Date(year, month - 1, day), now);
+  return age >= 0 ? String(age) : null;
 }
 
 export function ageLabel(dob: Date) {

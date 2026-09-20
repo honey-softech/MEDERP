@@ -1,9 +1,9 @@
 import type { ReminderChannel } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit";
 import { hasFrontDeskAccess } from "@/lib/authz/hospital";
+import { createAppointmentReminders } from "@/lib/appointments/follow-up-reminder-queue";
 import { doctorName, patientName, tokenLabel } from "@/lib/display";
 import { reminderMessage } from "@/lib/opd/scheduling";
-import { prisma } from "@/lib/prisma";
 import type { AppointmentActionContext, AppointmentActionResult } from "@/lib/appointments/types";
 
 const CHANNELS: ReminderChannel[] = ["SMS", "WHATSAPP", "EMAIL"];
@@ -34,6 +34,7 @@ export async function remindAppointment(
     };
   }
   const hospitalName = user.hospital?.name ?? "the hospital";
+  const now = new Date();
   const message = reminderMessage({
     patient: patientName(appointment.patient),
     doctor: doctorName(appointment.doctor),
@@ -41,48 +42,15 @@ export async function remindAppointment(
     when: appointment.scheduledAt,
     token: appointment.tokenNumber ? tokenLabel(appointment.tokenNumber) : undefined,
   });
-  const created = await prisma.$transaction(
-    channels.map((channel) =>
-      prisma.appointmentReminder.create({
-        data: {
-          hospitalId: user.hospitalId,
-          appointmentId: appointment.id,
-          channel,
-          status: "PENDING",
-          message,
-        },
-      }),
-    ),
-  );
-  const { enqueueMessage } = await import("@/lib/messaging");
-  const variables = {
-    patient: patientName(appointment.patient),
-    doctor: doctorName(appointment.doctor),
-    hospital: hospitalName,
-    when: appointment.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
-    date: appointment.scheduledAt.toLocaleDateString("en-IN", { dateStyle: "medium" }),
-    time: appointment.scheduledAt.toLocaleTimeString("en-IN", { timeStyle: "short" }),
-    token: appointment.tokenNumber ? tokenLabel(appointment.tokenNumber) : "",
-  };
-  for (const reminder of created) {
-    const queued = await enqueueMessage({
-      hospitalId: user.hospitalId,
-      patientId: appointment.patientId,
-      appointmentId: appointment.id,
-      reminderId: reminder.id,
-      channel: reminder.channel,
-      templateKey: "appointment_reminder",
-      variables,
-      toPhone: phone,
-      patient: appointment.patient,
-    });
-    if ("error" in queued) {
-      await prisma.appointmentReminder.update({
-        where: { id: reminder.id },
-        data: { status: "FAILED" },
-      });
-    }
-  }
+  await createAppointmentReminders({
+    hospitalId: user.hospitalId,
+    hospitalName,
+    appointment,
+    channels,
+    source: "MANUAL",
+    visitAt: appointment.scheduledAt,
+    scheduledFor: now,
+  });
   await writeAuditLog({
     request,
     hospitalId: user.hospitalId,

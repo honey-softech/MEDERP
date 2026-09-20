@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, hashPassword, normalizeMobile, passwordValidationError } from "@/lib/auth";
+import { suggestedUsername, uniqueUsername } from "@/lib/employee";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -32,13 +33,9 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const username = String(body?.username ?? "").trim();
   const mobile = normalizeMobile(String(body?.mobile ?? ""));
   const password = String(body?.password ?? "");
 
-  if (username.length < 3) {
-    return NextResponse.json({ error: "Username must be at least 3 characters." }, { status: 400 });
-  }
   if (mobile.length < 10) {
     return NextResponse.json({ error: "Enter a valid mobile number." }, { status: 400 });
   }
@@ -47,10 +44,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: passwordError }, { status: 400 });
   }
 
-  const clash = await prisma.appUser.findFirst({ where: { OR: [{ username }, { mobile }] } });
+  const clash = await prisma.appUser.findFirst({ where: { mobile } });
   if (clash) {
-    return NextResponse.json({ error: "Username or mobile number is already registered." }, { status: 409 });
+    return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
   }
+
+  const username = await uniqueUsername(suggestedUsername("helpdesk", mobile.slice(-4), "HELPDESK"));
 
   const agent = await prisma.appUser.create({
     data: {
@@ -74,7 +73,7 @@ export async function POST(request: Request) {
     action: "HELPDESK_USER_CREATED",
     entity: "AppUser",
     entityId: agent.id,
-    summary: `${actor.username} created helpdesk agent ${agent.username}.`,
+    summary: `${actor.username} created helpdesk agent for mobile ${agent.mobile}.`,
     metadata: { mobile: agent.mobile },
   });
 

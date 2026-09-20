@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { dateOfBirthFromAge, parsePatientAge } from "@/lib/display";
 import { babyOfName, startOfLocalDay } from "@/lib/patients/infant";
+import { mobileValidationError, normalizeMobile } from "@/lib/phone";
 
 export const GENDERS = ["MALE", "FEMALE", "OTHER"] as const;
 export const ID_PROOFS = ["AADHAAR", "PAN", "PASSPORT", "DRIVING_LICENSE", "VOTER_ID", "OTHER"] as const;
@@ -20,11 +22,21 @@ function optionalText(value: unknown) {
   return text(value) || null;
 }
 
+function resolvePatientDateOfBirth(dateOfBirthRaw: unknown, ageRaw: unknown) {
+  const dateOfBirth = dateOfBirthRaw ? new Date(String(dateOfBirthRaw)) : null;
+  if (dateOfBirth && !Number.isNaN(dateOfBirth.getTime())) {
+    return dateOfBirth;
+  }
+  const age = parsePatientAge(ageRaw);
+  return age === null ? null : dateOfBirthFromAge(age);
+}
+
 export const createPatientSchema = z
   .object({
     firstName: z.unknown().optional(),
     lastName: z.unknown().optional(),
     dateOfBirth: z.unknown().optional(),
+    age: z.unknown().optional(),
     gender: z.unknown().optional(),
     phone: z.unknown().optional(),
     email: z.unknown().optional(),
@@ -55,14 +67,14 @@ export const createPatientSchema = z
     const familyOfPatientId = optionalText(data.familyOfPatientId);
     let firstName = text(data.firstName);
     let lastName = text(data.lastName);
-    let dateOfBirth = data.dateOfBirth ? new Date(String(data.dateOfBirth)) : null;
+    let dateOfBirth = resolvePatientDateOfBirth(data.dateOfBirth, data.age);
     const gender = text(data.gender);
     if (unnamedInfant) {
       if (parentName) firstName = babyOfName(parentName);
       else if (familyOfPatientId) firstName = firstName || "Baby of parent";
       else firstName = babyOfName(firstName.replace(/^baby of\s+/i, ""));
       lastName = "";
-      if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
+      if (!dateOfBirth) {
         dateOfBirth = startOfLocalDay();
       }
       if (!firstName) {
@@ -72,11 +84,17 @@ export const createPatientSchema = z
         });
         return z.NEVER;
       }
-    } else if (!firstName || !dateOfBirth || Number.isNaN(dateOfBirth.getTime())) {
+    } else if (!firstName || !dateOfBirth) {
       ctx.addIssue({
         code: "custom",
-        message: "First name and date of birth are required.",
+        message: "First name and age are required.",
       });
+      return z.NEVER;
+    }
+    const phone = normalizeMobile(String(data.phone ?? ""));
+    const phoneError = mobileValidationError(phone, "Mobile number");
+    if (phoneError) {
+      ctx.addIssue({ code: "custom", message: phoneError });
       return z.NEVER;
     }
     if (!(GENDERS as readonly string[]).includes(gender)) {
@@ -103,7 +121,7 @@ export const createPatientSchema = z
       lastName,
       dateOfBirth,
       gender: gender as (typeof GENDERS)[number],
-      phone: optionalText(data.phone),
+      phone,
       email: optionalText(data.email),
       address: optionalText(data.address),
       bloodGroup: optionalText(data.bloodGroup),

@@ -8,7 +8,7 @@ import { secondaryButtonClass } from "@/components/auth-shell";
 import {
   DOCTOR_VISIT_ROLES,
   PRINT_SUMMARY_ROLES,
-  physicianLine,
+  doctorName,
   prettyEnum,
   requireHospitalPage,
 } from "@/lib/front-desk";
@@ -90,7 +90,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
         encounterNo={encounterNumber(appointment.hospital.code, appointment.scheduledAt, appointment.tokenNumber)}
         appointmentType={prettyEnum(appointment.visitType)}
         visitDate={visitDateLabel(appointment.scheduledAt)}
-        physician={physicianLine(appointment.doctor)}
+        physician={doctorName(appointment.doctor)}
         departmentName={appointment.department.name}
         diagnosis={appointment.assessment.diagnosis}
         chiefComplaint={appointment.assessment.chiefComplaint}

@@ -44,18 +44,18 @@ const doctorNav: NavSection[] = [
   {
     items: [
       { href: "/", label: "Dashboard" },
-      { href: "/patients", label: "Patients" },
-      { href: "/certificates", label: "Certificates" },
-      { href: "/appointments", label: "Appointments" },
       { href: "/queue", label: "OPD queue" },
+      { href: "/appointments", label: "Appointments" },
+      { href: "/patients", label: "Patients" },
+      { href: "/wards", label: "Wards" },
     ],
   },
   {
     title: "Hospital",
     items: [
       { href: "/staff", label: "Staff" },
-      { href: "/wards", label: "Wards" },
       { href: "/billing", label: "Billing" },
+      { href: "/certificates", label: "Certificates" },
     ],
   },
   {
@@ -232,25 +232,24 @@ const superAdminNav: NavSection[] = [
   {
     title: "Administration",
     items: [
-      { href: "/hospital/settings", label: "Hospital settings" },
-      { href: "/drug-brands", label: "Medicine brands" },
       { href: "/hospital/users", label: "Hospital users" },
-      { href: "/hospital/subscription", label: "Subscription" },
       { href: "/hospital/join-requests", label: "Join requests" },
+      { href: "/hospital/settings", label: "Hospital settings" },
       { href: "/hospital/leaves", label: "Staff leave" },
+      { href: "/hospital/subscription", label: "Subscription" },
+      { href: "/drug-brands", label: "Medicine brands" },
       { href: "/hospital/audit-log", label: "Audit log" },
     ],
   },
   {
     title: "Clinical",
     items: [
-      { href: "/nurse", label: "Nurse station" },
-      { href: "/patients", label: "Patients" },
-      { href: "/certificates", label: "Certificates" },
-      { href: "/appointments", label: "Appointments" },
       { href: "/queue", label: "OPD queue" },
-      { href: "/staff", label: "Staff" },
+      { href: "/appointments", label: "Appointments" },
+      { href: "/patients", label: "Patients" },
       { href: "/wards", label: "Wards" },
+      { href: "/staff", label: "Staff" },
+      { href: "/certificates", label: "Certificates" },
     ],
   },
   {

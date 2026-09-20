@@ -17,7 +17,6 @@ const roles = [
 
 export default function SignupPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("RECEPTIONIST");
@@ -38,7 +37,7 @@ export default function SignupPage() {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, mobile, password, role }),
+        body: JSON.stringify({ mobile, password, role }),
       });
       const raw = await response.text();
       let data: { error?: string; mobile?: string } = {};
@@ -80,16 +79,6 @@ export default function SignupPage() {
               </option>
             ))}
           </select>
-        </label>
-        <label className="block text-sm font-medium text-slate-700">
-          Username
-          <input
-            className={fieldClass}
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            autoComplete="username"
-            required
-          />
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Mobile number

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PatientForm } from "@/components/patient-form";
 import { getCurrentUser } from "@/lib/auth";
-import { hasFrontDeskAccess, patientName } from "@/lib/front-desk";
+import { ageYears, hasFrontDeskAccess, patientName } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 
 function dateInput(value: Date | null | undefined) {
@@ -40,6 +40,7 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
           id: patient.id,
           firstName: patient.firstName,
           lastName: patient.lastName,
+          age: String(Math.max(0, ageYears(patient.dateOfBirth))),
           dateOfBirth: dateInput(patient.dateOfBirth),
           gender: patient.gender,
           phone: patient.phone ?? "",

@@ -199,6 +199,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
               initial={{
                 firstName: "",
                 lastName: patient.lastName,
+                age: "",
                 dateOfBirth: "",
                 gender: "MALE",
                 phone: patient.phone ?? "",

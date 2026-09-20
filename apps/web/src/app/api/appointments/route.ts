@@ -19,6 +19,7 @@ import { staffIdsOnApprovedLeave } from "@/lib/staff-leave";
 import { notifyNursesOfConsult } from "@/lib/notifications";
 import { createAppointmentSchema } from "@/lib/validation/appointment";
 import { parseJsonBody } from "@/lib/validation/parse";
+import { scheduleFollowUpReminder } from "@/lib/appointments/follow-up-reminder-queue";
 
 export async function GET(request: Request) {
   const scoped = await requireHospitalActor();
@@ -96,8 +97,9 @@ export async function POST(request: Request) {
     reason,
     notes,
     checkInNow,
-    scheduledAt,
+    walkInWindowStartMinute,
   } = parsed.data;
+  let scheduledAt = parsed.data.scheduledAt;
   let doctorId = parsed.data.doctorId;
   const photoData = sanitizePhotoData(parsed.data.photoData);
 
@@ -153,7 +155,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const { assertDoctorBookableAt } = await import("@/lib/doctor-availability");
+  const walkIn = queueType === "WALK_IN";
+  const {
+    listDoctorAvailability,
+    resolveWalkInScheduledAt,
+    walkInMustBeToday,
+    assertDoctorBookableAt,
+  } = await import("@/lib/doctor-availability");
+
+  if (walkIn) {
+    const todayError = walkInMustBeToday(scheduledAt);
+    if (todayError) {
+      return NextResponse.json({ error: todayError }, { status: 400 });
+    }
+    const windows = await listDoctorAvailability(doctor.id);
+    const resolved = resolveWalkInScheduledAt({
+      windows,
+      chosenStartMinute: walkInWindowStartMinute,
+    });
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: 400 });
+    }
+    scheduledAt = resolved.at;
+  }
+
   const availability = await assertDoctorBookableAt({
     hospitalId: scoped.user.hospitalId,
     doctorId: doctor.id,
@@ -164,7 +189,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: availability.error }, { status: availability.status });
   }
 
-  const walkIn = queueType === "WALK_IN";
   const shouldCheckIn = walkIn || checkInNow;
   const tokenNumber = await nextToken(scoped.user.hospitalId, doctor.id, scheduledAt);
 
@@ -213,6 +237,19 @@ export async function POST(request: Request) {
     token: tokenLabel(tokenNumber),
     arrived: shouldCheckIn,
   });
+
+  if (visitType === "FOLLOW_UP") {
+    try {
+      await scheduleFollowUpReminder({
+        hospitalId: scoped.user.hospitalId,
+        appointmentId: appointment.id,
+        visitAt: appointment.scheduledAt,
+        hospital: scoped.user.hospital,
+      });
+    } catch (error) {
+      console.error("Failed to schedule follow-up reminder", error);
+    }
+  }
 
   return NextResponse.json({ ok: true, appointment });
 }

@@ -6,7 +6,6 @@ import { buttonClass, fieldClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
 import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
-import { suggestedUsername } from "@/lib/usernames";
 
 const roles = [
   { value: "RECEPTIONIST", label: "Receptionist" },
@@ -149,20 +148,11 @@ export default function HospitalUserForm({
   const [employmentOpen, setEmploymentOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const [professionalOpen, setProfessionalOpen] = useState(false);
-  const [usernameTouched, setUsernameTouched] = useState(editing);
 
   const role = roleLocked ? "SUPER_ADMIN" : values.role ?? "RECEPTIONIST";
 
   function setField<K extends keyof HospitalUserFormInitial>(key: K, value: HospitalUserFormInitial[K]) {
-    if (key === "username") setUsernameTouched(true);
-    setValues((current) => {
-      const next = { ...current, [key]: value };
-      const nextRole = key === "role" ? String(value) : roleLocked ? "SUPER_ADMIN" : next.role ?? "RECEPTIONIST";
-      if (!usernameTouched && (key === "firstName" || key === "lastName" || key === "role")) {
-        next.username = suggestedUsername(next.firstName ?? "", next.lastName ?? "", nextRole);
-      }
-      return next;
-    });
+    setValues((current) => ({ ...current, [key]: value }));
   }
 
   const payload = useMemo(
@@ -258,13 +248,6 @@ export default function HospitalUserForm({
 
       <Field label="First name" value={values.firstName} onChange={(v) => setField("firstName", v)} required autoComplete="given-name" />
       <Field label="Last name" value={values.lastName} onChange={(v) => setField("lastName", v)} autoComplete="family-name" />
-      <Field
-        label="Username"
-        value={values.username}
-        onChange={(v) => setField("username", v)}
-        placeholder="Auto from first name, last name, and role"
-        autoComplete={editing ? "username" : "off"}
-      />
       <Field label="Mobile number" value={values.mobile} onChange={(v) => setField("mobile", v)} required placeholder="+91 XXXXX XXXXX" autoComplete="tel" />
       <Field
         label={editing ? "New password (optional)" : "Password"}

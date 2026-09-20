@@ -165,6 +165,12 @@ enum ReminderStatus {
   PENDING
   SENT
   FAILED
+  CANCELLED
+}
+
+enum ReminderSource {
+  MANUAL
+  FOLLOW_UP
 }
 
 enum DiagnosticKind {
@@ -367,6 +373,8 @@ model Hospital {
   walkInByDoctor     Boolean           @default(true)
   walkInByNurse      Boolean           @default(false)
   nurseAsReceptionist Boolean          @default(false)
+  followUpReminderEnabled Boolean      @default(false)
+  followUpReminderDaysBefore Int       @default(1)
   trialEndsAt        DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
@@ -1041,9 +1049,15 @@ model AppointmentReminder {
   appointment    Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   channel        ReminderChannel
   status         ReminderStatus  @default(PENDING)
+  source         ReminderSource  @default(MANUAL)
   message        String
+  visitAt        DateTime?
+  scheduledFor   DateTime?
   sentAt         DateTime?
   createdAt      DateTime        @default(now())
+
+  @@index([status, scheduledFor])
+  @@index([appointmentId, status, source])
 }
 
 model OutboundMessage {

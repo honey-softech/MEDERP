@@ -480,8 +480,8 @@ export default function RegisterHospitalPage() {
                 <span>
                   <span className="font-medium">Admin is also a doctor</span>
                   <span className="mt-0.5 block text-slate-500">
-                    Same mobile and login for hospital admin and clinical practice. Fill doctor details
-                    below — enabled automatically after registration.
+                    Same mobile and login for hospital admin and clinical practice — still one seat on your plan.
+                    Fill doctor details below — enabled automatically after registration.
                   </span>
                 </span>
               </label>
@@ -521,7 +521,8 @@ export default function RegisterHospitalPage() {
             <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
             <p className="mt-1 text-sm text-slate-600">
               Add your card now to start. You get 1 month free; the plan amount is debited automatically from next
-              month. Super admin is free and does not use a seat.
+              month. Seat count includes the hospital admin. Admin-as-doctor and nurse-as-receptionist do not add
+              extra seats.
             </p>
             <div className="mt-3 grid gap-2">
               {(pkg?.tiers ?? []).map((tier) => {

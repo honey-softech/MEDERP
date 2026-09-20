@@ -120,9 +120,9 @@ export function AdminDoctorProfileForm({
       <div>
         <h3 className="font-semibold">Admin as doctor</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Practice as a doctor on the same login and mobile ({user.mobile}). Link an existing doctor if one
-          already works here, or add new doctor details. Then switch between Admin and Doctor views from the
-          header.
+          Practice as a doctor on the same login and mobile ({user.mobile}). This uses the same seat as hospital
+          admin — it does not add another user. Link an existing doctor if one already works here, or add new
+          doctor details. Then switch between Admin and Doctor views from the header.
         </p>
       </div>
 

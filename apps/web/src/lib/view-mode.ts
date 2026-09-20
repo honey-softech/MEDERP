@@ -35,6 +35,13 @@ export function canUserActAsDoctor(user: ViewUser | null | undefined): boolean {
   return Boolean(staff && staff.role === "DOCTOR" && staff.isActive);
 }
 
+/** True when the session should behave as a practicing doctor (not nurse/admin desk). */
+export function isActingAsDoctor(user: ViewUser | null | undefined, mode: ViewMode) {
+  if (!user) return false;
+  if (user.role === "DOCTOR") return true;
+  return canUserActAsDoctor(user) && mode === "doctor";
+}
+
 export function doctorStaffIdFor(user: ViewUser | null | undefined): string | null {
   if (!canUserActAsDoctor(user)) return null;
   return user?.staffProfile?.id ?? null;

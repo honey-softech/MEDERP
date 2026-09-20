@@ -38,6 +38,7 @@ export const createAppointmentSchema = z
     photoData: z.unknown().optional(),
     checkInNow: z.unknown().optional(),
     scheduledAt: z.unknown().optional(),
+    walkInWindowStartMinute: z.unknown().optional(),
   })
   .transform((data, ctx) => {
     const patientId = text(data.patientId);
@@ -66,6 +67,18 @@ export const createAppointmentSchema = z
       ctx.addIssue({ code: "custom", message: "Choose a valid appointment time." });
       return z.NEVER;
     }
+    const windowRaw = data.walkInWindowStartMinute;
+    const walkInWindowStartMinute =
+      windowRaw === "" || windowRaw == null ? null : Number(windowRaw);
+    if (
+      walkInWindowStartMinute != null &&
+      (!Number.isInteger(walkInWindowStartMinute) ||
+        walkInWindowStartMinute < 0 ||
+        walkInWindowStartMinute >= 24 * 60)
+    ) {
+      ctx.addIssue({ code: "custom", message: "Choose a walk-in time within today's hours." });
+      return z.NEVER;
+    }
     return {
       patientId,
       doctorId,
@@ -79,6 +92,7 @@ export const createAppointmentSchema = z
       photoData: data.photoData,
       checkInNow: Boolean(data.checkInNow),
       scheduledAt,
+      walkInWindowStartMinute,
     };
   });
 

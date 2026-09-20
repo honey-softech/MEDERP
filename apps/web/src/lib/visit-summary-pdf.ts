@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { physicianLine, prettyEnum } from "@/lib/front-desk";
+import { doctorName, prettyEnum } from "@/lib/front-desk";
 import {
   drawClinicalRow,
   drawIdentity,
@@ -75,7 +75,7 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
         : input.assessment.visitOutcome === "FOLLOW_UP"
           ? "Follow up"
           : "—";
-  const physician = physicianLine(input.doctor);
+  const physician = doctorName(input.doctor);
   const printedAt = input.printedAt ?? printClock();
 
   return new Promise((resolve, reject) => {

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES, getCurrentUser, hashPassword, invalidateUserSessions, passwordValidationError } from "@/lib/auth";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { parseEmployeeBody, suggestedUsername, uniqueUsername, upsertEmployeeStaff, nextEmployeeId, nextUserCode } from "@/lib/employee";
+import { parseEmployeeBody, upsertEmployeeStaff, nextEmployeeId, nextUserCode } from "@/lib/employee";
 import { userFormInitial } from "@/lib/user-form-initial";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -111,20 +111,17 @@ export async function PATCH(request: Request, context: Ctx) {
       where: { id: hospitalId },
       select: { code: true },
     });
-    const username = await uniqueUsername(
-      input.username || existing.username || suggestedUsername(input.firstName, input.lastName, role),
-      id,
-    );
+    const username = existing.username;
 
     const clash = await prisma.appUser.findFirst({
       where: {
         id: { not: id },
-        OR: [{ username }, { mobile }],
+        mobile,
       },
       select: { id: true },
     });
     if (clash) {
-      return NextResponse.json({ error: "Username, mobile, or employee ID is already registered." }, { status: 409 });
+      return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
 
     const roleChanged = role !== existing.role;

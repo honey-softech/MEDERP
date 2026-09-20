@@ -57,6 +57,29 @@ describe("patient update payload", () => {
     expect(ignored.data).not.toHaveProperty("firstName");
   });
 
+  it("lets front desk set date of birth from age when DOB is omitted", () => {
+    const result = buildPatientUpdatePayload({
+      isFrontDesk: true,
+      existing: { firstName: "Ravi", lastName: "Kumar" },
+      body: { age: "32" },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const dob = result.data.dateOfBirth as Date;
+    const now = new Date();
+    expect(dob.getFullYear()).toBe(now.getFullYear() - 32);
+  });
+
+  it("rejects an invalid age when date of birth is omitted", () => {
+    expect(
+      buildPatientUpdatePayload({
+        isFrontDesk: true,
+        existing: { firstName: "Ravi", lastName: "Kumar" },
+        body: { age: "abc" },
+      }),
+    ).toEqual({ ok: false, error: "Enter a valid age in years (0–150)." });
+  });
+
   it("rejects an invalid gender and empty clinician patches", () => {
     expect(
       buildPatientUpdatePayload({

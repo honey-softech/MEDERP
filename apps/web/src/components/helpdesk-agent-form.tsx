@@ -6,7 +6,6 @@ import { buttonClass, fieldClass } from "@/components/auth-shell";
 
 export function HelpdeskAgentForm() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,7 +18,7 @@ export function HelpdeskAgentForm() {
     const response = await fetch("/api/platform/helpdesk-users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, mobile, password }),
+      body: JSON.stringify({ mobile, password }),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -27,7 +26,6 @@ export function HelpdeskAgentForm() {
       setError(data.error ?? "Could not create helpdesk user.");
       return;
     }
-    setUsername("");
     setMobile("");
     setPassword("");
     setPending(false);
@@ -37,10 +35,6 @@ export function HelpdeskAgentForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="font-semibold">Add helpdesk agent</h3>
-      <label className="block text-sm font-medium text-slate-700">
-        Username
-        <input className={fieldClass} value={username} onChange={(event) => setUsername(event.target.value)} required />
-      </label>
       <label className="block text-sm font-medium text-slate-700">
         Mobile
         <input className={fieldClass} inputMode="numeric" value={mobile} onChange={(event) => setMobile(event.target.value)} required />

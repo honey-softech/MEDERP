@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { doctorIsOnLeave } from "@/lib/opd/scheduling";
+import { doctorIsOnLeave, isSameCalendarDay } from "@/lib/opd/scheduling";
 
 export const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
@@ -122,10 +122,87 @@ export async function doctorHasAvailabilityConfigured(staffId: string) {
   return count > 0;
 }
 
+export function minuteOfDay(at: Date) {
+  return at.getHours() * 60 + at.getMinutes();
+}
+
+export function applyMinuteOnDay(day: Date, minute: number) {
+  const next = new Date(day);
+  next.setHours(Math.floor(minute / 60), minute % 60, 0, 0);
+  return next;
+}
+
+export function windowsForWeekday(windows: AvailabilityWindowInput[], dayOfWeek: number) {
+  return windows.filter((window) => window.dayOfWeek === dayOfWeek).sort((a, b) => a.startMinute - b.startMinute);
+}
+
+/** Windows on `now`'s weekday that have not fully ended yet. */
+export function remainingWalkInWindows(windows: AvailabilityWindowInput[], now = new Date()) {
+  const minute = minuteOfDay(now);
+  return windowsForWeekday(windows, now.getDay()).filter((window) => window.endMinute > minute);
+}
+
+export function clampNowToWindow(now: Date, window: AvailabilityWindowInput) {
+  const start = applyMinuteOnDay(now, window.startMinute);
+  if (now.getTime() <= start.getTime()) return start;
+  const end = applyMinuteOnDay(now, window.endMinute);
+  if (now.getTime() >= end.getTime()) {
+    const last = new Date(end);
+    last.setMinutes(last.getMinutes() - 1);
+    return last;
+  }
+  return new Date(now);
+}
+
+export function resolveWalkInScheduledAt(params: {
+  now?: Date;
+  windows: AvailabilityWindowInput[];
+  chosenStartMinute?: number | null;
+}): { ok: true; at: Date } | { ok: false; error: string } {
+  const now = params.now ?? new Date();
+  if (params.windows.length === 0) {
+    return { ok: true, at: now };
+  }
+
+  const remaining = remainingWalkInWindows(params.windows, now);
+  if (remaining.length === 0) {
+    const todayWindows = windowsForWeekday(params.windows, now.getDay());
+    if (todayWindows.length > 0) {
+      return { ok: true, at: now };
+    }
+    return { ok: false, error: "This doctor has no availability windows today." };
+  }
+
+  let window = remaining[0];
+  if (remaining.length > 1) {
+    const chosen = params.chosenStartMinute;
+    if (chosen == null || !Number.isInteger(chosen)) {
+      return {
+        ok: false,
+        error: "This doctor has more than one session today. Choose a walk-in time.",
+      };
+    }
+    const matched =
+      remaining.find((row) => row.startMinute === chosen) ??
+      remaining.find((row) => chosen >= row.startMinute && chosen < row.endMinute);
+    if (!matched) {
+      return { ok: false, error: "Choose a walk-in time within today's remaining hours." };
+    }
+    window = matched;
+  }
+
+  return { ok: true, at: clampNowToWindow(now, window) };
+}
+
+export function walkInMustBeToday(at: Date, now = new Date()) {
+  if (isSameCalendarDay(at, now)) return null;
+  return "Walk-ins can only be added for today.";
+}
+
 /** True when `at` falls inside any configured window for that weekday. */
 export function instantInWindows(at: Date, windows: AvailabilityWindowInput[]) {
   const day = at.getDay();
-  const minute = at.getHours() * 60 + at.getMinutes();
+  const minute = minuteOfDay(at);
   return windows.some(
     (window) => window.dayOfWeek === day && minute >= window.startMinute && minute < window.endMinute,
   );
@@ -143,8 +220,8 @@ export async function assertDoctorBookableAt(params: {
   }
 
   const windows = await listDoctorAvailability(params.doctorId);
-  if (windows.length === 0) {
-    // No structured hours yet — keep legacy free-form booking.
+  if (windows.length === 0 || params.queueType === "WALK_IN") {
+    // No structured hours, or a walk-in after hours — still block leave above.
     return { ok: true as const };
   }
 

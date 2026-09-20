@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
+import { ageFromDateInput } from "@/lib/display";
 import { babyOfName, dateInputValue, isUnnamedInfantName } from "@/lib/patients/infant";
 
 const GENDERS = [
@@ -35,6 +36,7 @@ export type PatientFormValues = {
   id?: string;
   firstName: string;
   lastName: string;
+  age: string;
   dateOfBirth: string;
   gender: string;
   phone: string;
@@ -103,6 +105,7 @@ export function PatientForm({
     initial ?? {
       firstName: "",
       lastName: "",
+      age: "",
       dateOfBirth: "",
       gender: "MALE",
       phone: "",
@@ -142,7 +145,12 @@ export function PatientForm({
       const next = !current;
       if (next) {
         setFamilyRelation("CHILD");
-        setValues((form) => ({ ...form, dateOfBirth: form.dateOfBirth || dateInputValue(), lastName: "" }));
+        setValues((form) => ({
+          ...form,
+          dateOfBirth: form.dateOfBirth || dateInputValue(),
+          age: form.age || "0",
+          lastName: "",
+        }));
         if (familyHeadName && !parentName) setParentName(familyHeadName);
         if (!familyOfPatientId && !familyOf && familyHits[0]) {
           setFamilyOf(familyHits[0].id);
@@ -284,7 +292,7 @@ export function PatientForm({
         familyOfPatientId || familyOf ? (
           <p className="md:col-span-2 text-sm text-slate-600">
             Will be saved as <span className="font-medium text-slate-900">{infantDisplayName || "Baby of (select parent)"}</span>
-            . Date of birth defaults to today.
+            . Age defaults to 0 and date of birth to today.
           </p>
         ) : (
           <Field
@@ -308,15 +316,38 @@ export function PatientForm({
         </>
       )}
       <Field
+        label="Age (years)"
+        type="number"
+        value={values.age}
+        onChange={(v) => setField("age", v)}
+        required={!unnamedInfant}
+        min={0}
+        max={150}
+        step={1}
+      />
+      <Field
         label="Date of birth"
         type="date"
         value={values.dateOfBirth}
-        onChange={(v) => setField("dateOfBirth", v)}
-        required={!unnamedInfant}
+        onChange={(v) => {
+          setValues((current) => ({
+            ...current,
+            dateOfBirth: v,
+            age: v ? (ageFromDateInput(v) ?? current.age) : current.age,
+          }));
+        }}
       />
       <label className="text-sm font-medium text-slate-700">
         Gender
-        <select className={fieldClass} value={values.gender} onChange={(event) => setField("gender", event.target.value)}>
+        <span className="ml-0.5 text-red-600" aria-hidden="true">
+          *
+        </span>
+        <select
+          className={fieldClass}
+          value={values.gender}
+          required
+          onChange={(event) => setField("gender", event.target.value)}
+        >
           {GENDERS.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
@@ -325,9 +356,11 @@ export function PatientForm({
         </select>
       </label>
       <Field
-        label="Phone (use parent mobile for a child or relative)"
+        label="Phone (use parent mobile for a child)"
         value={values.phone}
         onChange={(v) => setField("phone", v)}
+        required={!isEdit}
+        placeholder="10-digit mobile"
       />
       <Field label="Blood group" value={values.bloodGroup} onChange={(v) => setField("bloodGroup", v)} placeholder="B+" />
       <p className="md:col-span-2 text-sm text-slate-500">
@@ -556,6 +589,9 @@ function Field({
   type = "text",
   required,
   placeholder,
+  min,
+  max,
+  step,
 }: {
   label: string;
   value: string;
@@ -563,16 +599,27 @@ function Field({
   type?: string;
   required?: boolean;
   placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
 }) {
   return (
     <label className="text-sm font-medium text-slate-700">
       {label}
+      {required ? (
+        <span className="ml-0.5 text-red-600" aria-hidden="true">
+          *
+        </span>
+      ) : null}
       <input
         className={fieldClass}
         type={type}
         value={value}
         required={required}
         placeholder={placeholder}
+        min={min}
+        max={max}
+        step={step}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>

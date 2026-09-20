@@ -294,7 +294,7 @@ def ts03_cases():
           "403 lab module not enabled.",
           "PATCH /api/join-requests/[id]"),
         c("TS-03-016", "Seats", "Approve blocked when staff seat limit reached", "P0", "Negative",
-          "CLINIC seatLimit=3 filled with non-SUPER staff (create via TS-06).", "SUPER_ADMIN",
+          "CLINIC seatLimit=3 filled including SUPER_ADMIN (create via TS-06).", "SUPER_ADMIN",
           "New pending join approve",
           "1. Approve when seats full.",
           "403 seat limit (assertStaffSeatAvailable).",
@@ -318,11 +318,11 @@ def ts04_cases():
     return [
         c("TS-04-001", "Tiers", "Three OPD plans — prices and seats", "P0", "Positive",
           "—", "Any",
-          "CLINIC Plan1 ₹1999 / 3 seats (1 doc 1 nurse 1 rec);\n"
-          "STARTER Plan2 ₹3500 / 6 seats (2 doc 3 nurse 1 rec);\n"
-          "GROWTH Plan3 ₹4999 / 9 seats (3 doc 5 nurse 1 rec)",
+          "CLINIC Plan1 ₹2499 / 3 seats (admin included; e.g. 1 admin doctor + 2 nurses/receptionists);\n"
+          "STARTER Plan2 ₹4499 / 6 seats (admin included);\n"
+          "GROWTH Plan3 ₹5999 / 9 seats (admin included)",
           "1. Compare UI (/register-hospital or /hospital/subscription) to table.",
-          "Matches subscription-tiers.ts. SUPER_ADMIN does not count toward seats. No pharmacy/lab/wards/inventory on any plan.",
+          "Matches subscription-tiers.ts. SUPER_ADMIN counts as one seat. Admin-as-doctor and nurse-as-receptionist do not add seats. No pharmacy/lab/wards/inventory on any plan.",
           "GET /api/public/package"),
         c("TS-04-002", "Trial Access", "During trial hospital staff can use app normally", "P0", "Positive",
           "H1 trialEndsAt in future.", "RECEPTIONIST",
@@ -646,11 +646,11 @@ def ts06_cases():
           "1. Create.",
           "409 clash or 400 charset.",
           "POST /api/hospital/users"),
-        c("TS-06-006", "Seats", "Create blocked at seat limit (SUPER_ADMIN free)", "P0", "Negative",
-          "CLINIC 3 seats filled with staff (not counting SUPER_ADMIN).", "SUPER_ADMIN",
+        c("TS-06-006", "Seats", "Create blocked at seat limit (admin included)", "P0", "Negative",
+          "CLINIC 3 seats filled including SUPER_ADMIN.", "SUPER_ADMIN",
           "New nurse",
           "1. Create.",
-          "403 seat limit. Creating another SUPER_ADMIN (platform only) or note SUPER doesn't consume seat.",
+          "403 seat limit. Admin-as-doctor / nurse-as-receptionist do not create extra seats.",
           "POST /api/hospital/users"),
         c("TS-06-007", "Module", "Cannot create PHARMACIST if pharmacyEnabled false", "P0", "Negative",
           "CLINIC hospital.", "SUPER_ADMIN",

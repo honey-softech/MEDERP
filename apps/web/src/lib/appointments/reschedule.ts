@@ -5,6 +5,7 @@ import { doctorIsOnLeave } from "@/lib/opd/scheduling";
 import { assertDoctorBookableAt } from "@/lib/doctor-availability";
 import { prisma } from "@/lib/prisma";
 import type { AppointmentActionContext, AppointmentActionResult } from "@/lib/appointments/types";
+import { scheduleFollowUpReminder } from "@/lib/appointments/follow-up-reminder-queue";
 
 export async function rescheduleAppointment(
   ctx: AppointmentActionContext,
@@ -57,5 +58,17 @@ export async function rescheduleAppointment(
       ),
     },
   });
+  if (appointment.visitType === "FOLLOW_UP") {
+    try {
+      await scheduleFollowUpReminder({
+        hospitalId: user.hospitalId,
+        appointmentId: appointment.id,
+        visitAt: updated.scheduledAt,
+        hospital: user.hospital,
+      });
+    } catch (error) {
+      console.error("Failed to reschedule follow-up reminder", error);
+    }
+  }
   return { ok: true, body: { ok: true, appointment: updated } };
 }

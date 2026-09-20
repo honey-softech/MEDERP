@@ -5,6 +5,7 @@ import { nextToken } from "@/lib/ids";
 import { notifyNursesOfConsult } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { doctorOwnsVisit } from "@/lib/appointments/access";
+import { cancelPendingRemindersForAppointment } from "@/lib/appointments/follow-up-reminder-queue";
 import type { AppointmentActionContext, AppointmentActionResult } from "@/lib/appointments/types";
 
 function noAccess(): AppointmentActionResult {
@@ -20,6 +21,7 @@ export async function cancelAppointment(
     where: { id: appointment.id },
     data: { status: "CANCELLED", cancelledAt: new Date() },
   });
+  await cancelPendingRemindersForAppointment(appointment.id);
   await writeAuditLog({
     request,
     hospitalId: user.hospitalId,

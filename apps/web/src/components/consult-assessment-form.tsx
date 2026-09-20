@@ -111,6 +111,7 @@ export function ConsultAssessmentForm({
   visitReason = "",
   priorVisit = null,
   cockpit = false,
+  followUpReminderNote = null,
   children,
 }: {
   appointmentId: string;
@@ -128,6 +129,7 @@ export function ConsultAssessmentForm({
   visitReason?: string;
   priorVisit?: PriorVisitReuse;
   cockpit?: boolean;
+  followUpReminderNote?: string | null;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -727,6 +729,9 @@ export function ConsultAssessmentForm({
                   </button>
                 ))}
               </div>
+              {followUpReminderNote ? (
+                <p className="text-[11px] text-text-secondary">{followUpReminderNote}</p>
+              ) : null}
               <button
                 type="button"
                 className={`${primaryButtonClass} mt-1 w-full`}

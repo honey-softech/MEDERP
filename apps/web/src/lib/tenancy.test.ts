@@ -16,6 +16,7 @@ describe("tenancy", () => {
       lastName: "Kumar",
       dateOfBirth: "2000-01-15",
       gender: "MALE",
+      phone: "9876543210",
       hospitalId: "some-other-hospital",
     });
     expect(parsed.success).toBe(true);
@@ -28,6 +29,7 @@ describe("tenancy", () => {
       firstName: "Ravi",
       dateOfBirth: "2000-01-15",
       gender: "MALE",
+      phone: "9876543210",
     });
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;

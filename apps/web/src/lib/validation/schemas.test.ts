@@ -8,14 +8,21 @@ describe("auth schemas", () => {
     expect(loginSchema.safeParse({ mobile: "9876543210", password: "secret" }).success).toBe(true);
   });
 
-  it("rejects a short signup username", () => {
-    const parsed = signupSchema.safeParse({
-      username: "ab",
-      mobile: "9876543210",
-      password: "password1",
-      role: "RECEPTIONIST",
-    });
-    expect(parsed.success).toBe(false);
+  it("requires mobile and password on signup without a username field", () => {
+    expect(
+      signupSchema.safeParse({
+        mobile: "9876543210",
+        password: "password1",
+        role: "RECEPTIONIST",
+      }).success,
+    ).toBe(true);
+    expect(
+      signupSchema.safeParse({
+        mobile: "",
+        password: "password1",
+        role: "RECEPTIONIST",
+      }).success,
+    ).toBe(false);
   });
 });
 

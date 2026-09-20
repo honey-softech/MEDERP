@@ -118,7 +118,11 @@ export async function processOutboundQueue() {
 
 export function startOutboundMessageWorker() {
   const tick = () => {
-    void processOutboundQueue().catch((error) => {
+    void (async () => {
+      const { processDueFollowUpReminders } = await import("@/lib/appointments/follow-up-reminder-queue");
+      await processDueFollowUpReminders();
+      await processOutboundQueue();
+    })().catch((error) => {
       console.error("Outbound message worker failed", error);
     });
   };

@@ -54,6 +54,24 @@ jobs:
               fi
             }
 
+            set_env() {
+              local key="$1"
+              local value="$2"
+              local line="${key}=\"${value}\""
+              if grep -qE "^#?[[:space:]]*${key}=" apps/web/.env; then
+                sed -i -E "s|^#?[[:space:]]*${key}=.*|${line}|" apps/web/.env
+                echo "Set ${key} in apps/web/.env"
+              else
+                printf '%s\n' "$line" >> apps/web/.env
+                echo "Added ${key} to apps/web/.env"
+              fi
+            }
+
+            # Razorpay Test Mode plans (amount = MedERP fee + 18% GST)
+            set_env RAZORPAY_PLAN_ID_CLINIC "plan_TeJsdSN6PAwtAJ"
+            set_env RAZORPAY_PLAN_ID_STARTER "plan_TeJtDouBjTwD2x"
+            set_env RAZORPAY_PLAN_ID_GROWTH "plan_TeJtYuDOAcJnVA"
+
             PUBLIC_API_URL="$(grep -E '^NEXT_PUBLIC_API_URL=' apps/web/.env | head -n1 | cut -d= -f2- | tr -d '"' || true)"
             ensure_env ASKEVA_API_URL "https://backend.askeva.io/v1"
             ensure_env WHATSAPP_TEMPLATE_LANG "en,en_IN"

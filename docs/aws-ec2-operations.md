@@ -83,7 +83,7 @@ RAZORPAY_KEY_SECRET="...."
 NEXT_PUBLIC_RAZORPAY_KEY_ID="rzp_test_...."
 
 # One Razorpay Plan per MedERP tier (amount = plan fee + 18% GST)
-# CLINIC ₹2359 · STARTER ₹4130 · GROWTH ₹5899
+# CLINIC ₹2949 · STARTER ₹5309 · GROWTH ₹7079
 RAZORPAY_PLAN_ID_CLINIC="plan_...."
 RAZORPAY_PLAN_ID_STARTER="plan_...."
 RAZORPAY_PLAN_ID_GROWTH="plan_...."
@@ -110,9 +110,9 @@ Update these if you recreate plans in the Razorpay dashboard:
 
 | MedERP tier | Amount (incl. GST) | Env key | Example plan id |
 |-------------|--------------------|---------|-----------------|
-| CLINIC (Plan 1) | ₹2,359 | `RAZORPAY_PLAN_ID_CLINIC` | `plan_Tby4ytkcTpN2oH` |
-| STARTER (Plan 2) | ₹4,130 | `RAZORPAY_PLAN_ID_STARTER` | `plan_TbxyOLwJm4sH17` |
-| GROWTH (Plan 3) | ₹5,899 | `RAZORPAY_PLAN_ID_GROWTH` | `plan_Tbxz6ZPoCuqDIl` |
+| CLINIC (Plan 1) | ₹2,949 | `RAZORPAY_PLAN_ID_CLINIC` | `plan_TeJsdSN6PAwtAJ` |
+| STARTER (Plan 2) | ₹5,309 | `RAZORPAY_PLAN_ID_STARTER` | `plan_TeJtDouBjTwD2x` |
+| GROWTH (Plan 3) | ₹7,079 | `RAZORPAY_PLAN_ID_GROWTH` | `plan_TeJtYuDOAcJnVA` |
 
 If a plan amount does not match, MedERP creates a new plan via API for that payment (works, but clutters the Razorpay Plans list).
 

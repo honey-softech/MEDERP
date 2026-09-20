@@ -29,7 +29,16 @@ type VisitRow = {
     recordedByUsername: string;
     recordedAt: Date;
   } | null;
-  assessment: { status: string; diagnosis: string | null; approvedAt: Date | null } | null;
+  assessment: {
+    status: string;
+    chiefComplaint?: string | null;
+    diagnosis: string | null;
+    prescription?: string | null;
+    advice?: string | null;
+    summary?: string | null;
+    followUpAt?: Date | null;
+    approvedAt: Date | null;
+  } | null;
   labOrders?: Array<{
     id: string;
     status: string;
@@ -83,8 +92,23 @@ export function PatientVisitHistory({
               <p className="font-medium text-slate-900">
                 Visit summary · {last.assessment.status === "APPROVED" ? "Approved" : "Draft"}
               </p>
+              {last.assessment.chiefComplaint ? (
+                <p className="mt-1 text-slate-600">Chief complaint: {last.assessment.chiefComplaint}</p>
+              ) : null}
               {last.assessment.diagnosis ? (
                 <p className="mt-1 text-slate-600">Diagnosis: {last.assessment.diagnosis}</p>
+              ) : null}
+              {last.assessment.prescription ? (
+                <p className="mt-1 whitespace-pre-wrap text-slate-600">Prescription: {last.assessment.prescription}</p>
+              ) : null}
+              {last.assessment.advice ? (
+                <p className="mt-1 whitespace-pre-wrap text-slate-600">Advice: {last.assessment.advice}</p>
+              ) : null}
+              {last.assessment.followUpAt ? (
+                <p className="mt-1 text-slate-600">
+                  Follow-up:{" "}
+                  {last.assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                </p>
               ) : null}
               {last.assessment.status === "APPROVED" && canPrintSummary ? (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -187,6 +211,14 @@ export function PatientVisitHistory({
                     </span>
                   </div>
                 </div>
+                {row.assessment?.diagnosis ? (
+                  <p className="mt-2 text-slate-600">Diagnosis: {row.assessment.diagnosis}</p>
+                ) : null}
+                {row.assessment?.prescription ? (
+                  <p className="mt-1 whitespace-pre-wrap text-slate-600">
+                    Prescription: {row.assessment.prescription}
+                  </p>
+                ) : null}
                 {row.assessment?.status === "APPROVED" && canPrintSummary ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <SendPatientMessageButton

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { MissingRecord } from "@/components/missing-record";
 import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
+import { PatientFamilyGroup } from "@/components/patient-family-group";
 import { PatientForm } from "@/components/patient-form";
 import { FamilyLinkForm, MergePatientForm } from "@/components/patient-family-merge";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
@@ -13,6 +14,11 @@ import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
 import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageLabel, hasFrontDeskAccess, hasRoleAccess, inr, patientName, prettyEnum } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
+
+function display(value: string | null | undefined) {
+  const text = String(value ?? "").trim();
+  return text || "—";
+}
 
 function dateInput(value: Date | null | undefined) {
   if (!value) return "";
@@ -38,7 +44,18 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           doctor: { include: { appUser: { select: { username: true } } } },
           department: true,
           vitals: true,
-          assessment: { select: { status: true, diagnosis: true, approvedAt: true } },
+          assessment: {
+            select: {
+              status: true,
+              chiefComplaint: true,
+              diagnosis: true,
+              prescription: true,
+              advice: true,
+              summary: true,
+              followUpAt: true,
+              approvedAt: true,
+            },
+          },
           labOrders: {
             where: { status: { not: "CANCELLED" } },
             include: { items: { select: { id: true, nameSnapshot: true } } },
@@ -160,77 +177,61 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       <section className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-6">
         <h3 className="font-semibold">Profile</h3>
         <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div><dt className="text-slate-500">Phone</dt><dd>{patient.phone ?? "—"}</dd></div>
-          <div><dt className="text-slate-500">Address</dt><dd>{patient.address ?? "—"}</dd></div>
-          <div><dt className="text-slate-500">Blood group</dt><dd>{patient.bloodGroup ?? "—"}</dd></div>
-          <div><dt className="text-slate-500">Insurance</dt><dd>{patient.insuranceProvider ?? "—"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-slate-500">Allergies</dt><dd>{patient.allergies ?? "—"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-slate-500">Medical history</dt><dd>{patient.medicalHistory ?? "—"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-slate-500">Family history</dt><dd>{patient.familyHistory ?? "—"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-slate-500">Social history</dt><dd>{patient.socialHistory ?? "—"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-slate-500">Current medications</dt><dd>{patient.currentMedications ?? "—"}</dd></div>
+          <div><dt className="text-slate-500">Name</dt><dd>{patientName(patient)}</dd></div>
+          <div><dt className="text-slate-500">UHID</dt><dd className="font-mono">{patient.mrn}</dd></div>
+          <div><dt className="text-slate-500">Phone</dt><dd>{display(patient.phone)}</dd></div>
+          <div><dt className="text-slate-500">Age / gender</dt><dd>{ageLabel(patient.dateOfBirth)} · {prettyEnum(patient.gender)}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-slate-500">Address</dt><dd>{display(patient.address)}</dd></div>
+          <div><dt className="text-slate-500">Blood group</dt><dd>{display(patient.bloodGroup)}</dd></div>
+          {patient.email?.trim() ? <div><dt className="text-slate-500">Email</dt><dd>{patient.email}</dd></div> : null}
+          {patient.idProofType ? (
+            <div>
+              <dt className="text-slate-500">ID proof</dt>
+              <dd>
+                {prettyEnum(patient.idProofType)}
+                {patient.idProofNumber ? ` · ${patient.idProofNumber}` : ""}
+              </dd>
+            </div>
+          ) : null}
+          {patient.emergencyName?.trim() || patient.emergencyPhone?.trim() ? (
+            <>
+              <div><dt className="text-slate-500">Emergency contact</dt><dd>{display(patient.emergencyName)}</dd></div>
+              <div><dt className="text-slate-500">Emergency phone</dt><dd>{display(patient.emergencyPhone)}</dd></div>
+            </>
+          ) : null}
+          {patient.insuranceProvider?.trim() ? (
+            <>
+              <div><dt className="text-slate-500">Insurance</dt><dd>{patient.insuranceProvider}</dd></div>
+              <div><dt className="text-slate-500">Policy no.</dt><dd>{display(patient.insurancePolicyNo)}</dd></div>
+            </>
+          ) : null}
+          {patient.allergies?.trim() ? (
+            <div className="sm:col-span-2"><dt className="text-slate-500">Allergies</dt><dd className="whitespace-pre-wrap">{patient.allergies}</dd></div>
+          ) : null}
+          {patient.medicalHistory?.trim() ? (
+            <div className="sm:col-span-2"><dt className="text-slate-500">Medical history</dt><dd className="whitespace-pre-wrap">{patient.medicalHistory}</dd></div>
+          ) : null}
+          {patient.familyHistory?.trim() ? (
+            <div className="sm:col-span-2"><dt className="text-slate-500">Family history</dt><dd className="whitespace-pre-wrap">{patient.familyHistory}</dd></div>
+          ) : null}
+          {patient.socialHistory?.trim() ? (
+            <div className="sm:col-span-2"><dt className="text-slate-500">Social history</dt><dd className="whitespace-pre-wrap">{patient.socialHistory}</dd></div>
+          ) : null}
+          {patient.currentMedications?.trim() ? (
+            <div className="sm:col-span-2"><dt className="text-slate-500">Current medications</dt><dd className="whitespace-pre-wrap">{patient.currentMedications}</dd></div>
+          ) : null}
         </dl>
       </section>
 
-      <section className="mt-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <h3 className="font-semibold">Family group</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Children can share a parent&apos;s mobile. Each member has a unique UHID.
-        </p>
-        <ul className="mt-3 mb-4 space-y-1 text-sm">
-          {family.map((member) => (
-            <li key={member.id}>
-              <Link className="text-teal-700 hover:underline" href={`/patients/${member.id}`}>
-                {patientName(member)}
-              </Link>
-              <span className="font-mono text-slate-500"> · {member.mrn}</span>
-              {member.id === patient.id ? <span className="text-teal-700"> · this patient</span> : null}
-            </li>
-          ))}
-        </ul>
-        {canEdit ? (
-          <>
-            <h4 className="mb-3 text-sm font-medium">Register a family member under this patient</h4>
-            <PatientForm
-              submitLabel="Add family member"
-              familyOfPatientId={patient.id}
-              familyHeadName={patientName(patient)}
-              familyRelationDefault="CHILD"
-              initial={{
-                firstName: "",
-                lastName: patient.lastName,
-                age: "",
-                dateOfBirth: "",
-                gender: "MALE",
-                phone: patient.phone ?? "",
-                email: "",
-                address: patient.address ?? "",
-                bloodGroup: "",
-                allergies: "",
-                medicalHistory: "",
-                familyHistory: "",
-                socialHistory: "",
-                currentMedications: "",
-                emergencyName: patientName(patient),
-                emergencyPhone: patient.phone ?? "",
-                idProofType: "",
-                idProofNumber: "",
-                insuranceProvider: patient.insuranceProvider ?? "",
-                insurancePolicyNo: patient.insurancePolicyNo ?? "",
-                insuranceValidUntil: dateInput(patient.insuranceValidUntil),
-                photoData: "",
-              }}
-            />
-            <div className="mt-6">
-              <h4 className="mb-3 text-sm font-medium">Or link an already registered patient</h4>
-              <FamilyLinkForm patientId={patient.id} />
-            </div>
-          </>
-        ) : null}
-      </section>
+      <PatientVisitHistory
+        visits={patient.appointments}
+        canPrintSummary={canPrintSummary}
+        canViewLabReports={canViewLabReports}
+        patientPhone={patient.phone}
+      />
 
       {canViewCertificates ? (
-        <section className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="mt-8 mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-semibold">Medical certificates</h3>
             {canIssueCertificate ? (
@@ -271,7 +272,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       ) : null}
 
       {canViewLabReports ? (
-        <section className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="mt-8 mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h3 className="font-semibold">Lab reports</h3>
           <p className="mt-1 text-sm text-slate-500">
             Documents from the hospital laboratory or reports brought from outside. Only the doctor and nurse can open in-house lab files.
@@ -296,12 +297,51 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </section>
       ) : null}
 
-      <PatientVisitHistory
-        visits={patient.appointments}
-        canPrintSummary={canPrintSummary}
-        canViewLabReports={canViewLabReports}
-        patientPhone={patient.phone}
-      />
+      <PatientFamilyGroup
+        currentPatientId={patient.id}
+        canEdit={canEdit}
+        members={family.map((member) => ({
+          id: member.id,
+          name: patientName(member),
+          mrn: member.mrn,
+        }))}
+      >
+        <h4 className="mb-3 text-sm font-medium">Register a family member under this patient</h4>
+        <PatientForm
+          submitLabel="Add family member"
+          familyOfPatientId={patient.id}
+          familyHeadName={patientName(patient)}
+          familyRelationDefault="CHILD"
+          initial={{
+            firstName: "",
+            lastName: patient.lastName,
+            age: "",
+            dateOfBirth: "",
+            gender: "MALE",
+            phone: patient.phone ?? "",
+            email: "",
+            address: patient.address ?? "",
+            bloodGroup: "",
+            allergies: "",
+            medicalHistory: "",
+            familyHistory: "",
+            socialHistory: "",
+            currentMedications: "",
+            emergencyName: patientName(patient),
+            emergencyPhone: patient.phone ?? "",
+            idProofType: "",
+            idProofNumber: "",
+            insuranceProvider: patient.insuranceProvider ?? "",
+            insurancePolicyNo: patient.insurancePolicyNo ?? "",
+            insuranceValidUntil: dateInput(patient.insuranceValidUntil),
+            photoData: "",
+          }}
+        />
+        <div className="mt-6">
+          <h4 className="mb-3 text-sm font-medium">Or link an already registered patient</h4>
+          <FamilyLinkForm patientId={patient.id} />
+        </div>
+      </PatientFamilyGroup>
 
       {canEdit ? (
         <section className="mt-8 max-w-5xl rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-6">

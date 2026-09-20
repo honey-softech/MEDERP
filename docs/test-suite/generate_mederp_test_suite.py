@@ -49,20 +49,20 @@ SUITES = [
     ("TS-04", "Subscription & Tiers", "Tiers, seats, module gating, trial expiry, tier change, webhooks, monthly subscription bill WhatsApp to SUPER_ADMIN", 23, "P0"),
     ("TS-05", "Platform Admin Console", "Hospital CRUD, stop access, platform users, invoices, billing settings on every subscription bill", 25, "P1"),
     ("TS-06", "Hospital User Management", "Create/edit staff, codes, seats, deactivate, signatures, merge; Receptionist + Nurse both remain available", 36, "P0"),
-    ("TS-07", "Hospital Settings", "Branding, OPD fee, walk-in policy, nurses as receptionists, admin-as-doctor, doctor availability", 34, "P1"),
+    ("TS-07", "Hospital Settings", "Branding, OPD fee, walk-in policy, nurses as receptionists, admin-as-doctor, doctor availability, follow-up reminders", 41, "P1"),
     ("TS-08", "Staff Leave", "Apply/approve/reject/cancel, overlap, doctor availability impact; nurse record-leave when opted in", 22, "P1"),
     ("TS-09", "Patient Management", "Register, UHID, unnamed infant Baby of parent, duplicates, family, merge, search, edit permissions; nurse-as-receptionist register/edit", 44, "P0"),
-    ("TS-10", "Appointments & Queue", "Booking, walk-in, token, status machine, reschedule, doctor availability slots; nurse front desk when opted in", 56, "P0"),
+    ("TS-10", "Appointments & Queue", "Booking, walk-in today/hours, token, status machine, reschedule, doctor availability slots; nurse front desk when opted in", 66, "P0"),
     ("TS-11", "Vitals & Nurse Station", "Vital fields, ranges, BMI, fever flag, same-day lock", 26, "P0"),
-    ("TS-12", "Doctor Visit & Assessment", "Draft/approve, signature gate, Rx, medicine suggest, summary PDF/send", 32, "P0"),
+    ("TS-12", "Doctor Visit & Assessment", "Draft/approve, signature gate, Rx, medicine suggest, summary PDF/send, auto follow-up reminders", 43, "P0"),
     ("TS-13", "Medical Certificates", "Sick leave / fitness / general, issue, void ownership, send", 20, "P1"),
     ("TS-14", "Invoices & OPD Collection", "Invoice numbering, line math, OPD collect, card brand; nurse billing when opted in", 30, "P0"),
     ("TS-15", "Discounts, Waivers, Advances, Refunds", "Discount caps, waiver flow, advance apply, refunds", 30, "P0"),
     ("TS-16", "Billing Reports & Receipts", "Daily collections, monthly report, CSV, outstanding, WhatsApp receipt; nurse reports when opted in", 23, "P1"),
     ("TS-17", "Helpdesk", "Ticket lifecycle, escalation, SLA, visibility, support actions", 26, "P1"),
-    ("TS-18", "Board & Notifications", "Post/reply/pin/delete, in-app notifications, templates", 18, "P2"),
-    ("TS-19", "Audit Log", "Audited actions, record shape, redaction, viewer access", 14, "P2"),
-    ("TS-20", "RBAC & Tenant Isolation", "Role × module negative matrix, cross-hospital access attempts, nurse-as-receptionist matrix", 32, "P0"),
+    ("TS-18", "Board & Notifications", "Post/reply/pin/delete, in-app notifications, AskEva appointment_reminder1, follow-up reminder queue", 23, "P2"),
+    ("TS-19", "Audit Log", "Audited actions including follow-up reminder policy, record shape, redaction, viewer access", 15, "P2"),
+    ("TS-20", "RBAC & Tenant Isolation", "Role × module negative matrix, cross-hospital access attempts, nurse-as-receptionist matrix, follow-up reminder settings", 33, "P0"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -992,6 +992,8 @@ def build_testdata(wb: Workbook):
         ("Valid username", "≥3 chars [a-zA-Z0-9._]", "Staff signup only — hospital register uses display name"),
         ("Card brands (OPD collect)", "Visa / Mastercard / RuPay / Amex / Other", "Required when method=CARD"),
         ("nurseAsReceptionist", "false (default)", "Hospital settings. Off: nurses stay clinical-only. On: every nurse gets receptionist front desk (register, queue, billing). Dedicated RECEPTIONIST still allowed."),
+        ("followUpReminderEnabled", "false (default)", "Hospital settings. Off: no auto WhatsApp when a follow-up is set. On: schedule reminder 1 or 2 days before at 09:00 local. Reception can still remind manually."),
+        ("followUpReminderDaysBefore", "1 or 2 (default 1)", "Lead time when auto reminders are on. Invalid values coerce to 1. Send time is 09:00 on that calendar day; if already past, send immediately. Today/past follow-ups skip."),
     ]
     c_headers = ["Name", "Value", "Notes"]
     for c, h in enumerate(c_headers, 1):
@@ -1026,6 +1028,8 @@ def build_env(wb: Workbook):
         ("RAZORPAY_KEY_ID / SECRET", "Required for TS-01 paid path & TS-04", "", ""),
         ("RAZORPAY_WEBHOOK_SECRET", "Required for webhook cases in TS-04", "", ""),
         ("WhatsApp / ASKEVA token", "Optional; without it messaging is console/dummy", "", ""),
+        ("WHATSAPP_REMINDER_TEMPLATE", "appointment_reminder1 — AskEva UTILITY named template for visit reminders", "", ""),
+        ("WHATSAPP_REMINDER_PARAMS", "named (patient_name, doctor_name, appointment_date, appointment_time). Set positional only for old {{1}}..{{4}} templates", "", ""),
         ("WHATSAPP_SUBSCRIPTION_BILL_TEMPLATE", "subscription_bill — UTILITY + Document header; sent to hospital SUPER_ADMIN on Razorpay renewal", "", ""),
         ("Browser", "Chrome latest + one mobile viewport check", "", ""),
         ("Roles available in env", "SOFTWARE_ADMIN exists (9999999999) or create", "", ""),
@@ -1062,6 +1066,8 @@ def build_watchlist(wb: Workbook):
         ("W-09", "Patients", "Patient phone is NOT validated as Indian mobile on register (unlike login/users).", "TS-09", ""),
         ("W-10", "Fees", "followUpFee=0 does not make follow-up free — falls through to full consultation fee (min ₹500).", "TS-10/TS-14", ""),
         ("W-11", "RBAC", "Nurses as receptionists is hospital-wide (all nurses), not per-nurse. Dedicated RECEPTIONIST role is still available.", "TS-07/TS-20", ""),
+        ("W-12", "Walk-in", "If today's clinic hours have ended, walk-in is still allowed (scheduledAt ≈ now). Blocked only when the doctor has windows on other days but none today.", "TS-10", ""),
+        ("W-13", "Reminders", "Auto follow-up reminder is WhatsApp-only (source FOLLOW_UP). Manual visit remind stays source MANUAL. Disabling the hospital toggle cancels PENDING FOLLOW_UP rows only.", "TS-07/TS-12/TS-18", ""),
     ]
     for i, row in enumerate(items):
         for c, v in enumerate(row, 1):
@@ -1089,18 +1095,18 @@ def build_traceability(wb: Workbook):
         ("Subscription", "/subscribe, /hospital/subscription", "/api/hospital/subscription*, /api/public/razorpay/webhook", "TS-04"),
         ("Platform Admin", "/platform/**", "/api/platform/**", "TS-05"),
         ("Hospital Users", "/hospital/users, /staff", "/api/hospital/users*", "TS-06"),
-        ("Settings", "/hospital/settings", "/api/hospital/settings (branding, walk-in, nurseAsReceptionist), /api/hospital/doctor-profile, /api/hospital/staff/[id]/availability, /api/session/view-mode", "TS-07"),
+        ("Settings", "/hospital/settings", "/api/hospital/settings (branding, walk-in, nurseAsReceptionist, follow-up reminders), /api/hospital/doctor-profile, /api/hospital/staff/[id]/availability, /api/session/view-mode", "TS-07"),
         ("Leave", "/leave, /hospital/leaves", "/api/leaves*", "TS-08"),
         ("Patients", "/patients/**", "/api/patients*", "TS-09"),
         ("Appointments", "/appointments/**, /queue", "/api/appointments*", "TS-10"),
         ("Vitals", "/nurse, appointment vitals panel", "/api/appointments/[id]/vitals", "TS-11"),
-        ("Assessment", "/appointments/[id]", "/api/appointments/[id]/assessment, /summary/send, /medicines/suggest", "TS-12"),
+        ("Assessment", "/appointments/[id]", "/api/appointments/[id]/assessment, /summary/send, /medicines/suggest, follow-up reminder schedule", "TS-12"),
         ("Certificates", "/certificates/**", "/api/certificates*", "TS-13"),
         ("Billing core", "/billing/**, /billing/collect/**", "/api/invoices*, /api/appointments/[id]/collect", "TS-14"),
         ("Billing money ops", "/billing/[id], /billing/advance", "/api/invoices/[id] PATCH, /api/payments/advance", "TS-15"),
         ("Billing reports", "/billing/collections, /billing/reports", "/api/billing/reports, /api/invoices/[id]/send", "TS-16"),
         ("Helpdesk", "/helpdesk/**, /platform/helpdesk-team", "/api/helpdesk/**, /api/public/help-request", "TS-17"),
-        ("Board / Notifs", "/ (board chat), notifications bell", "/api/board*, /api/notifications", "TS-18"),
+        ("Board / Notifs", "/ (board chat), notifications bell", "/api/board*, /api/notifications, messaging worker processDueFollowUpReminders + appointment_reminder1", "TS-18"),
         ("Audit", "/hospital/audit-log, /platform/audit-log", "/api/hospital/audit-log", "TS-19"),
         ("RBAC / Tenancy", "All modules (negative)", "Cross-tenant API ID probes", "TS-20"),
     ]

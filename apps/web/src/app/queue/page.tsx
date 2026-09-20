@@ -29,6 +29,7 @@ import {
 } from "@/lib/front-desk";
 import { statusBadge, statusBadgeBase } from "@/lib/ui";
 import { resolveViewContext, isActingAsDoctor } from "@/lib/view-mode";
+import { isConsultationPaid } from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
 
 export default async function QueuePage({
@@ -73,6 +74,12 @@ export default async function QueuePage({
         department: true,
         vitals: { select: { id: true } },
         assessment: { select: { id: true, status: true } },
+        invoices: {
+          where: { status: { not: "VOID" } },
+          orderBy: { issuedAt: "desc" },
+          take: 1,
+          select: { netTotal: true, paidAmount: true, status: true },
+        },
       },
     }),
     listBookableDoctors(user.hospitalId),
@@ -274,10 +281,16 @@ export default async function QueuePage({
 
                       {canManage && isToday ? (
                         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                          <Link href={`/billing/collect/${row.id}`} className={compactPrimaryButtonClass}>
-                            Record payment
-                          </Link>
-                          <AppointmentActions id={row.id} status={row.status} />
+                          {!isConsultationPaid(row.invoices[0]) ? (
+                            <Link href={`/billing/collect/${row.id}`} className={compactPrimaryButtonClass}>
+                              Record payment
+                            </Link>
+                          ) : null}
+                          <AppointmentActions
+                            id={row.id}
+                            status={row.status}
+                            summaryApproved={row.assessment?.status === "APPROVED"}
+                          />
                         </div>
                       ) : null}
 

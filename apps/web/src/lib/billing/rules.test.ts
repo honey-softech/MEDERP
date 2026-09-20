@@ -4,6 +4,7 @@ import {
   canSendIssuedInvoice,
   hasSendableMobile,
   invoiceDue,
+  isConsultationPaid,
   parseBillItems,
   validateDiscount,
   validatePayment,
@@ -14,6 +15,10 @@ import { invoicePatchSchema, sendInvoiceSchema } from "@/lib/validation/invoice"
 describe("billing rules", () => {
   it("computes due and blocks sending draft or void invoices", () => {
     expect(invoiceDue(1000, 250)).toBe(750);
+    expect(isConsultationPaid(null)).toBe(false);
+    expect(isConsultationPaid({ netTotal: 200, paidAmount: 200 })).toBe(true);
+    expect(isConsultationPaid({ netTotal: 200, paidAmount: 50 })).toBe(false);
+    expect(isConsultationPaid({ status: "VOID", netTotal: 200, paidAmount: 200 })).toBe(false);
     expect(canSendIssuedInvoice("ISSUED")).toBe(true);
     expect(canSendIssuedInvoice("DRAFT")).toBe(false);
     expect(canSendIssuedInvoice("VOID")).toBe(false);

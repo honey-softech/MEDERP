@@ -35,7 +35,12 @@ export default async function CollectVisitPaymentPage({
       doctor: { include: { appUser: { select: { username: true } } } },
       department: true,
       hospital: { select: { opdFee: true } },
-      invoices: { orderBy: { issuedAt: "desc" }, take: 1, include: { payments: true } },
+      invoices: {
+        where: { status: { not: "VOID" } },
+        orderBy: { issuedAt: "desc" },
+        take: 1,
+        include: { payments: true },
+      },
     },
   });
   if (!appointment) {
@@ -50,6 +55,10 @@ export default async function CollectVisitPaymentPage({
   const due = Math.max(0, fee - paid);
   const doctorLabel = doctorName(appointment.doctor);
   const amountLocked = Boolean(invoice);
+
+  if (due <= 0) {
+    redirect(invoice ? `/billing/${invoice.id}` : `/appointments/${appointment.id}`);
+  }
 
   return (
     <AppShell title="Record payment">
@@ -103,18 +112,12 @@ export default async function CollectVisitPaymentPage({
         </dl>
       </article>
 
-      {due <= 0 ? (
-        <p className="max-w-3xl rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
-          This visit is already paid. Amount credited to {doctorLabel}: {inr(paid)}.
-        </p>
-      ) : (
-        <VisitPaymentForm
-          appointmentId={appointment.id}
-          due={due}
-          doctorLabel={doctorLabel}
-          amountLocked={amountLocked}
-        />
-      )}
+      <VisitPaymentForm
+        appointmentId={appointment.id}
+        due={due}
+        doctorLabel={doctorLabel}
+        amountLocked={amountLocked}
+      />
     </AppShell>
   );
 }

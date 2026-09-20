@@ -7,10 +7,12 @@ import { secondaryButtonClass } from "@/components/auth-shell";
 export function AppointmentActions({
   id,
   status,
+  summaryApproved = false,
   compact = false,
 }: {
   id: string;
   status: string;
+  summaryApproved?: boolean;
   compact?: boolean;
 }) {
   const router = useRouter();
@@ -43,7 +45,7 @@ export function AppointmentActions({
           {pending === "checkin" ? "…" : "Check in"}
         </button>
       ) : null}
-      {status === "CHECKED_IN" || status === "IN_PROGRESS" ? (
+      {(status === "CHECKED_IN" || status === "IN_PROGRESS") && !summaryApproved ? (
         <button className={secondaryButtonClass} type="button" disabled={Boolean(pending)} onClick={() => void run("checkout")}>
           {pending === "checkout" ? "…" : "Check out"}
         </button>

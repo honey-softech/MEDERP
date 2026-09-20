@@ -5,6 +5,7 @@ import { nextToken } from "@/lib/ids";
 import { notifyNursesOfConsult } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { doctorOwnsVisit } from "@/lib/appointments/access";
+import { markAppointmentCompleted } from "@/lib/appointments/complete";
 import { cancelPendingRemindersForAppointment } from "@/lib/appointments/follow-up-reminder-queue";
 import type { AppointmentActionContext, AppointmentActionResult } from "@/lib/appointments/types";
 
@@ -141,7 +142,7 @@ export async function closeAppointment(
   ctx: AppointmentActionContext,
   action: "checkout" | "complete",
 ): Promise<AppointmentActionResult> {
-  const { request, user, appointment } = ctx;
+  const { user, appointment } = ctx;
   const isFrontDesk = hasFrontDeskAccess(user);
   const isDoctorVisit = DOCTOR_VISIT_ROLES.includes(user.role);
   if (action === "checkout" && !isFrontDesk && !isDoctorVisit) return noAccess();
@@ -166,31 +167,7 @@ export async function closeAppointment(
       };
     }
   }
-  const updated = await prisma.appointment.update({
-    where: { id: appointment.id },
-    data: { status: "COMPLETED", checkOutAt: new Date() },
-  });
-  await writeAuditLog({
-    request,
-    hospitalId: user.hospitalId,
-    actorUserId: user.id,
-    actorUsername: user.username,
-    actorRole: user.role,
-    action: action === "complete" ? "VISIT_COMPLETED" : "PATIENT_CHECKED_OUT",
-    entity: "Appointment",
-    entityId: appointment.id,
-    summary:
-      action === "complete"
-        ? `${user.username} marked visit done for ${patientName(appointment.patient)}.`
-        : `${user.username} checked out ${patientName(appointment.patient)}.`,
-    metadata: {
-      changes: diffAuditFields(
-        { status: appointment.status, checkOutAt: appointment.checkOutAt },
-        { status: updated.status, checkOutAt: updated.checkOutAt },
-        { fields: ["status", "checkOutAt"] },
-      ),
-    },
-  });
+  const updated = await markAppointmentCompleted(ctx, action);
   return { ok: true, body: { ok: true, appointment: updated } };
 }
 

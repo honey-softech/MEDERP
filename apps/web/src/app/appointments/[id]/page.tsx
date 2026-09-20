@@ -35,6 +35,7 @@ import {
 } from "@/lib/front-desk";
 import { siteFromSnapshot } from "@/lib/lab-catalog";
 import { investigationsEditable } from "@/lib/lab";
+import { isConsultationPaid } from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
 import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
@@ -67,6 +68,12 @@ export default async function AppointmentDetailPage({
       reminders: { orderBy: { createdAt: "desc" }, take: 6 },
       vitals: true,
       assessment: true,
+      invoices: {
+        where: { status: { not: "VOID" } },
+        orderBy: { issuedAt: "desc" },
+        take: 1,
+        select: { netTotal: true, paidAmount: true, status: true },
+      },
       labOrders: {
         where: { status: { not: "CANCELLED" } },
         include: { items: true },
@@ -178,6 +185,7 @@ export default async function AppointmentDetailPage({
   );
   const assessment = appointment.assessment;
   const summaryApproved = assessment?.status === "APPROVED";
+  const visitPaid = isConsultationPaid(appointment.invoices[0]);
   const visitClosed =
     appointment.status === "COMPLETED" || appointment.status === "NO_SHOW" || summaryApproved;
   const showEditableAssessment =
@@ -213,7 +221,6 @@ export default async function AppointmentDetailPage({
                     status={appointment.status}
                     summaryApproved={summaryApproved}
                     patientPhone={appointment.patient.phone}
-                    showHint={false}
                   />
                 </div>
               ) : null}
@@ -283,7 +290,6 @@ export default async function AppointmentDetailPage({
               status={appointment.status}
               summaryApproved={summaryApproved}
               patientPhone={appointment.patient.phone}
-              showHint={false}
             />
           ) : null}
           <Link href="/queue" className={compactButtonClass}>
@@ -435,10 +441,12 @@ export default async function AppointmentDetailPage({
             ) : null}
             {canManage ? (
               <div className="print:hidden">
-                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                  Record payment
-                </Link>
-                <AppointmentActions id={appointment.id} status={appointment.status} />
+                {!visitPaid ? (
+                  <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                    Record payment
+                  </Link>
+                ) : null}
+                <AppointmentActions id={appointment.id} status={appointment.status} summaryApproved={summaryApproved} />
               </div>
             ) : null}
           </ConsultAssessmentForm>
@@ -475,10 +483,12 @@ export default async function AppointmentDetailPage({
             ) : null}
             {canManage ? (
               <div className="print:hidden">
-                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                  Record payment
-                </Link>
-                <AppointmentActions id={appointment.id} status={appointment.status} />
+                {!visitPaid ? (
+                  <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                    Record payment
+                  </Link>
+                ) : null}
+                <AppointmentActions id={appointment.id} status={appointment.status} summaryApproved={summaryApproved} />
               </div>
             ) : null}
           </div>
@@ -541,10 +551,12 @@ export default async function AppointmentDetailPage({
 
           {canManage ? (
             <div className="print:hidden">
-              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                Record payment
-              </Link>
-              <AppointmentActions id={appointment.id} status={appointment.status} />
+              {!visitPaid ? (
+                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                  Record payment
+                </Link>
+              ) : null}
+              <AppointmentActions id={appointment.id} status={appointment.status} summaryApproved={summaryApproved} />
             </div>
           ) : null}
         </div>

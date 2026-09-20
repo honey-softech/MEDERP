@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { compactPrimaryButtonClass, compactButtonClass } from "@/components/auth-shell";
+import { compactButtonClass } from "@/components/auth-shell";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 
 export function DoctorVisitActions({
@@ -15,7 +15,6 @@ export function DoctorVisitActions({
   summaryHref,
   assessmentLabel,
   summaryLabel,
-  showHint = true,
 }: {
   id: string;
   status: string;
@@ -25,7 +24,6 @@ export function DoctorVisitActions({
   summaryHref?: string;
   assessmentLabel?: string;
   summaryLabel?: string;
-  showHint?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -63,12 +61,12 @@ export function DoctorVisitActions({
     />
   ) : null;
 
-  const closed = ["CANCELLED", "COMPLETED", "NO_SHOW"].includes(status);
+  const closed = ["CANCELLED", "COMPLETED", "NO_SHOW"].includes(status) || summaryApproved;
   if (closed) {
-    if (status !== "COMPLETED") return null;
+    if (status === "CANCELLED" || status === "NO_SHOW") return null;
     return (
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <p className="text-xs font-medium text-teal-800">Visit marked done.</p>
+        <p className="text-xs font-medium text-teal-800">Visit completed.</p>
         {assessmentHref ? (
           <Link href={assessmentHref} className={compactButtonClass}>
             {assessmentLabel ?? "View visit"}
@@ -108,18 +106,6 @@ export function DoctorVisitActions({
         <Link href={summaryHref} className={compactButtonClass}>
           {summaryLabel ?? "Preview summary"}
         </Link>
-      ) : null}
-      <button
-        className={compactPrimaryButtonClass}
-        type="button"
-        disabled={Boolean(pending) || !summaryApproved}
-        title={!summaryApproved ? "Approve the summary before marking done" : undefined}
-        onClick={() => void run("complete")}
-      >
-        {pending === "complete" ? "Saving…" : "Done"}
-      </button>
-      {showHint && !summaryApproved ? (
-        <p className="w-full text-xs text-text-secondary sm:w-auto">Approve the summary before marking done.</p>
       ) : null}
       {error ? <p className="w-full text-sm text-red-600">{error}</p> : null}
     </div>

@@ -17,6 +17,7 @@ import { upsertVisitLabOrder } from "@/lib/lab";
 import { syncPharmacyRxFromAssessment } from "@/lib/pharmacy-rx";
 import { activeSignatureFor } from "@/lib/signatures";
 import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
+import { markAppointmentCompleted } from "@/lib/appointments/complete";
 import {
   cancelPendingFollowUpReminders,
   scheduleFollowUpReminder,
@@ -319,6 +320,13 @@ export async function POST(request: Request, context: Ctx) {
         prescription: assessment.prescription,
         orderedByUsername: scoped.user.username,
       });
+    }
+
+    if (assessment.status === "APPROVED") {
+      await markAppointmentCompleted(
+        { request, user: scoped.user, appointment },
+        "complete",
+      );
     }
 
     await syncFollowUpReminder({

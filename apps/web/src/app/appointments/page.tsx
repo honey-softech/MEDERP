@@ -105,7 +105,12 @@ export default async function AppointmentsPage({
         ...(params.departmentId ? { departmentId: params.departmentId } : {}),
       },
       orderBy: { scheduledAt: "asc" },
-      include: { patient: true, doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+      include: {
+        patient: true,
+        doctor: { include: { appUser: { select: { username: true } } } },
+        department: true,
+        assessment: { select: { status: true } },
+      },
     }),
     listBookableDoctors(user.hospitalId),
     prisma.department.findMany({
@@ -421,7 +426,11 @@ export default async function AppointmentsPage({
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{prettyEnum(row.status)}</span>
                 </div>
                 {canManage ? (
-                  <AppointmentActions id={row.id} status={row.status} />
+                  <AppointmentActions
+                    id={row.id}
+                    status={row.status}
+                    summaryApproved={row.assessment?.status === "APPROVED"}
+                  />
                 ) : (
                   <Link href={`/appointments/${row.id}`} className="mt-3 inline-block text-sm text-teal-700 hover:underline">
                     View visit details

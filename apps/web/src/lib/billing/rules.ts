@@ -14,6 +14,20 @@ export function invoiceDue(netTotal: { toString(): string } | number, paidAmount
   return Math.max(0, Number(netTotal) - Number(paidAmount));
 }
 
+export function isConsultationPaid(
+  invoice:
+    | {
+        status?: string | null;
+        netTotal: { toString(): string } | number;
+        paidAmount: { toString(): string } | number;
+      }
+    | null
+    | undefined,
+) {
+  if (!invoice || invoice.status === "VOID") return false;
+  return invoiceDue(invoice.netTotal, invoice.paidAmount) <= 0.001;
+}
+
 export function canSendIssuedInvoice(status: string) {
   return status !== "VOID" && status !== "DRAFT";
 }

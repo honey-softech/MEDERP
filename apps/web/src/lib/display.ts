@@ -56,8 +56,8 @@ export function prettyEnum(value: string) {
     .join(" ");
 }
 
-export function patientName(patient: { firstName: string; lastName: string }) {
-  return `${patient.firstName} ${patient.lastName}`.trim();
+export function patientName(patient: { firstName?: string | null; lastName?: string | null }) {
+  return `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim();
 }
 
 export function doctorName(doctor: {

@@ -81,7 +81,7 @@ export function DeveloperCredit() {
 
 export function ManagedByCredit() {
   return (
-    <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+    <p className="text-center text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
       Managed by <span className="font-semibold tracking-[0.2em] text-slate-600">HANISHA EXIM</span>
     </p>
   );

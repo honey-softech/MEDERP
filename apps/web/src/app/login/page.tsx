@@ -186,7 +186,7 @@ function LoginForm() {
         </Link>
       </p>
       <DeveloperCredit />
-      <div className="mt-3">
+      <div className="mt-3 text-center">
         <ManagedByCredit />
       </div>
     </AuthShell>

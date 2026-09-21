@@ -1,3 +1,8 @@
+/**
+ * Paid Razorpay registration. Currently unused from the public register form
+ * (payment gateway is paused; the form posts to /api/public/register-hospital/trial).
+ * Keep this route so card setup can be restored without rewriting verification.
+ */
 import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { createSession, homeForRole } from "@/lib/auth";

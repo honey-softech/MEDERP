@@ -1,3 +1,7 @@
+/**
+ * Starts Razorpay Checkout for hospital registration.
+ * Currently unused while the public register form skips the payment gateway.
+ */
 import { NextResponse } from "next/server";
 import { HospitalRegistrationError, prepareHospitalRegistration } from "@/lib/hospital-registration";
 import { trialEndsAtFromNow } from "@/lib/hospital-access";

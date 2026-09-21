@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AuthShell, buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
-import { DeveloperCredit, PasswordField } from "@/components/auth-branding";
+import { AuthShell, fieldClass, iconButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { DeveloperCredit, ManagedByCredit, PasswordField } from "@/components/auth-branding";
 import { isValidIndianMobile, mobileValidationError, normalizeMobile } from "@/lib/phone";
 
 const LOGIN_MOBILE_KEY = "mederp.login.mobile";
@@ -16,12 +16,61 @@ function safeNextPath(value: string | null) {
   return value;
 }
 
+function LoginHelpDialog({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50" onClick={onClose}>
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="login-help-title"
+          className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="login-help-title" className="text-lg font-semibold text-slate-900">
+                Help
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">Choose how you want to get support.</p>
+            </div>
+            <button type="button" className={secondaryButtonClass} onClick={onClose}>
+              Close
+            </button>
+          </div>
+          <div className="grid gap-2">
+            <Link href="/help" className={secondaryButtonClass}>
+              Contact support
+            </Link>
+            <Link href="/help/status" className={secondaryButtonClass}>
+              Check status
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(LOGIN_MOBILE_KEY);
@@ -78,7 +127,24 @@ function LoginForm() {
   }
 
   return (
-    <AuthShell title="Sign in" subtitle="Use your registered mobile number. OTP login will be added next.">
+    <AuthShell
+      title="Sign in"
+      headerAction={
+        <button
+          type="button"
+          className={iconButtonClass}
+          aria-label="Help"
+          title="Help"
+          onClick={() => setHelpOpen(true)}
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.6 9.4a2.4 2.4 0 1 1 3.3 2.2c-.8.4-1.4 1-1.4 1.9" />
+            <path d="M12 17h.01" strokeLinecap="round" />
+          </svg>
+        </button>
+      }
+    >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
           Mobile number
@@ -98,23 +164,16 @@ function LoginForm() {
           <p className="text-sm text-teal-700">Password updated. Sign in with your new password.</p>
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <button className={buttonClass} type="submit" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
-        </button>
+        <div className="flex gap-3">
+          <button className={`${primaryButtonClass} min-w-0 flex-1`} type="submit" disabled={pending}>
+            {pending ? "Signing in…" : "Sign in"}
+          </button>
+          <Link href="/register-hospital" className={`${secondaryButtonClass} min-w-0 flex-1`}>
+            Register hospital
+          </Link>
+        </div>
       </form>
-      <p className="mt-4 text-center text-sm text-slate-500">
-        Locked out or account deactivated?{" "}
-        <Link className="font-medium text-teal-700 hover:underline" href="/help">
-          Contact support
-        </Link>
-        {" · "}
-        <Link className="font-medium text-teal-700 hover:underline" href="/help/status">
-          Check status
-        </Link>
-      </p>
-      <Link href="/register-hospital" className={`${secondaryButtonClass} mt-4 w-full`}>
-        Register hospital
-      </Link>
+      {helpOpen ? <LoginHelpDialog onClose={() => setHelpOpen(false)} /> : null}
       <p className="mt-4 text-center text-sm text-slate-500">
         <Link className="font-medium text-teal-700 hover:underline" href="/forgot-password">
           Forgot password?
@@ -127,6 +186,9 @@ function LoginForm() {
         </Link>
       </p>
       <DeveloperCredit />
+      <div className="mt-3">
+        <ManagedByCredit />
+      </div>
     </AuthShell>
   );
 }

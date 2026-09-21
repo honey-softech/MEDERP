@@ -186,7 +186,7 @@ export async function prepareHospitalRegistration(
     throw new HospitalRegistrationError(adminMobileError, 400);
   }
   if (!isValidEmail(adminEmail)) {
-    throw new HospitalRegistrationError("Enter a valid super admin email for payment receipts.", 400);
+    throw new HospitalRegistrationError("Enter a valid super admin email.", 400);
   }
   if (!adminDisplayName) {
     throw new HospitalRegistrationError("Super admin name is required.", 400);

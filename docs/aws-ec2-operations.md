@@ -320,4 +320,96 @@ sudo docker image prune -f
 
 ---
 
-*Last aligned with MedERP OPD plans + 18% GST + deferred subscription card auth (2026-09).*
+## 12. Daily backup and data protection
+
+Patient, visit, and billing data lives in the Postgres Docker volume `mederp_pgdata`. That volume is **not** copied by git deploy. A disk failure, `docker volume rm`, or a bad wipe deletes it unless a dump exists **off the server**.
+
+What is already in place:
+
+- Postgres has **no public port**. Only the `web` container on the Docker network can reach it.
+- The app listens on `127.0.0.1:3000`. The internet only hits Caddy on 80/443 (HTTPS).
+- Login cookies are `httpOnly`, `SameSite=strict`, and `COOKIE_SECURE=1` behind HTTPS.
+
+What a daily backup adds: a full database dump every night, kept 30 days on the server, and (when configured) an encrypted copy in S3.
+
+### 12.1 One-time setup on EC2
+
+```bash
+ssh -i YOUR_KEY.pem ubuntu@YOUR_EC2_HOST
+cd ~/mederp
+git pull origin main
+chmod +x scripts/backup-db.sh scripts/restore-db.sh
+
+sudo mkdir -p /var/backups/mederp /etc/mederp
+sudo chmod 700 /var/backups/mederp /etc/mederp
+
+# Passphrase used to encrypt dumps before they leave the box. Store a copy offline.
+openssl rand -base64 32 | sudo tee /etc/mederp/backup.pass >/dev/null
+sudo chmod 600 /etc/mederp/backup.pass
+
+sudo tee /etc/mederp/backup.env >/dev/null <<'EOF'
+BACKUP_DIR=/var/backups/mederp
+BACKUP_RETENTION_DAYS=30
+BACKUP_PASSPHRASE_FILE=/etc/mederp/backup.pass
+# Uncomment after the S3 bucket exists (section 12.3):
+# BACKUP_S3_URI=s3://YOUR-BUCKET/mederp
+EOF
+sudo chmod 600 /etc/mederp/backup.env
+
+# Prove a dump is created
+bash scripts/backup-db.sh
+sudo ls -lh /var/backups/mederp
+```
+
+### 12.2 Run every day at 02:15 server time
+
+```bash
+sudo tee /etc/cron.d/mederp-backup >/dev/null <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 2 * * * ubuntu /bin/bash /home/ubuntu/mederp/scripts/backup-db.sh >> /var/log/mederp-backup.log 2>&1
+EOF
+sudo chmod 644 /etc/cron.d/mederp-backup
+```
+
+Check the next morning:
+
+```bash
+sudo tail -n 40 /var/log/mederp-backup.log
+sudo ls -lh /var/backups/mederp
+```
+
+### 12.3 Copy backups off the EC2 disk (required)
+
+A backup that stays only on the same disk is lost with the disk. Create a **private** S3 bucket (Block Public Access on, versioning on, default encryption on). Lifecycle: keep 90 days, then expire.
+
+Install AWS CLI on the box, attach an IAM role that can `s3:PutObject` only on `s3://YOUR-BUCKET/mederp/*`, then set `BACKUP_S3_URI` in `/etc/mederp/backup.env` and run `bash scripts/backup-db.sh` once.
+
+Optional second copy: an EBS snapshot of the instance volume once a day from the AWS console (Lifecycle Manager). That covers the Docker volume even if the dump script fails.
+
+### 12.4 Restore (only when you mean to replace live data)
+
+```bash
+cd ~/mederp
+CONFIRM_RESTORE=yes bash scripts/restore-db.sh /var/backups/mederp/mederp-YYYYMMDDTHHMMSSZ.dump.enc
+```
+
+Practice this once on a throwaway database or a stopped copy so a real incident is not the first restore.
+
+### 12.5 Extra protection (do these on AWS, not in git)
+
+| Control | Why |
+|---------|-----|
+| Security group: inbound **22, 80, 443** only. SSH from your IP, not `0.0.0.0/0` if you can avoid it. | Shrinks the attack surface. |
+| SSH key only. No password login. | Stolen passwords cannot open the box. |
+| Do not publish Postgres (`5432`) in compose or the security group. | The database is reachable only inside Docker. |
+| Keep `apps/web/.env` mode `600`. Never commit it. | Keys and the DB password stay on the server. |
+| S3 bucket private + versioning + encryption. | A deleted or overwritten dump can be recovered. |
+| Keep the backup passphrase **offline** (password manager), not only on EC2. | An attacker who copies the disk still cannot read `.enc` dumps. |
+| Test a restore every month. | An untested backup is not a backup. |
+
+Deploy does **not** install the cron job or create `/etc/mederp`. That stays a one-time step on the server (12.1–12.2).
+
+---
+
+*Last aligned with MedERP OPD plans + daily Postgres backup (2026-09).*

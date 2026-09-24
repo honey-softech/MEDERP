@@ -96,6 +96,7 @@ export async function POST(request: Request) {
       pharmacyEnabled: Boolean(body.pharmacyEnabled),
       labEnabled: Boolean(body.labEnabled),
       termsAccepted: true,
+      referralCode: body.referralCode != null ? String(body.referralCode) : null,
     });
 
     const razorpay = getRazorpayClient();
@@ -194,6 +195,7 @@ export async function POST(request: Request) {
       paymentMethod: "UPI" as PaymentMethod,
       paymentNotes,
       termsAccepted: true,
+      referralCode: body.referralCode != null ? String(body.referralCode) : null,
       trialEndsAt: mode === "subscription" ? trialEndsAt : null,
       ...doctorProfileFromBody(body),
       razorpayPlanId: mode === "subscription" ? planId || null : null,

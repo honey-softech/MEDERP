@@ -57,6 +57,7 @@ export type VisitSummaryPdfInput = {
     followUpAt?: Date | null;
     approvedByDisplayName?: string | null;
     approvedByCredentials?: string | null;
+    approvedBySignatureImage?: string | null;
     approvedBySignature?: { imageData?: string | null } | null;
   };
 };
@@ -139,7 +140,7 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
       credentials:
         [input.assessment.approvedByCredentials, input.departmentName].filter(Boolean).join("\n") ||
         input.departmentName,
-      imageData: input.assessment.approvedBySignature?.imageData,
+      imageData: input.assessment.approvedBySignatureImage ?? input.assessment.approvedBySignature?.imageData,
     });
 
     drawPrintFooter(doc, { printedAt, confidential: true });

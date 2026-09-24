@@ -8,6 +8,7 @@ import { printClock } from "@/lib/print-document-pdf";
 import { toVitalsValues } from "@/lib/vitals";
 import { generalExaminationRows } from "@/lib/visit-summary";
 import { buildVisitSummaryPdf } from "@/lib/visit-summary-pdf";
+import { visitLetterhead, visitSignatureImage } from "@/lib/issued-document";
 import {
   doctorName,
   patientName,
@@ -63,9 +64,10 @@ export async function POST(request: Request, context: Ctx) {
     dateStyle: "medium",
     timeStyle: "short",
   });
+  const letterhead = visitLetterhead(appointment.assessment, appointment.hospital);
   const variables = {
     patient: patientName(appointment.patient),
-    hospital: appointment.hospital.name,
+    hospital: letterhead.name,
     doctor: doctorName(appointment.doctor),
     when,
   };
@@ -73,7 +75,7 @@ export async function POST(request: Request, context: Ctx) {
   const filename = `visit-summary-${appointment.patient.mrn}.pdf`;
 
   const pdf = await buildVisitSummaryPdf({
-    hospital: appointment.hospital,
+    hospital: letterhead,
     patient: appointment.patient,
     doctor: appointment.doctor,
     departmentName: appointment.department.name,
@@ -82,7 +84,11 @@ export async function POST(request: Request, context: Ctx) {
     tokenNumber: appointment.tokenNumber,
     vitalsRows: generalExaminationRows(appointment.vitals ? toVitalsValues(appointment.vitals) : null),
     printedAt: printClock(),
-    assessment: appointment.assessment,
+    assessment: {
+      ...appointment.assessment,
+      approvedBySignatureImage: visitSignatureImage(appointment.assessment),
+      approvedBySignature: null,
+    },
   });
 
   let documentMediaId: string | undefined;

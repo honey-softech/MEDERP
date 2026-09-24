@@ -4,6 +4,7 @@ import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front
 import { notifyFrontDesk, notifyHospitalRole } from "@/lib/notifications";
 import { parseMedications } from "@/lib/prescription-text";
 import { activeSignatureFor } from "@/lib/signatures";
+import { billIdentityForInvoice } from "@/lib/issued-document";
 
 export const PHARMACY_BILLING_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "PHARMACIST"];
 
@@ -300,11 +301,13 @@ export async function collectAndDispenseRx(params: {
     }
 
     const invoiceNo = await nextInvoiceNo(params.hospitalId, params.hospitalCode);
+    const issued = await billIdentityForInvoice(params.hospitalId, order.patientId);
     const invoice = await tx.invoice.create({
       data: {
         hospitalId: params.hospitalId,
         invoiceNo,
         patientId: order.patientId,
+        ...issued,
         appointmentId: order.appointmentId,
         status: "PAID",
         subtotal: total,

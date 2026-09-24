@@ -351,10 +351,10 @@ sudo tee /etc/mederp/backup.env >/dev/null <<'EOF'
 BACKUP_DIR=/var/backups/mederp
 BACKUP_RETENTION_DAYS=30
 BACKUP_PASSPHRASE_FILE=/etc/mederp/backup.pass
-# Uncomment after the S3 bucket exists (section 12.3):
-# BACKUP_S3_URI=s3://YOUR-BUCKET/mederp
+BACKUP_S3_URI=s3://mederp-backup/mederp
 EOF
 sudo chmod 600 /etc/mederp/backup.env
+sudo grep BACKUP_S3_URI /etc/mederp/backup.env
 
 # Prove a dump is created
 bash scripts/backup-db.sh
@@ -379,36 +379,137 @@ sudo tail -n 40 /var/log/mederp-backup.log
 sudo ls -lh /var/backups/mederp
 ```
 
-### 12.3 Copy backups off the EC2 disk (required)
+### 12.3 S3 bucket `mederp-backup`
 
-A backup that stays only on the same disk is lost with the disk. Create a **private** S3 bucket (Block Public Access on, versioning on, default encryption on). Lifecycle: keep 90 days, then expire.
+A backup that stays only on the EC2 disk is lost with the disk. Each run of `backup-db.sh` writes **one new snapshot file** (name includes the time). It does not insert duplicate rows in Postgres, and it does not upload the same file twice. Local files older than 30 days are deleted. S3 keeps them 90 days, then the lifecycle rule expires them.
 
-Install AWS CLI on the box, attach an IAM role that can `s3:PutObject` only on `s3://YOUR-BUCKET/mederp/*`, then set `BACKUP_S3_URI` in `/etc/mederp/backup.env` and run `bash scripts/backup-db.sh` once.
+Bucket (same region as the EC2 instance):
 
-Optional second copy: an EBS snapshot of the instance volume once a day from the AWS console (Lifecycle Manager). That covers the Docker volume even if the dump script fails.
+1. **S3** → **Create bucket** → name `mederp-backup`.
+2. **Block all public access**: leave all four boxes checked.
+3. **Bucket Versioning**: Enable.
+4. **Default encryption**: SSE-S3 (AES-256).
+5. Create the bucket → **Management** → **Create lifecycle rule**.
+   - Name: `expire-old-backups`
+   - Prefix: `mederp/`
+   - Expire current versions after **90** days.
+   - Delete noncurrent versions after **30** days.
 
-### 12.4 Restore (only when you mean to replace live data)
+### 12.4 IAM role `mederp-ec2-backup`
+
+The instance uses this role. Do not create a second role. The role must have permission to write only under `mederp-backup/mederp/`.
+
+1. **EC2** → **Instances** → MedERP instance → **Security** tab → IAM role `mederp-ec2-backup`.
+2. **IAM** → **Roles** → `mederp-ec2-backup` → **Add permissions** → **Create inline policy**.
+3. **JSON** tab, paste:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::mederp-backup"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::mederp-backup/mederp/*"
+    }
+  ]
+}
+```
+
+4. Policy name: `mederp-backup-policy` → **Create policy**.
+5. Permissions tab should show **Permissions policies (1)**.
+
+If the instance IAM role is **None**, attach `mederp-ec2-backup`: **Actions** → **Security** → **Modify IAM role**.
+
+### 12.5 Point the server at the bucket and upload once
+
+`/etc/mederp/backup.env` is mode `600`. Read it with `sudo`.
+
+```bash
+sudo apt-get update && sudo apt-get install -y awscli
+
+sudo mkdir -p /etc/mederp
+sudo touch /etc/mederp/backup.env
+sudo sed -i '/BACKUP_S3_URI=/d' /etc/mederp/backup.env
+echo 'BACKUP_S3_URI=s3://mederp-backup/mederp' | sudo tee -a /etc/mederp/backup.env
+sudo chmod 600 /etc/mederp/backup.env
+sudo grep BACKUP_S3_URI /etc/mederp/backup.env
+
+bash ~/mederp/scripts/backup-db.sh
+aws s3 ls s3://mederp-backup/mederp/
+```
+
+`sudo grep` must print `BACKUP_S3_URI=s3://mederp-backup/mederp`.  
+`aws s3 ls` must list `mederp-YYYYMMDDTHHMMSSZ.dump.enc`. In the console that file is inside bucket `mederp-backup`, folder `mederp`.
+
+| `aws` error | Fix |
+|-------------|-----|
+| AccessDenied | Inline policy in 12.4 is missing, or the JSON still names a different bucket. |
+| NoSuchBucket | Bucket name is not exactly `mederp-backup`. |
+
+### 12.6 Security group
+
+**EC2** → instance → **Security** → security group → **Edit inbound rules**. Keep only:
+
+| Type | Port | Source |
+|------|------|--------|
+| SSH | 22 | My IP |
+| HTTP | 80 | 0.0.0.0/0 |
+| HTTPS | 443 | 0.0.0.0/0 |
+
+Delete **5432**, **3000**, and **All traffic**. Postgres stays on the Docker network only.
+
+### 12.7 Monthly restore check (does not touch the live database)
+
+Loads the latest dump into `mederp_backup_check`, counts patients, then drops that database.
+
+```bash
+cd ~/mederp
+LATEST=$(sudo ls -1t /var/backups/mederp/mederp-*.dump.enc | head -1)
+WORK=$(mktemp /tmp/mederp-check.XXXXXX.dump)
+sudo openssl enc -d -aes-256-cbc -pbkdf2 -in "$LATEST" -out "$WORK" -pass file:/etc/mederp/backup.pass
+
+sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml exec -T db \
+  psql -U postgres -c "DROP DATABASE IF EXISTS mederp_backup_check;"
+sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml exec -T db \
+  psql -U postgres -c "CREATE DATABASE mederp_backup_check;"
+sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml exec -T db \
+  pg_restore -U postgres -d mederp_backup_check --no-owner --no-acl < "$WORK" || true
+sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml exec -T db \
+  psql -U postgres -d mederp_backup_check -c 'SELECT count(*) AS patients FROM "Patient";'
+
+rm -f "$WORK"
+sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml exec -T db \
+  psql -U postgres -c "DROP DATABASE mederp_backup_check;"
+```
+
+A patient count that matches production means the dump can be restored. A zero count on a hospital that already has patients means the dump is not usable.
+
+### 12.8 Restore over the live database (incident only)
 
 ```bash
 cd ~/mederp
 CONFIRM_RESTORE=yes bash scripts/restore-db.sh /var/backups/mederp/mederp-YYYYMMDDTHHMMSSZ.dump.enc
 ```
 
-Practice this once on a throwaway database or a stopped copy so a real incident is not the first restore.
-
-### 12.5 Extra protection (do these on AWS, not in git)
+### 12.9 Extra protection
 
 | Control | Why |
 |---------|-----|
-| Security group: inbound **22, 80, 443** only. SSH from your IP, not `0.0.0.0/0` if you can avoid it. | Shrinks the attack surface. |
+| Security group: inbound **22, 80, 443** only. | Shrinks the attack surface. |
 | SSH key only. No password login. | Stolen passwords cannot open the box. |
-| Do not publish Postgres (`5432`) in compose or the security group. | The database is reachable only inside Docker. |
+| Do not publish Postgres (`5432`). | The database is reachable only inside Docker. |
 | Keep `apps/web/.env` mode `600`. Never commit it. | Keys and the DB password stay on the server. |
-| S3 bucket private + versioning + encryption. | A deleted or overwritten dump can be recovered. |
-| Keep the backup passphrase **offline** (password manager), not only on EC2. | An attacker who copies the disk still cannot read `.enc` dumps. |
-| Test a restore every month. | An untested backup is not a backup. |
+| S3 bucket private + versioning + encryption. | A deleted dump can be recovered from a previous version. |
+| Keep `/etc/mederp/backup.pass` in a password manager, not only on EC2. | An encrypted `.enc` dump cannot be read without it. |
+| Test a restore every month (12.7). | An untested backup is not a backup. |
 
-Deploy does **not** install the cron job or create `/etc/mederp`. That stays a one-time step on the server (12.1–12.2).
+Deploy does **not** install the cron job, create `/etc/mederp`, or attach the IAM policy. Those stay one-time steps on the server and in AWS (12.1–12.5).
 
 ---
 

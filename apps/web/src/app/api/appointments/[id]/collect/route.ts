@@ -14,6 +14,7 @@ import {
   requireHospitalActor,
 } from "@/lib/front-desk";
 import { activeSignatureFor } from "@/lib/signatures";
+import { billIdentityForInvoice } from "@/lib/issued-document";
 
 const METHODS: PaymentMethod[] = ["CASH", "CARD", "UPI"];
 const CARD_BRANDS = ["Visa", "Mastercard", "RuPay", "Amex", "Other"];
@@ -93,6 +94,7 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   const signature = await activeSignatureFor(scoped.user.id, scoped.user.hospitalId);
+  const issued = await billIdentityForInvoice(scoped.user.hospitalId, appointment.patientId);
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -104,6 +106,7 @@ export async function POST(request: Request, context: Ctx) {
           invoiceNo: await nextInvoiceNo(scoped.user.hospitalId, hospital.code),
           patientId: appointment.patientId,
           appointmentId: appointment.id,
+          ...issued,
           status: "ISSUED",
           subtotal: charge,
           discountAmount: 0,

@@ -6,20 +6,21 @@ describe("auth schemas", () => {
   it("rejects empty login credentials", () => {
     expect(loginSchema.safeParse({ mobile: "", password: "" }).success).toBe(false);
     expect(loginSchema.safeParse({ mobile: "9876543210", password: "secret" }).success).toBe(true);
+    expect(loginSchema.safeParse({ mobile: "9876543210", password: "password" }).success).toBe(false);
   });
 
   it("requires mobile and password on signup without a username field", () => {
     expect(
       signupSchema.safeParse({
         mobile: "9876543210",
-        password: "password1",
+        password: "Clinic@123",
         role: "RECEPTIONIST",
       }).success,
     ).toBe(true);
     expect(
       signupSchema.safeParse({
         mobile: "",
-        password: "password1",
+        password: "Clinic@123",
         role: "RECEPTIONIST",
       }).success,
     ).toBe(false);

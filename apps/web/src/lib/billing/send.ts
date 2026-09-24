@@ -58,7 +58,7 @@ export async function sendInvoiceWhatsApp(params: {
   const variables = {
     patient: patientName(invoice.patient),
     invoiceNo: invoice.invoiceNo,
-    hospital: invoice.hospital.name,
+    hospital: invoice.issuedHospitalName || invoice.hospital.name,
     total: inr(invoice.netTotal),
     paid: inr(invoice.paidAmount),
     due: inr(due),
@@ -70,11 +70,11 @@ export async function sendInvoiceWhatsApp(params: {
     : null;
 
   const pdf = await buildBillReceiptPdf({
-    hospitalName: invoice.hospital.name,
+    hospitalName: invoice.issuedHospitalName || invoice.hospital.name,
     issuedAt: invoice.issuedAt,
     status: invoice.status,
-    patientName: patientName(invoice.patient),
-    patientMrn: invoice.patient.mrn,
+    patientName: invoice.issuedPatientName || patientName(invoice.patient),
+    patientMrn: invoice.issuedPatientMrn || invoice.patient.mrn,
     visitLine,
     items: invoice.items,
     subtotal: invoice.subtotal,

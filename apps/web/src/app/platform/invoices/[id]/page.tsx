@@ -14,13 +14,28 @@ export default async function PlatformInvoicePage({ params }: { params: Promise<
   if (!actor) redirect("/login");
 
   const { id } = await params;
-  const [invoice, settings] = await Promise.all([
-    prisma.platformInvoice.findUnique({
-      where: { id },
-      include: { items: true, hospital: true },
-    }),
-    getPlatformBillingSettings(),
-  ]);
+  const invoice = await prisma.platformInvoice.findUnique({
+    where: { id },
+    include: { items: true, hospital: true },
+  });
+  const settings = invoice?.issuerName
+    ? null
+    : await getPlatformBillingSettings();
+  const issuer = {
+    companyName: invoice?.issuerName || settings?.companyName || "",
+    companyAddress: invoice?.issuerName ? invoice.issuerAddress : settings?.companyAddress,
+    companyPhone: invoice?.issuerName ? invoice.issuerPhone : settings?.companyPhone,
+    companyEmail: invoice?.issuerName ? invoice.issuerEmail : settings?.companyEmail,
+    gstin: invoice?.issuerName ? invoice.issuerGstin : settings?.gstin,
+    bankDetails: invoice?.issuerName ? invoice.issuerBankDetails : settings?.bankDetails,
+    termsNote: invoice?.issuerName ? invoice.issuerTermsNote : settings?.termsNote,
+  };
+  const billed = {
+    name: invoice?.billedHospitalName || invoice?.hospital.name || "",
+    code: invoice?.billedHospitalCode || invoice?.hospital.code || "",
+    address: invoice?.billedHospitalName ? invoice.billedHospitalAddress : invoice?.hospital.address,
+    phone: invoice?.billedHospitalName ? invoice.billedHospitalPhone : invoice?.hospital.phone,
+  };
 
   if (!invoice) notFound();
   if (actor.role !== "SOFTWARE_ADMIN" && !(actor.role === "SUPER_ADMIN" && actor.hospitalId === invoice.hospitalId)) {
@@ -41,10 +56,10 @@ export default async function PlatformInvoicePage({ params }: { params: Promise<
       <article className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm print:border-0 print:shadow-none">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
-            <h2 className="text-xl font-semibold">{settings.companyName}</h2>
-            {settings.companyAddress ? <p className="mt-1 text-sm text-slate-600 whitespace-pre-line">{settings.companyAddress}</p> : null}
+            <h2 className="text-xl font-semibold">{issuer.companyName}</h2>
+            {issuer.companyAddress ? <p className="mt-1 text-sm text-slate-600 whitespace-pre-line">{issuer.companyAddress}</p> : null}
             <p className="mt-1 text-sm text-slate-600">
-              {[settings.companyPhone, settings.companyEmail, settings.gstin ? `GSTIN ${settings.gstin}` : null]
+              {[issuer.companyPhone, issuer.companyEmail, issuer.gstin ? `GSTIN ${issuer.gstin}` : null]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -62,10 +77,10 @@ export default async function PlatformInvoicePage({ params }: { params: Promise<
         <section className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Bill to</p>
-            <p className="font-semibold">{invoice.hospital.name}</p>
-            <p className="font-mono text-slate-600">{invoice.hospital.code}</p>
-            {invoice.hospital.address ? <p className="text-slate-600">{invoice.hospital.address}</p> : null}
-            {invoice.hospital.phone ? <p className="text-slate-600">{invoice.hospital.phone}</p> : null}
+            <p className="font-semibold">{billed.name}</p>
+            <p className="font-mono text-slate-600">{billed.code}</p>
+            {billed.address ? <p className="text-slate-600">{billed.address}</p> : null}
+            {billed.phone ? <p className="text-slate-600">{billed.phone}</p> : null}
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Payment</p>
@@ -102,15 +117,15 @@ export default async function PlatformInvoicePage({ params }: { params: Promise<
           </tfoot>
         </table>
 
-        {settings.bankDetails ? (
+        {issuer.bankDetails ? (
           <p className="mt-6 text-sm text-slate-600 whitespace-pre-line">
             <span className="font-medium">Bank / UPI:</span>
             {"\n"}
-            {settings.bankDetails}
+            {issuer.bankDetails}
           </p>
         ) : null}
-        {settings.termsNote ? (
-          <p className="mt-4 text-xs text-slate-500 whitespace-pre-line">{settings.termsNote}</p>
+        {issuer.termsNote ? (
+          <p className="mt-4 text-xs text-slate-500 whitespace-pre-line">{issuer.termsNote}</p>
         ) : null}
       </article>
     </AppShell>

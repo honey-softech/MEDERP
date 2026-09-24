@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
+import { PasswordStrength } from "@/components/password-strength";
 import { mobileValidationError } from "@/lib/phone";
+import { passwordValidationError, stripSuperAdminName, superAdminNameError } from "@/lib/password-policy";
 import {
   SUBSCRIPTION_GST_PERCENT,
   subscriptionGstAmount,
@@ -34,6 +36,7 @@ export function AddHospitalForm() {
   const [adminMobile, setAdminMobile] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [tierId, setTierId] = useState("CLINIC");
   const paymentMethod: "UPI" = "UPI";
   const [paymentNotes, setPaymentNotes] = useState("");
@@ -95,6 +98,20 @@ export function AddHospitalForm() {
     const adminMobileError = mobileValidationError(adminMobile, "Super admin mobile");
     if (adminMobileError) {
       setError(adminMobileError);
+      return;
+    }
+    const adminNameError = superAdminNameError(adminUsername);
+    if (adminNameError) {
+      setError(adminNameError);
+      return;
+    }
+    const passwordError = passwordValidationError(adminPassword);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    if (adminPassword !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
     setPending(true);
@@ -168,10 +185,11 @@ export function AddHospitalForm() {
         <input
           className={fieldClass}
           value={adminUsername}
-          onChange={(event) => setAdminUsername(event.target.value)}
-          placeholder="Any name — login uses mobile"
+          onChange={(event) => setAdminUsername(stripSuperAdminName(event.target.value))}
+          placeholder="Name used on records — login uses mobile"
           required
         />
+        <span className="mt-1 block text-xs font-normal text-slate-500">Do not use . ! or ,</span>
       </label>
       <label className="text-sm font-medium text-slate-700">
         Super admin mobile
@@ -202,6 +220,19 @@ export function AddHospitalForm() {
           type="password"
           value={adminPassword}
           onChange={(event) => setAdminPassword(event.target.value)}
+          autoComplete="new-password"
+          required
+        />
+        <PasswordStrength password={adminPassword} />
+      </label>
+      <label className="md:col-span-2 text-sm font-medium text-slate-700">
+        Confirm password
+        <input
+          className={fieldClass}
+          type="password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          autoComplete="new-password"
           required
         />
       </label>

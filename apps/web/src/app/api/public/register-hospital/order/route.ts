@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       pharmacyEnabled: Boolean(body.pharmacyEnabled),
       labEnabled: Boolean(body.labEnabled),
       termsAccepted: true,
+      referralCode: body.referralCode != null ? String(body.referralCode) : null,
     });
 
     const amountPaise = toPaise(prepared.quote.total);

@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       adminPassword: String(body.adminPassword ?? ""),
       tierId: body.tierId != null ? String(body.tierId) : undefined,
       termsAccepted: true,
+      referralCode: body.referralCode != null ? String(body.referralCode) : null,
     });
 
     const result = await registerHospital({
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
       skipInvoice: true,
       paymentNotes: "1-month free trial — no invoice until first paid charge.",
       termsAccepted: true,
+      referralCode: body.referralCode != null ? String(body.referralCode) : null,
       trialEndsAt: trialEndsAtFromNow(),
       ...doctorProfileFromBody(body),
       actor: {

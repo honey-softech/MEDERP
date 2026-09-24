@@ -11,9 +11,32 @@ function toDateInput(value?: string | Date | null) {
   return date.toISOString().slice(0, 10);
 }
 
+function addMonthsToDateInput(current: string, months: number) {
+  const today = new Date();
+  const parsed = current ? new Date(`${current}T00:00:00`) : null;
+  const base = parsed && !Number.isNaN(parsed.getTime()) && parsed.getTime() > today.getTime() ? parsed : today;
+  const next = new Date(base.getTime());
+  next.setMonth(next.getMonth() + months);
+  const year = next.getFullYear();
+  const month = String(next.getMonth() + 1).padStart(2, "0");
+  const day = String(next.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function daysRemaining(value: string) {
+  if (!value) return null;
+  const end = new Date(`${value}T23:59:59.000Z`);
+  if (Number.isNaN(end.getTime())) return null;
+  const ms = end.getTime() - Date.now();
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / (24 * 60 * 60 * 1000));
+}
+
 export function HospitalAdminPanel({
   hospitalId,
   initial,
+  referralBonusMonths = 0,
+  maxReferralBonusMonths = 2,
 }: {
   hospitalId: string;
   initial: {
@@ -26,6 +49,8 @@ export function HospitalAdminPanel({
     extraStaffSlots: number;
     trialEndsAt?: string | Date | null;
   };
+  referralBonusMonths?: number;
+  maxReferralBonusMonths?: number;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
@@ -155,7 +180,7 @@ export function HospitalAdminPanel({
             onChange={(e) => setExtraStaffSlots(e.target.value)}
           />
         </label>
-        <label className="text-sm font-medium text-slate-700">
+        <div className="text-sm font-medium text-slate-700">
           Trial ends on
           <input
             className={fieldClass}
@@ -163,7 +188,32 @@ export function HospitalAdminPanel({
             value={trialEndsAt}
             onChange={(e) => setTrialEndsAt(e.target.value)}
           />
-        </label>
+          <span className="mt-1 block text-xs font-normal text-slate-500">
+            {trialEndsAt
+              ? `${daysRemaining(trialEndsAt) ?? 0} day(s) remaining from this date.`
+              : "No trial end date. Legacy hospitals stay open until a date is set."}
+          </span>
+          <span className="mt-1 block text-xs font-normal text-slate-500">
+            Referral months already granted: {referralBonusMonths} of {maxReferralBonusMonths}. Extending the date
+            here is separate from that cap.
+          </span>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={() => setTrialEndsAt((current) => addMonthsToDateInput(current, 1))}
+            >
+              +1 month
+            </button>
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={() => setTrialEndsAt((current) => addMonthsToDateInput(current, 3))}
+            >
+              +3 months
+            </button>
+          </div>
+        </div>
         <label className="flex items-center gap-2 self-end text-sm text-slate-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           Hospital is active (users can sign in)

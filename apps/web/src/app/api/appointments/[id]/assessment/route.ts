@@ -16,6 +16,7 @@ import { parseInvestigationPicks } from "@/lib/lab-catalog";
 import { upsertVisitLabOrder } from "@/lib/lab";
 import { syncPharmacyRxFromAssessment } from "@/lib/pharmacy-rx";
 import { activeSignatureFor } from "@/lib/signatures";
+import { visitLetterheadStamp } from "@/lib/issued-document";
 import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
 import { markAppointmentCompleted } from "@/lib/appointments/complete";
 import {
@@ -104,6 +105,11 @@ export async function POST(request: Request, context: Ctx) {
             followUpReminderEnabled: true,
             followUpReminderDaysBefore: true,
             name: true,
+            code: true,
+            address: true,
+            phone: true,
+            logoData: true,
+            sealData: true,
           },
         },
       },
@@ -257,6 +263,14 @@ export async function POST(request: Request, context: Ctx) {
         : wasApproved
           ? appointment.assessment?.approvedByCredentials ?? null
           : null,
+      approvedBySignatureImage: approve
+        ? signature?.imageData ?? null
+        : wasApproved
+          ? appointment.assessment?.approvedBySignatureImage ?? null
+          : null,
+      ...(!appointment.assessment?.issuedHospitalName && (approve || wasApproved)
+        ? visitLetterheadStamp(appointment.hospital)
+        : {}),
     };
 
     const created = !appointment.assessment;

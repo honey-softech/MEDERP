@@ -14,6 +14,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { ageYears, invoiceStatusFromTotals, nextCounter, nextInvoiceNo, pad, requireHospitalPage } from "@/lib/front-desk";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
+import { billIdentityForInvoice } from "@/lib/issued-document";
 import { redirect } from "next/navigation";
 
 export const WARD_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "DOCTOR", "NURSE", "ACCOUNTANT"];
@@ -827,12 +828,14 @@ export async function generateIpdInvoice(params: {
     paidAmount = applyAdvance;
   }
 
+  const issued = await billIdentityForInvoice(params.hospitalId, admission.patientId);
   return prisma.$transaction(async (tx) => {
     const invoice = await tx.invoice.create({
       data: {
         hospitalId: params.hospitalId,
         invoiceNo: await nextInvoiceNo(params.hospitalId, params.hospitalCode),
         patientId: admission.patientId,
+        ...issued,
         admissionId: admission.id,
         status: invoiceStatusFromTotals(subtotal, paidAmount),
         subtotal,

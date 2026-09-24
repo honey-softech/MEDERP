@@ -1,7 +1,8 @@
 import type { AppRole, HospitalSubscriptionStatus, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
-import { hashPassword, MIN_PASSWORD_LENGTH, normalizeHospitalCode, normalizeMobile, passwordValidationError } from "@/lib/auth";
+import { hashPassword, normalizeHospitalCode, normalizeMobile } from "@/lib/auth";
+import { passwordValidationError, superAdminNameError } from "@/lib/password-policy";
 import {
   HOSPITAL_CODE_LENGTH,
   isCanonicalHospitalCode,
@@ -16,6 +17,12 @@ import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platfor
 import { upsertHospitalSubscription, unixToDate } from "@/lib/hospital-subscription";
 import { hospitalFieldsFromTier, isSubscriptionTierId, type SubscriptionTierId } from "@/lib/subscription-tiers";
 import { pricingFromSettings } from "@/lib/platform-pricing";
+import {
+  createReferralFromCode,
+  findReferrerByCode,
+  MAX_REFERRALS_PER_HOSPITAL,
+  openReferralCount,
+} from "@/lib/hospital-referrals";
 
 export class HospitalRegistrationError extends Error {
   constructor(
@@ -63,6 +70,8 @@ export type RegisterHospitalInput = {
   paymentMethod?: PaymentMethod | null;
   paymentNotes?: string | null;
   termsAccepted?: boolean;
+  /** Optional code of the clinic that referred this hospital. */
+  referralCode?: string | null;
   adminAsDoctor?: boolean;
   doctorProfile?: AdminDoctorRegistrationProfile | null;
   razorpayPlanId?: string | null;
@@ -113,6 +122,9 @@ export type PreparedRegistration = {
   adminPassword: string;
   tierId: SubscriptionTierId;
   quote: Awaited<ReturnType<typeof calculateRegistrationTotal>>;
+  referrerHospitalId: string | null;
+  referrerHospitalName: string | null;
+  referralCode: string | null;
 };
 
 function normalizeEmail(value: string) {
@@ -188,14 +200,13 @@ export async function prepareHospitalRegistration(
   if (!isValidEmail(adminEmail)) {
     throw new HospitalRegistrationError("Enter a valid super admin email.", 400);
   }
-  if (!adminDisplayName) {
-    throw new HospitalRegistrationError("Super admin name is required.", 400);
+  const adminNameError = superAdminNameError(adminDisplayName);
+  if (adminNameError) {
+    throw new HospitalRegistrationError(adminNameError, 400);
   }
-  if (passwordValidationError(adminPassword)) {
-    throw new HospitalRegistrationError(
-      `Super admin password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
-      400,
-    );
+  const passwordError = passwordValidationError(adminPassword);
+  if (passwordError) {
+    throw new HospitalRegistrationError(passwordError, 400);
   }
 
   const code = await allocateUniqueHospitalCode(name, input.code);
@@ -235,6 +246,24 @@ export async function prepareHospitalRegistration(
     throw new HospitalRegistrationError("Registration total must be greater than zero.", 400);
   }
 
+  let referrerHospitalId: string | null = null;
+  let referrerHospitalName: string | null = null;
+  let referralCode: string | null = null;
+  const rawReferralCode = String(input.referralCode ?? "").trim();
+  if (rawReferralCode) {
+    const referrer = await findReferrerByCode(rawReferralCode);
+    if (!referrer) {
+      throw new HospitalRegistrationError("Referral code not recognised.", 400);
+    }
+    const open = await openReferralCount(referrer.id);
+    if (open >= MAX_REFERRALS_PER_HOSPITAL) {
+      throw new HospitalRegistrationError("That clinic has already reached the referral limit.", 400);
+    }
+    referrerHospitalId = referrer.id;
+    referrerHospitalName = referrer.name;
+    referralCode = referrer.code;
+  }
+
   return {
     name,
     code,
@@ -247,6 +276,9 @@ export async function prepareHospitalRegistration(
     tierId,
     quote,
     adminDisplayName,
+    referrerHospitalId,
+    referrerHospitalName,
+    referralCode,
   };
 }
 
@@ -408,6 +440,22 @@ export async function registerHospital(input: RegisterHospitalInput) {
       currentPeriodStart: unixToDate(input.subscriptionCurrentStart),
       currentPeriodEnd: unixToDate(input.subscriptionCurrentEnd),
       nextChargeAt: unixToDate(input.subscriptionChargeAt) ?? input.trialEndsAt ?? null,
+    });
+  }
+
+  if (prepared.referrerHospitalId && prepared.referralCode && prepared.referrerHospitalName) {
+    await createReferralFromCode({
+      referrerHospitalId: prepared.referrerHospitalId,
+      referredHospitalId: hospital.id,
+      referralCode: prepared.referralCode,
+      referredHospitalName: hospital.name,
+      referrerHospitalName: prepared.referrerHospitalName,
+      request: input.request,
+      actor: {
+        userId: input.actor.userId ?? superAdmin?.id,
+        username: input.actor.username,
+        role: input.actor.role,
+      },
     });
   }
 

@@ -12,11 +12,9 @@ export async function GET(request: Request) {
   }
 
   const where =
-    user.role === "SOFTWARE_ADMIN"
-      ? {}
-      : user.role === "SUPER_ADMIN" && user.hospitalId
-        ? { hospitalId: user.hospitalId }
-        : { userId: user.id };
+    user.role === "SUPER_ADMIN" && user.hospitalId
+      ? { hospitalId: user.hospitalId }
+      : { userId: user.id };
 
   const requests = await prisma.hospitalJoinRequest.findMany({
     where,

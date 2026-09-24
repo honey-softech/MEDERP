@@ -7,8 +7,8 @@ import { nextEmployeeId, nextUserCode } from "@/lib/employee";
 import { assertStaffSeatAvailable } from "@/lib/platform-billing";
 import { moduleErrorForRole } from "@/lib/platform-pricing";
 
+/** Hospital join requests belong to that hospital's SUPER_ADMIN — not the platform software admin. */
 export function canReviewJoinRequests(user: Pick<AppUser, "id" | "role" | "hospitalId">, hospitalId: string) {
-  if (user.role === "SOFTWARE_ADMIN") return true;
   return user.role === "SUPER_ADMIN" && user.hospitalId === hospitalId;
 }
 
@@ -17,33 +17,35 @@ export async function notifyJoinRequested(params: {
   requesterName: string;
   role: AppRole;
 }) {
-  const [hospitalAdmins, platformAdmins] = await Promise.all([
-    prisma.appUser.findMany({
-      where: { hospitalId: params.hospitalId, role: "SUPER_ADMIN", isVerified: true, isActive: true },
-      select: { id: true, hospitalId: true },
-    }),
-    prisma.appUser.findMany({
-      where: { role: "SOFTWARE_ADMIN", isVerified: true, isActive: true },
-      select: { id: true, hospitalId: true },
-    }),
-  ]);
+  // Prefer any active hospital SUPER_ADMIN (verified or not) so requests reach the hospital,
+  // not the platform inbox.
+  let hospitalAdmins = await prisma.appUser.findMany({
+    where: { hospitalId: params.hospitalId, role: "SUPER_ADMIN", isActive: true },
+    select: { id: true },
+  });
+  if (hospitalAdmins.length === 0) {
+    hospitalAdmins = await prisma.appUser.findMany({
+      where: { hospitalId: params.hospitalId, role: "SUPER_ADMIN" },
+      select: { id: true },
+    });
+  }
+
   const roleLabel = params.role.replace(/_/g, " ").toLowerCase();
-  const body = `${params.requesterName} requested to join as ${roleLabel}. Review the request to add them.`;
+  const body = `${params.requesterName} requested to join as ${roleLabel}. Open Join requests to approve or decline.`;
+
+  if (hospitalAdmins.length === 0) {
+    console.warn(
+      `Join request for hospital ${params.hospitalId}: no SUPER_ADMIN to notify. Platform will not auto-approve.`,
+    );
+    return;
+  }
+
   for (const admin of hospitalAdmins) {
     await notifyUser({
       hospitalId: params.hospitalId,
       userId: admin.id,
       href: "/hospital/join-requests",
       title: "Staff wants to join",
-      body,
-    });
-  }
-  for (const admin of platformAdmins) {
-    await notifyUser({
-      hospitalId: params.hospitalId,
-      userId: admin.id,
-      href: "/platform/join-requests",
-      title: "Hospital join request",
       body,
     });
   }

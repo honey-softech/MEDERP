@@ -24,6 +24,7 @@ export type RegisterHospitalDraft = {
   adminEmail: string;
   tierId: string;
   termsAccepted: boolean;
+  referralCode: string;
   adminAsDoctor: boolean;
   doctorProfile: RegisterDoctorDraft;
 };
@@ -52,6 +53,7 @@ const empty: RegisterHospitalDraft = {
   adminEmail: "",
   tierId: "CLINIC",
   termsAccepted: false,
+  referralCode: "",
   adminAsDoctor: false,
   doctorProfile: emptyDoctor,
 };
@@ -82,6 +84,7 @@ export function loadRegisterHospitalDraft(): RegisterHospitalDraft | null {
       ...parsed,
       tierId,
       termsAccepted: Boolean(parsed.termsAccepted),
+      referralCode: typeof parsed.referralCode === "string" ? parsed.referralCode : "",
       adminAsDoctor: Boolean(parsed.adminAsDoctor),
       doctorProfile: { ...emptyDoctor, ...(parsed.doctorProfile ?? {}) },
     };

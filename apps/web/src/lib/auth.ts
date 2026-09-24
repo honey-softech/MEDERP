@@ -9,8 +9,8 @@ import { getUserBySessionToken, loadSessionByToken } from "./session-user";
 export { SESSION_COOKIE, getUserBySessionToken, loadSessionByToken };
 export { sessionCookieOptions, sessionCookieSecure } from "./session-policy";
 export { normalizeMobile, isValidIndianMobile, mobileValidationError } from "./phone";
+export { MIN_PASSWORD_LENGTH, passwordValidationError } from "./password-policy";
 const BCRYPT_ROUNDS = 12;
-export const MIN_PASSWORD_LENGTH = 8;
 
 export const STAFF_ROLES: AppRole[] = [
   "DOCTOR",
@@ -31,13 +31,6 @@ export function homeForRole(role: AppRole, hospitalId?: string | null) {
   if (role === "HELPDESK") return "/helpdesk";
   if (!isPlatformRole(role) && !hospitalId) return "/join";
   return "/";
-}
-
-export function passwordValidationError(password: string) {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
-  }
-  return null;
 }
 
 /** Valid bcrypt hash used only so failed logins take similar time when the user is missing. */

@@ -64,7 +64,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
       <article className="max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700">
-          {user.hospital?.name ?? "Hospital"}
+          {invoice.issuedHospitalName || user.hospital?.name || "Hospital"}
         </p>
         <h2 className="mt-1 text-xl font-semibold">Receipt / invoice</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -75,9 +75,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             <span className="text-slate-500">Patient</span>
             <br />
             <Link className="font-medium text-teal-700 hover:underline" href={`/patients/${invoice.patientId}`}>
-              {patientName(invoice.patient)}
+              {invoice.issuedPatientName || patientName(invoice.patient)}
             </Link>{" "}
-            · {invoice.patient.mrn}
+            · {invoice.issuedPatientMrn || invoice.patient.mrn}
           </p>
           {invoice.appointment ? (
             <p>

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { AuthShell, buttonClass, fieldClass } from "@/components/auth-shell";
+import { PasswordStrength } from "@/components/password-strength";
+import { passwordValidationError } from "@/lib/password-policy";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -20,6 +22,11 @@ function ResetPasswordForm() {
     event.preventDefault();
     setError("");
 
+    const passwordError = passwordValidationError(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -45,7 +52,7 @@ function ResetPasswordForm() {
   return (
     <AuthShell
       title="Set a new password"
-      subtitle="Enter the 6-digit WhatsApp OTP. New password must be at least 8 characters."
+      subtitle="Enter the 6-digit WhatsApp OTP. Use 8+ characters with upper and lower case, a number, and a symbol."
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
@@ -81,6 +88,7 @@ function ResetPasswordForm() {
             minLength={8}
             required
           />
+          <PasswordStrength password={password} />
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Confirm password

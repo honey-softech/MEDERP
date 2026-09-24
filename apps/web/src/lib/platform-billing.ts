@@ -73,7 +73,13 @@ export async function createPlatformInvoice(params: {
   razorpayPaymentId?: string | null;
   razorpaySubscriptionId?: string | null;
 }) {
-  const settings = await getPlatformBillingSettings();
+  const [settings, hospital] = await Promise.all([
+    getPlatformBillingSettings(),
+    prisma.hospital.findUnique({
+      where: { id: params.hospitalId },
+      select: { name: true, code: true, address: true, phone: true },
+    }),
+  ]);
   const invoiceNo = await nextPlatformInvoiceNo(settings.invoicePrefix);
   const now = new Date();
   const status = params.status ?? "PAID";
@@ -91,6 +97,17 @@ export async function createPlatformInvoice(params: {
       paidAt: status === "PAID" ? now : null,
       razorpayPaymentId: params.razorpayPaymentId ?? null,
       razorpaySubscriptionId: params.razorpaySubscriptionId ?? null,
+      issuerName: settings.companyName,
+      issuerAddress: settings.companyAddress,
+      issuerPhone: settings.companyPhone,
+      issuerEmail: settings.companyEmail,
+      issuerGstin: settings.gstin,
+      issuerBankDetails: settings.bankDetails,
+      issuerTermsNote: settings.termsNote,
+      billedHospitalName: hospital?.name ?? null,
+      billedHospitalCode: hospital?.code ?? null,
+      billedHospitalAddress: hospital?.address ?? null,
+      billedHospitalPhone: hospital?.phone ?? null,
       items: {
         create: params.lines.map((line) => ({
           description: line.description,

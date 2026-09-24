@@ -9,6 +9,7 @@ import { staffSeatLimit } from "@/lib/platform-pricing";
 import { prisma } from "@/lib/prisma";
 import { HospitalSubscriptionForm } from "../hospital-subscription-form";
 import { HospitalAdminPanel } from "../hospital-admin-panel";
+import { earnedBonusMonths, MAX_REFERRAL_BONUS_MONTHS } from "@/lib/hospital-referrals";
 
 function formatDate(value: Date) {
   return value.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
@@ -59,7 +60,10 @@ export default async function HospitalDetailPage({
 
   if (!hospital) notFound();
 
-  const staffUsed = await countHospitalStaffSeats(hospital.id);
+  const [staffUsed, referralBonusMonths] = await Promise.all([
+    countHospitalStaffSeats(hospital.id),
+    earnedBonusMonths(hospital.id),
+  ]);
   const staffLimit = staffSeatLimit(hospital);
   const sub = hospital.subscription;
   const linked = Boolean(sub && !["CANCELLED", "COMPLETED", "EXPIRED"].includes(sub.status));
@@ -162,6 +166,8 @@ export default async function HospitalDetailPage({
             extraStaffSlots: hospital.extraStaffSlots,
             trialEndsAt: hospital.trialEndsAt,
           }}
+          referralBonusMonths={referralBonusMonths}
+          maxReferralBonusMonths={MAX_REFERRAL_BONUS_MONTHS}
         />
       </div>
 

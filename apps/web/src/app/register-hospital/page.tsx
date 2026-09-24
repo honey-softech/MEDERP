@@ -17,6 +17,8 @@ import {
   type RegisterDoctorDraft,
 } from "@/lib/register-hospital-draft";
 import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
+import { PasswordStrength } from "@/components/password-strength";
+import { passwordValidationError, stripSuperAdminName, superAdminNameError } from "@/lib/password-policy";
 // Payment gateway temporarily disabled. Restore Razorpay Checkout by uncommenting:
 // import {
 //   attachRazorpayFailureHandler,
@@ -61,8 +63,11 @@ export default function RegisterHospitalPage() {
   const [adminMobile, setAdminMobile] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [tierId, setTierId] = useState("CLINIC");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [referralHint, setReferralHint] = useState("");
   const [adminAsDoctor, setAdminAsDoctor] = useState(false);
   const [doctorProfile, setDoctorProfile] = useState<RegisterDoctorDraft>({
     firstName: "",
@@ -96,6 +101,7 @@ export default function RegisterHospitalPage() {
       setAdminEmail(draft.adminEmail || "");
       setTierId(draft.tierId || "CLINIC");
       setTermsAccepted(draft.termsAccepted);
+      setReferralCode(draft.referralCode || "");
       setAdminAsDoctor(Boolean(draft.adminAsDoctor));
       if (draft.doctorProfile) setDoctorProfile(draft.doctorProfile);
       skipCodeFetch.current = /^[A-Z0-9]{8}$/i.test(draft.code || "");
@@ -122,6 +128,7 @@ export default function RegisterHospitalPage() {
       adminEmail,
       tierId,
       termsAccepted,
+      referralCode,
       adminAsDoctor,
       doctorProfile,
     });
@@ -136,6 +143,7 @@ export default function RegisterHospitalPage() {
     adminEmail,
     tierId,
     termsAccepted,
+    referralCode,
     adminAsDoctor,
     doctorProfile,
   ]);
@@ -152,7 +160,11 @@ export default function RegisterHospitalPage() {
   useEffect(() => {
     if (!draftReady) return;
     const trimmed = name.trim();
-    if (trimmed.length < 2) return;
+    if (trimmed.length < 2) {
+      lastFetchedName.current = "";
+      setCode("");
+      return;
+    }
     if (skipCodeFetch.current && code) {
       skipCodeFetch.current = false;
       lastFetchedName.current = trimmed;
@@ -165,6 +177,35 @@ export default function RegisterHospitalPage() {
     }, 400);
     return () => window.clearTimeout(handle);
   }, [draftReady, name, code]);
+
+  useEffect(() => {
+    const trimmed = referralCode.trim();
+    if (trimmed.length < 3) {
+      setReferralHint("");
+      return;
+    }
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      const query = new URLSearchParams({ code: trimmed });
+      void fetch(`/api/public/referral-code?${query.toString()}`)
+        .then((response) => response.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (data.valid && data.hospitalName) {
+            setReferralHint(`Referred by ${data.hospitalName}`);
+            return;
+          }
+          setReferralHint(data.message || "Referral code not recognised.");
+        })
+        .catch(() => {
+          if (!cancelled) setReferralHint("");
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [referralCode]);
 
   const selectedTier = useMemo(
     () => pkg?.tiers.find((tier) => tier.id === tierId) ?? null,
@@ -197,6 +238,7 @@ export default function RegisterHospitalPage() {
       adminPassword,
       tierId,
       termsAccepted,
+      referralCode: referralCode.trim(),
       adminAsDoctor,
       doctorProfile: adminAsDoctor ? doctorProfile : null,
     }),
@@ -211,6 +253,7 @@ export default function RegisterHospitalPage() {
       adminPassword,
       tierId,
       termsAccepted,
+      referralCode,
       adminAsDoctor,
       doctorProfile,
     ],
@@ -282,8 +325,9 @@ export default function RegisterHospitalPage() {
       setError("Hospital code is still being assigned. Wait a moment and try again.");
       return false;
     }
-    if (!adminUsername.trim()) {
-      setError("Super admin name is required.");
+    const adminNameError = superAdminNameError(adminUsername);
+    if (adminNameError) {
+      setError(adminNameError);
       return false;
     }
     if (!termsAccepted) {
@@ -309,12 +353,13 @@ export default function RegisterHospitalPage() {
       setError("Enter a valid super admin email.");
       return false;
     }
-    if (!adminPassword) {
-      setError("Super admin password is required.");
+    const passwordError = passwordValidationError(adminPassword);
+    if (passwordError) {
+      setError(passwordError);
       return false;
     }
-    if (adminPassword.length < 8) {
-      setError("Super admin password must be at least 8 characters.");
+    if (adminPassword !== confirmPassword) {
+      setError("Passwords do not match.");
       return false;
     }
     if (adminAsDoctor) {
@@ -474,6 +519,28 @@ export default function RegisterHospitalPage() {
                 onChange={(event) => setAddress(event.target.value)}
               />
             </label>
+            <label className="sm:col-span-2 text-sm font-medium text-slate-700">
+              Referral code (optional)
+              <input
+                className={fieldClass}
+                value={referralCode}
+                onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
+                placeholder="Hospital code of the clinic that referred you"
+                autoComplete="off"
+                maxLength={12}
+              />
+              {referralHint ? (
+                <span
+                  className={`mt-1 block text-xs font-normal ${referralHint.startsWith("Referred by") ? "text-teal-700" : "text-red-600"}`}
+                >
+                  {referralHint}
+                </span>
+              ) : (
+                <span className="mt-1 block text-xs font-normal text-slate-500">
+                  Leave blank if no clinic referred you. A software admin confirms the referral before any free month is added.
+                </span>
+              )}
+            </label>
             <label className="text-sm font-medium text-slate-700">
               Hospital mobile
               <input
@@ -492,11 +559,12 @@ export default function RegisterHospitalPage() {
               <input
                 className={fieldClass}
                 value={adminUsername}
-                onChange={(event) => setAdminUsername(event.target.value)}
+                onChange={(event) => setAdminUsername(stripSuperAdminName(event.target.value))}
                 autoComplete="name"
-                placeholder="Any name — login uses mobile, not username"
+                placeholder="Name used on records — login uses mobile"
                 required
               />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Do not use . ! or ,</span>
             </label>
             <label className="text-sm font-medium text-slate-700">
               Super admin mobile
@@ -529,6 +597,19 @@ export default function RegisterHospitalPage() {
                 type="password"
                 value={adminPassword}
                 onChange={(event) => setAdminPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+              <PasswordStrength password={adminPassword} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Confirm password
+              <input
+                className={fieldClass}
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
                 autoComplete="new-password"
                 minLength={8}
                 required

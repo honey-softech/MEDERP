@@ -4,6 +4,7 @@ import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front
 import { ALL_LAB_CATALOG, investigationLineName, type InvestigationPick } from "@/lib/lab-catalog";
 import { notifyFrontDesk, notifyHospitalRole, notifyUser } from "@/lib/notifications";
 import { activeSignatureFor } from "@/lib/signatures";
+import { billIdentityForInvoice } from "@/lib/issued-document";
 
 export const LAB_WORK_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH"];
 export const LAB_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH", "DOCTOR", "NURSE", "RECEPTIONIST"];
@@ -343,11 +344,13 @@ export async function ensureLabInvoice(params: { orderId: string; hospitalId: st
   }
 
   const subtotal = Number(order.totalAmount);
+  const issued = await billIdentityForInvoice(params.hospitalId, order.patientId);
   const invoice = await prisma.invoice.create({
     data: {
       hospitalId: params.hospitalId,
       invoiceNo: await nextInvoiceNo(params.hospitalId, params.hospitalCode),
       patientId: order.patientId,
+      ...issued,
       subtotal,
       netTotal: subtotal,
       paidAmount: 0,

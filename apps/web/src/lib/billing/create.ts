@@ -7,6 +7,7 @@ import { nextInvoiceNo } from "@/lib/ids";
 import { invoiceStatusFromTotals } from "@/lib/opd/fees";
 import { prisma } from "@/lib/prisma";
 import { hospitalScope } from "@/lib/tenancy";
+import { billIdentityForInvoice } from "@/lib/issued-document";
 
 export async function createInvoice(params: {
   request: Request;
@@ -60,12 +61,14 @@ export async function createInvoice(params: {
     return { ok: false, error: "Hospital not found.", status: 400 };
   }
 
+  const issued = await billIdentityForInvoice(params.user.hospitalId, patient.id);
   const invoice = await prisma.invoice.create({
     data: {
       hospitalId: params.user.hospitalId,
       invoiceNo: await nextInvoiceNo(params.user.hospitalId, hospital.code),
       patientId: patient.id,
       appointmentId: params.appointmentId,
+      ...issued,
       status: invoiceStatusFromTotals(netTotal, 0),
       subtotal,
       discountAmount: params.discountAmount,

@@ -18,7 +18,7 @@ export async function activeSignatureFor(userId: string, hospitalId: string) {
   return prisma.userSignature.findFirst({
     where: { userId, hospitalId, status: "ACTIVE" },
     orderBy: { version: "desc" },
-    select: { id: true, displayName: true, credentials: true },
+    select: { id: true, displayName: true, credentials: true, imageData: true },
   });
 }
 

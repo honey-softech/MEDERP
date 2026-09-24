@@ -9,6 +9,8 @@ import { razorpayConfigured } from "@/lib/razorpay";
 import { prisma } from "@/lib/prisma";
 import { getSubscriptionTier, publicSubscriptionTiers } from "@/lib/subscription-tiers";
 import { hospitalAccessBlocked } from "@/lib/hospital-access";
+import { MAX_REFERRALS_PER_HOSPITAL, MAX_TOTAL_FREE_MONTHS, referralSummary } from "@/lib/hospital-referrals";
+import { ReferralCodeCopy } from "@/components/referral-code-copy";
 
 export default async function HospitalSubscriptionPage() {
   const user = await getCurrentUser();
@@ -16,12 +18,13 @@ export default async function HospitalSubscriptionPage() {
     redirect("/login");
   }
 
-  const [hospital, usedSeats] = await Promise.all([
+  const [hospital, usedSeats, referrals] = await Promise.all([
     prisma.hospital.findUnique({
       where: { id: user.hospitalId },
       include: { subscription: true },
     }),
     countHospitalStaffSeats(user.hospitalId),
+    referralSummary(user.hospitalId),
   ]);
 
   if (!hospital) {
@@ -61,6 +64,46 @@ export default async function HospitalSubscriptionPage() {
           The free trial has ended. Start a paid subscription below to restore access for your staff.
         </p>
       ) : null}
+      <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="font-semibold">Refer a clinic</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Share your hospital code. When another clinic registers with it and a software admin approves the referral,
+          you get 1 extra free month. You can refer up to {MAX_REFERRALS_PER_HOSPITAL} clinics. Free usage is capped at{" "}
+          {MAX_TOTAL_FREE_MONTHS} months total (your first month plus up to {referrals.maxBonusMonths} referral months).
+        </p>
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Your referral code</p>
+          <div className="mt-1">
+            <ReferralCodeCopy code={hospital.code} />
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-slate-600">
+          Referral months granted: {referrals.earnedMonths} of {referrals.maxBonusMonths}
+          {referrals.remainingMonths === 0 ? " · free-month cap reached" : ` · ${referrals.remainingMonths} month(s) still available`}
+          . Referrals recorded: {referrals.recordedReferrals} of {referrals.maxReferrals}.
+        </p>
+        {referrals.referrals.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">No clinics have registered with your code yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-100 text-sm">
+            {referrals.referrals.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                <span>
+                  {row.referredName} ({row.referredCode})
+                </span>
+                <span className="text-slate-500">
+                  {row.status === "PENDING"
+                    ? "Waiting for approval"
+                    : row.status === "APPROVED"
+                      ? `Approved · +${row.rewardMonths} month`
+                      : "Rejected"}
+                  {row.reviewNote ? ` · ${row.reviewNote}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <HospitalSeatSubscriptionForm
         currentUsed={usedSeats}
         currentLimit={seatLimit}

@@ -7,6 +7,20 @@ import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+function trialDayKey(value: Date | null | undefined) {
+  if (!value) return "";
+  return value.toISOString().slice(0, 10);
+}
+
+function sameTrialDay(next: Date | null | undefined, prev: Date | null | undefined) {
+  return trialDayKey(next) === trialDayKey(prev);
+}
+
+function formatTrialDay(value: Date | null | undefined) {
+  if (!value) return "none";
+  return value.toLocaleDateString("en-IN", { dateStyle: "medium" });
+}
+
 async function requireSoftwareAdmin() {
   const actor = await getCurrentUser();
   if (!actor || actor.role !== "SOFTWARE_ADMIN") {
@@ -121,6 +135,21 @@ export async function PATCH(request: Request, context: Ctx) {
     return NextResponse.json({ error: "No changes provided." }, { status: 400 });
   }
 
+  const changed = new Set<string>();
+  if (data.name !== undefined && data.name !== existing.name) changed.add("name");
+  if (data.code !== undefined && data.code !== existing.code) changed.add("code");
+  if (data.address !== undefined && data.address !== existing.address) changed.add("address");
+  if (data.phone !== undefined && data.phone !== existing.phone) changed.add("phone");
+  if (data.opdFee !== undefined && data.opdFee !== Number(existing.opdFee)) changed.add("opdFee");
+  if (data.isActive !== undefined && data.isActive !== existing.isActive) changed.add("isActive");
+  if (data.extraStaffSlots !== undefined && data.extraStaffSlots !== existing.extraStaffSlots) {
+    changed.add("extraStaffSlots");
+  }
+  if (data.trialEndsAt !== undefined && !sameTrialDay(data.trialEndsAt, existing.trialEndsAt)) {
+    changed.add("trialEndsAt");
+  }
+  const trialOnly = changed.size === 1 && changed.has("trialEndsAt");
+
   const hospital = await prisma.hospital.update({ where: { id }, data });
 
   // When hospital is deactivated, also deactivate all hospital users so they cannot sign in.
@@ -140,15 +169,24 @@ export async function PATCH(request: Request, context: Ctx) {
     actorUserId: actor.id,
     actorUsername: actor.username,
     actorRole: actor.role,
-    action: data.isActive === false ? "HOSPITAL_ACCESS_STOPPED" : data.isActive === true ? "HOSPITAL_ACCESS_ENABLED" : "HOSPITAL_UPDATED",
+    action:
+      changed.has("isActive") && data.isActive === false
+        ? "HOSPITAL_ACCESS_STOPPED"
+        : changed.has("isActive") && data.isActive === true
+          ? "HOSPITAL_ACCESS_ENABLED"
+          : trialOnly
+            ? "TRIAL_EXTENDED"
+            : "HOSPITAL_UPDATED",
     entity: "Hospital",
     entityId: hospital.id,
     summary:
-      data.isActive === false
+      changed.has("isActive") && data.isActive === false
         ? `${actor.username} stopped access for hospital ${hospital.code}.`
-        : data.isActive === true
+        : changed.has("isActive") && data.isActive === true
           ? `${actor.username} enabled access for hospital ${hospital.code}.`
-          : `${actor.username} updated hospital ${hospital.code} details.`,
+          : trialOnly
+            ? `${actor.username} set the free trial for ${hospital.code} to end ${formatTrialDay(hospital.trialEndsAt)} (was ${formatTrialDay(existing.trialEndsAt)}).`
+            : `${actor.username} updated hospital ${hospital.code} details.`,
     metadata: {
       ...data,
       trialEndsAt: data.trialEndsAt?.toISOString?.() ?? data.trialEndsAt ?? undefined,

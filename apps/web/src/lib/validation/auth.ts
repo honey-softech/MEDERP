@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { STAFF_ROLES, passwordValidationError } from "@/lib/auth";
+import { STAFF_ROLES } from "@/lib/auth";
+import { passwordValidationError, signInPasswordError } from "@/lib/password-policy";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 
 const staffRole = z.enum(STAFF_ROLES as unknown as [string, ...string[]], {
@@ -25,6 +26,11 @@ export const loginSchema = z
         code: "custom",
         message: "Enter a valid 10-digit mobile number and password.",
       });
+      return z.NEVER;
+    }
+    const blocked = signInPasswordError(password);
+    if (blocked) {
+      ctx.addIssue({ code: "custom", message: blocked });
       return z.NEVER;
     }
     return { mobile, password };

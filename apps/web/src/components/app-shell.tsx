@@ -208,7 +208,7 @@ const softwareAdminNav: NavSection[] = [
       { href: "/platform/hospitals/new", label: "Create hospital" },
       { href: "/platform/billing-settings", label: "Billing settings" },
       { href: "/platform/users", label: "All users" },
-      { href: "/platform/join-requests", label: "Join requests" },
+      { href: "/platform/referrals", label: "Referrals" },
       { href: "/medicine-catalog", label: "Medicine catalog" },
     ],
   },

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthShell, buttonClass, fieldClass } from "@/components/auth-shell";
+import { PasswordStrength } from "@/components/password-strength";
 import { mobileValidationError } from "@/lib/phone";
+import { passwordValidationError } from "@/lib/password-policy";
 
 const roles = [
   { value: "RECEPTIONIST", label: "Receptionist" },
@@ -29,6 +31,11 @@ export default function SignupPage() {
     const mobileError = mobileValidationError(mobile, "Mobile number");
     if (mobileError) {
       setError(mobileError);
+      return;
+    }
+    const passwordError = passwordValidationError(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     setPending(true);
@@ -104,6 +111,7 @@ export default function SignupPage() {
             minLength={8}
             required
           />
+          <PasswordStrength password={password} />
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <button className={buttonClass} type="submit" disabled={pending}>

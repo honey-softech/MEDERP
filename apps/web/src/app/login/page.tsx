@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { AuthShell, fieldClass, iconButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { DeveloperCredit, ManagedByCredit, PasswordField } from "@/components/auth-branding";
 import { isValidIndianMobile, mobileValidationError, normalizeMobile } from "@/lib/phone";
+import { signInPasswordError } from "@/lib/password-policy";
 
 const LOGIN_MOBILE_KEY = "mederp.login.mobile";
 
@@ -93,6 +94,11 @@ function LoginForm() {
     }
     if (!password) {
       setError("Enter your password.");
+      return;
+    }
+    const blockedPassword = signInPasswordError(password);
+    if (blockedPassword) {
+      setError(blockedPassword);
       return;
     }
     setPending(true);

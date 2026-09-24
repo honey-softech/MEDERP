@@ -15,6 +15,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
 import { ageGenderLine, encounterNumber, generalExaminationRows, visitDateLabel } from "@/lib/visit-summary";
+import { visitLetterhead, visitSignatureImage } from "@/lib/issued-document";
 
 export default async function VisitSummaryPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireHospitalPage();
@@ -39,6 +40,8 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
   const canPrint = PRINT_SUMMARY_ROLES.includes(user.role);
   if (!approved && !canPreviewDraft) notFound();
   if (approved && !canPrint && !canPreviewDraft) notFound();
+
+  const letterhead = visitLetterhead(appointment.assessment, appointment.hospital);
 
   const printedAt = new Date().toLocaleString("en-IN", {
     day: "2-digit",
@@ -79,15 +82,15 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
       </div>
       <div className="visit-summary-frame">
       <VisitSummaryDocument
-        hospitalName={appointment.hospital.name}
-        hospitalAddress={appointment.hospital.address}
-        hospitalPhone={appointment.hospital.phone}
-        logoData={appointment.hospital.logoData}
-        sealData={appointment.hospital.sealData}
+        hospitalName={letterhead.name}
+        hospitalAddress={letterhead.address}
+        hospitalPhone={letterhead.phone}
+        logoData={letterhead.logoData}
+        sealData={letterhead.sealData}
         patientName={`${appointment.patient.firstName} ${appointment.patient.lastName}`.trim().toUpperCase()}
         mrn={appointment.patient.mrn}
         ageGender={ageGenderLine(appointment.patient.dateOfBirth, appointment.patient.gender)}
-        encounterNo={encounterNumber(appointment.hospital.code, appointment.scheduledAt, appointment.tokenNumber)}
+        encounterNo={encounterNumber(letterhead.code, appointment.scheduledAt, appointment.tokenNumber)}
         appointmentType={prettyEnum(appointment.visitType)}
         visitDate={visitDateLabel(appointment.scheduledAt)}
         physician={doctorName(appointment.doctor)}
@@ -107,7 +110,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
         prescription={appointment.assessment.prescription}
         printedAt={printedAt}
         draft={!approved}
-        signatureImage={appointment.assessment.approvedBySignature?.imageData}
+        signatureImage={visitSignatureImage(appointment.assessment)}
         signatureName={appointment.assessment.approvedByDisplayName}
         signatureCredentials={appointment.assessment.approvedByCredentials}
       />

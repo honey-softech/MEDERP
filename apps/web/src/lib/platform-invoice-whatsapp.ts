@@ -5,7 +5,6 @@ import { inr } from "@/lib/display";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { renderTemplate } from "@/lib/messaging/templates";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
-import { getPlatformBillingSettings } from "@/lib/platform-billing";
 import { buildPlatformInvoicePdf, subscriptionBillFilename } from "@/lib/platform-invoice-pdf";
 import { prisma } from "@/lib/prisma";
 
@@ -66,8 +65,7 @@ export async function sendSubscriptionInvoiceWhatsApp(invoiceId: string) {
     return { ok: false as const, error: "Invoice not found." };
   }
 
-  const [settings, subscription, admin] = await Promise.all([
-    getPlatformBillingSettings(),
+  const [subscription, admin] = await Promise.all([
     prisma.hospitalSubscription.findUnique({
       where: { hospitalId: invoice.hospitalId },
       select: { currentPeriodStart: true, currentPeriodEnd: true },
@@ -100,7 +98,7 @@ export async function sendSubscriptionInvoiceWhatsApp(invoiceId: string) {
   );
   const variables = {
     admin: adminName,
-    hospital: invoice.hospital.name,
+    hospital: invoice.billedHospitalName || invoice.hospital.name,
     invoiceNo: invoice.invoiceNo,
     total: inr(invoice.netTotal),
     period,
@@ -108,23 +106,23 @@ export async function sendSubscriptionInvoiceWhatsApp(invoiceId: string) {
   const body = renderTemplate("subscription_bill", variables);
   const filename = subscriptionBillFilename(invoice.invoiceNo);
   const pdf = await buildPlatformInvoicePdf({
-    companyName: settings.companyName,
-    companyAddress: settings.companyAddress,
-    companyPhone: settings.companyPhone,
-    companyEmail: settings.companyEmail,
-    gstin: settings.gstin,
-    bankDetails: settings.bankDetails,
-    termsNote: settings.termsNote,
+    companyName: invoice.issuerName || "MedERP",
+    companyAddress: invoice.issuerAddress,
+    companyPhone: invoice.issuerPhone,
+    companyEmail: invoice.issuerEmail,
+    gstin: invoice.issuerGstin,
+    bankDetails: invoice.issuerBankDetails,
+    termsNote: invoice.issuerTermsNote,
     invoiceNo: invoice.invoiceNo,
     issuedAt: invoice.issuedAt,
     paidAt: invoice.paidAt,
     status: invoice.status,
     paymentMethod: invoice.paymentMethod,
     notes: invoice.notes,
-    hospitalName: invoice.hospital.name,
-    hospitalCode: invoice.hospital.code,
-    hospitalAddress: invoice.hospital.address,
-    hospitalPhone: invoice.hospital.phone,
+    hospitalName: invoice.billedHospitalName || invoice.hospital.name,
+    hospitalCode: invoice.billedHospitalCode || invoice.hospital.code,
+    hospitalAddress: invoice.billedHospitalName ? invoice.billedHospitalAddress : invoice.hospital.address,
+    hospitalPhone: invoice.billedHospitalName ? invoice.billedHospitalPhone : invoice.hospital.phone,
     billedToName: adminName,
     billedToMobile: phone.slice(-10),
     periodLabel: period,

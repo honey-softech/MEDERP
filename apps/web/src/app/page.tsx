@@ -117,13 +117,11 @@ export default async function Home({
             where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REPLY", "ESCALATED"] } },
           }),
           prisma.helpdeskTicket.count({ where: { status: "ESCALATED" } }),
-          prisma.hospitalJoinRequest.count({ where: { status: "PENDING" } }),
-        ]).then(([hospitals, users, openTickets, escalatedTickets, joinRequests]) => [
+        ]).then(([hospitals, users, openTickets, escalatedTickets]) => [
           { label: "Hospitals", value: String(hospitals), href: "/platform/hospitals" },
           { label: "Hospital users", value: String(users), href: "/platform/users" },
           { label: "Open helpdesk", value: String(openTickets), href: "/helpdesk" },
           { label: "Escalated", value: String(escalatedTickets), href: "/helpdesk" },
-          { label: "Join requests", value: String(joinRequests), href: "/platform/join-requests" },
         ])
       : user?.role === "HELPDESK"
         ? await prisma.helpdeskTicket

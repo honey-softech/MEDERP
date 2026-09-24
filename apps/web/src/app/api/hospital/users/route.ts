@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { STAFF_ROLES, getCurrentUser, hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth";
+import { STAFF_ROLES, getCurrentUser, hashPassword } from "@/lib/auth";
+import { passwordValidationError } from "@/lib/password-policy";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -106,11 +107,9 @@ export async function POST(request: Request) {
     if (!password) {
       return NextResponse.json({ error: "Password is required." }, { status: 400 });
     }
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      return NextResponse.json(
-        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
-        { status: 400 },
-      );
+    const passwordError = passwordValidationError(password);
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 });
     }
 
     const username = await uniqueUsername(suggestedUsername(input.firstName, input.lastName, role));

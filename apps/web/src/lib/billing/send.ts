@@ -56,7 +56,7 @@ export async function sendInvoiceWhatsApp(params: {
   const phone = patientMobileDigits(invoice.patient.phone);
   const due = invoiceDue(invoice.netTotal, invoice.paidAmount);
   const variables = {
-    patient: patientName(invoice.patient),
+    patient: invoice.issuedPatientName || patientName(invoice.patient),
     invoiceNo: invoice.invoiceNo,
     hospital: invoice.issuedHospitalName || invoice.hospital.name,
     total: inr(invoice.netTotal),

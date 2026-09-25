@@ -50,7 +50,11 @@ class ApiClient {
 
   final String baseUrl;
 
+  /// Release builds pass this with `--dart-define=API_BASE_URL=https://mederp.co.in`.
+  static const String configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
+
   static String get defaultBaseUrl {
+    if (configuredBaseUrl.isNotEmpty) return configuredBaseUrl;
     if (!kIsWeb && Platform.isAndroid) {
       return 'http://10.0.2.2:3000';
     }

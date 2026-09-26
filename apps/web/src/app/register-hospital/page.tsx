@@ -670,8 +670,9 @@ export default function RegisterHospitalPage() {
           <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6">
             <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Choose a plan. You get 1 month free; card setup is paused for now. Seat count includes the hospital
-              admin. Admin-as-doctor and nurse-as-receptionist do not add extra seats.
+              Choose a plan. You get 1 month free; card setup is paused for now. On Plan 1 the hospital admin
+              login is extra unless that admin is also a doctor. On Plan 2 and Plan 3 the admin login uses one
+              seat. Nurse-as-receptionist does not add a second login.
             </p>
             <div className="mt-3 grid gap-2">
               {(pkg?.tiers ?? []).map((tier) => {

@@ -7,7 +7,7 @@ import { staffSeatLimit } from "@/lib/platform-pricing";
 import { monthlyAmountForHospital } from "@/lib/hospital-subscription";
 import { razorpayConfigured } from "@/lib/razorpay";
 import { prisma } from "@/lib/prisma";
-import { getSubscriptionTier, publicSubscriptionTiers } from "@/lib/subscription-tiers";
+import { getSubscriptionTier, normalizeSubscriptionTierId, publicSubscriptionTiers } from "@/lib/subscription-tiers";
 import { hospitalAccessBlocked } from "@/lib/hospital-access";
 import { MAX_REFERRALS_PER_HOSPITAL, MAX_TOTAL_FREE_MONTHS, referralSummary } from "@/lib/hospital-referrals";
 import { ReferralCodeCopy } from "@/components/referral-code-copy";
@@ -104,6 +104,13 @@ export default async function HospitalSubscriptionPage() {
           </ul>
         )}
       </section>
+      {normalizeSubscriptionTierId(hospital.subscriptionTier) === "CLINIC" ? (
+        <p className="mb-4 text-sm text-slate-600">
+          Plan 1 usage counts staff logins only. The hospital admin account is extra unless that admin also
+          practices as a doctor, in which case it uses one seat. A separate doctor means 4 accounts including
+          admin; admin-as-doctor means 3 accounts.
+        </p>
+      ) : null}
       <HospitalSeatSubscriptionForm
         currentUsed={usedSeats}
         currentLimit={seatLimit}

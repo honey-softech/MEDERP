@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { HospitalSubscriptionForm } from "../hospital-subscription-form";
 import { HospitalAdminPanel } from "../hospital-admin-panel";
 import { earnedBonusMonths, MAX_REFERRAL_BONUS_MONTHS } from "@/lib/hospital-referrals";
+import { normalizeSubscriptionTierId } from "@/lib/subscription-tiers";
 
 function formatDate(value: Date) {
   return value.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
@@ -97,6 +98,11 @@ export default async function HospitalDetailPage({
           <p className="mt-1 font-semibold">
             {staffUsed} / {staffLimit == null ? "∞" : staffLimit} used
           </p>
+          {normalizeSubscriptionTierId(hospital.subscriptionTier) === "CLINIC" ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Plan 1: admin login is extra unless that admin is also a doctor.
+            </p>
+          ) : null}
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Modules</p>

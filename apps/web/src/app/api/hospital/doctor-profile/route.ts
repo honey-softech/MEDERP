@@ -184,11 +184,34 @@ export async function PUT(request: Request) {
   }
 
   const mode = String(body.mode ?? "create").trim().toLowerCase() === "link" ? "link" : "create";
+  const adminAlreadyActiveDoctor = Boolean(existing && existing.role === "DOCTOR" && existing.isActive);
 
   if (mode === "link") {
     const staffId = String(body.staffId ?? "").trim();
     if (!staffId) {
       return NextResponse.json({ error: "Select an existing doctor." }, { status: 400 });
+    }
+
+    const target = await prisma.staff.findFirst({
+      where: { id: staffId, hospitalId: scoped.user.hospitalId, role: "DOCTOR" },
+      select: { appUser: { select: { id: true, role: true, isActive: true } } },
+    });
+    const freesAnotherActiveLogin = Boolean(
+      target?.appUser &&
+        target.appUser.role === "DOCTOR" &&
+        target.appUser.isActive &&
+        target.appUser.id !== scoped.user.id,
+    );
+    try {
+      await assertSeatIfAdminBecomesDoctor(scoped.user.hospitalId, {
+        adminAlreadyActiveDoctor,
+        freesAnotherActiveLogin,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Staff limit reached." },
+        { status: 403 },
+      );
     }
 
     const linked = await linkAdminToExistingDoctorStaff({
@@ -263,6 +286,18 @@ export async function PUT(request: Request) {
   );
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
+  try {
+    await assertSeatIfAdminBecomesDoctor(scoped.user.hospitalId, {
+      adminAlreadyActiveDoctor,
+      freesAnotherActiveLogin: false,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Staff limit reached." },
+      { status: 403 },
+    );
   }
 
   const staff = await upsertAdminDoctorStaff({

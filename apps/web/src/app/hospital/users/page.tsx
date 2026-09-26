@@ -53,10 +53,13 @@ export default async function HospitalUsersPage() {
   const seatLimit = hospital ? staffSeatLimit(hospital) : 0;
   const seatLimitReached = seatLimit != null && usedSeats >= seatLimit;
   const remainingSeats = seatLimit == null ? null : Math.max(0, seatLimit - usedSeats);
+  const basePlan = normalizeSubscriptionTierId(hospital?.subscriptionTier) === "CLINIC";
   const seatMessage =
     seatLimit == null
-      ? `Unlimited staff seats. ${usedSeats} in use (hospital admin included).`
-      : `Plan allows ${seatLimit} login${seatLimit === 1 ? "" : "s"} total, including hospital admin. ${usedSeats} in use, ${remainingSeats} remaining. Admin-as-doctor and nurse-as-receptionist do not add seats.`;
+      ? `Unlimited staff seats. ${usedSeats} in use.`
+      : basePlan
+        ? `Plan 1 allows ${seatLimit} staff logins. ${usedSeats} in use, ${remainingSeats} remaining. The hospital admin login is extra unless that admin also practices as a doctor — then it uses one of these seats. Separate doctor: 4 accounts including admin. Admin-as-doctor: 3 accounts.`
+        : `Plan allows ${seatLimit} login${seatLimit === 1 ? "" : "s"} total, including hospital admin. ${usedSeats} in use, ${remainingSeats} remaining. Admin-as-doctor and nurse-as-receptionist do not add seats.`;
   const limitReason = `Maximum user limit reached (${usedSeats}/${seatLimit}). Upgrade your subscription plan to continue.`;
 
   return (

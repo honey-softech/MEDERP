@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { templateComponents } from "@/lib/messaging/providers";
+import { afterEach, describe, expect, it } from "vitest";
+import { askEvaTokenCandidates, normalizeAskEvaToken, templateComponents } from "@/lib/messaging/providers";
 import { reminderComponents } from "@/lib/messaging/whatsapp-meta-templates";
 
 describe("WhatsApp template builder", () => {
@@ -212,5 +212,30 @@ describe("WhatsApp template builder", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("AskEva API token", () => {
+  const previous = {
+    askeva: process.env.ASKEVA_API_TOKEN,
+    whatsapp: process.env.WHATSAPP_ACCESS_TOKEN,
+  };
+
+  afterEach(() => {
+    if (previous.askeva === undefined) delete process.env.ASKEVA_API_TOKEN;
+    else process.env.ASKEVA_API_TOKEN = previous.askeva;
+    if (previous.whatsapp === undefined) delete process.env.WHATSAPP_ACCESS_TOKEN;
+    else process.env.WHATSAPP_ACCESS_TOKEN = previous.whatsapp;
+  });
+
+  it("joins a key that was wrapped or quoted", () => {
+    const key = `${"a".repeat(64)}\n${"b".repeat(64)}`;
+    expect(normalizeAskEvaToken(`"${key}"`)).toBe("a".repeat(64) + "b".repeat(64));
+  });
+
+  it("uses the complete key when the other value is truncated", () => {
+    process.env.ASKEVA_API_TOKEN = "abcd";
+    process.env.WHATSAPP_ACCESS_TOKEN = `"${"c".repeat(128)}"`;
+    expect(askEvaTokenCandidates()).toEqual(["c".repeat(128)]);
   });
 });

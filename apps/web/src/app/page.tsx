@@ -331,7 +331,7 @@ export default async function Home({
       <div
         className={
           showBoard
-            ? "mb-6 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:grid-cols-[minmax(0,1fr)_28rem]"
+            ? "mb-6 grid items-stretch gap-4 lg:h-[30dvh] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:grid-cols-[minmax(0,1fr)_28rem]"
             : undefined
         }
       >
@@ -342,7 +342,7 @@ export default async function Home({
             locationTitle={copy.locationTitle}
             locationSubtitle={copy.locationSubtitle}
             compact={showBoard}
-            className={showBoard ? "h-full" : undefined}
+            className={showBoard ? "h-[30dvh] min-h-0 lg:h-full" : undefined}
           />
         ) : null}
 

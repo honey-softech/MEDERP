@@ -80,7 +80,7 @@ export function BoardChat({
   }
 
   return (
-    <section className="flex h-full min-h-[22rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className="flex h-[30dvh] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-full">
       <header className="border-b border-slate-200 px-4 py-3">
         <h3 className="font-semibold text-slate-900">Hospital chat</h3>
         <p className="text-xs text-slate-500">Visible to everyone on staff</p>

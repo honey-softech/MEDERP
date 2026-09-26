@@ -245,8 +245,6 @@ export function PrescriptionBuilder({
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-semibold text-text-primary">Prescription</h4>
-
       <div ref={boxRef} className="relative space-y-2">
         <input
           className={`${rxInputClass} w-full`}

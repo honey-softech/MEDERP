@@ -4,6 +4,56 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { parseMedications } from "@/lib/prescription-text";
 import { readableClinicalText } from "@/lib/visit-summary";
 
+export function VisitSummaryBanner({
+  appointmentId,
+  statusLabel,
+  summaryApproved,
+  canEdit,
+  canPrint,
+  patientPhone,
+}: {
+  appointmentId: string;
+  statusLabel: string;
+  summaryApproved: boolean;
+  canEdit: boolean;
+  canPrint: boolean;
+  patientPhone?: string | null;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5">
+      <div>
+        <p className="text-sm font-semibold text-teal-900">
+          {summaryApproved ? "Visit summary approved" : "Visit closed"}
+        </p>
+        <p className="mt-0.5 text-xs text-teal-800">
+          {statusLabel}. Send the record on WhatsApp or open print view
+          {canEdit ? ", or edit to change the assessment" : ""}.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {canPrint && summaryApproved ? (
+          <>
+            <SendPatientMessageButton
+              endpoint={`/api/appointments/${appointmentId}/summary/send`}
+              patientPhone={patientPhone}
+              compact
+              label="Send on WhatsApp"
+            />
+            <Link href={`/appointments/${appointmentId}/summary`} className={primaryButtonClass}>
+              Print record
+            </Link>
+          </>
+        ) : null}
+        {canEdit ? (
+          <Link href={`/appointments/${appointmentId}?edit=1`} className={compactButtonClass}>
+            Edit assessment
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function VisitAssessmentReadonly({
   appointmentId,
   statusLabel,
@@ -19,6 +69,7 @@ export function VisitAssessmentReadonly({
   advice,
   visitOutcome,
   followUpAt,
+  omitBanner = false,
 }: {
   appointmentId: string;
   statusLabel: string;
@@ -34,6 +85,7 @@ export function VisitAssessmentReadonly({
   advice?: string | null;
   visitOutcome?: string | null;
   followUpAt?: Date | string | null;
+  omitBanner?: boolean;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
   const diagnosisText = readableClinicalText(diagnosis);
@@ -55,37 +107,16 @@ export function VisitAssessmentReadonly({
 
   return (
     <div className="min-w-0 space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5">
-        <div>
-          <p className="text-sm font-semibold text-teal-900">
-            {summaryApproved ? "Visit summary approved" : "Visit closed"}
-          </p>
-          <p className="mt-0.5 text-xs text-teal-800">
-            {statusLabel}. Send the record on WhatsApp or open print view
-            {canEdit ? ", or edit to change the assessment" : ""}.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {canPrint && summaryApproved ? (
-            <>
-              <SendPatientMessageButton
-                endpoint={`/api/appointments/${appointmentId}/summary/send`}
-                patientPhone={patientPhone}
-                compact
-                label="Send on WhatsApp"
-              />
-              <Link href={`/appointments/${appointmentId}/summary`} className={primaryButtonClass}>
-                Print record
-              </Link>
-            </>
-          ) : null}
-          {canEdit ? (
-            <Link href={`/appointments/${appointmentId}?edit=1`} className={compactButtonClass}>
-              Edit assessment
-            </Link>
-          ) : null}
-        </div>
-      </div>
+      {omitBanner ? null : (
+        <VisitSummaryBanner
+          appointmentId={appointmentId}
+          statusLabel={statusLabel}
+          summaryApproved={summaryApproved}
+          canEdit={canEdit}
+          canPrint={canPrint}
+          patientPhone={patientPhone}
+        />
+      )}
 
       <div className="grid min-w-0 gap-3 md:grid-cols-2">
         <section className="min-w-0 space-y-3 rounded-xl border border-border bg-surface p-3 shadow-card">

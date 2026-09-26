@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mederp_mobile/system_notifications.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -44,9 +45,16 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
   @override
   void initState() {
     super.initState();
+    SystemNotifications.onOpen = _openNotice;
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
+      ..addJavaScriptChannel(
+        'MedErpNative',
+        onMessageReceived: (message) {
+          SystemNotifications.showFromBridge(message.message);
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (progress) {
@@ -57,14 +65,35 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             if (!mounted) return;
             setState(() => _failed = false);
           },
+          onPageFinished: (_) {
+            _controller.runJavaScript(inAppToastGuardScript);
+          },
           onWebResourceError: (error) {
             if (error.isForMainFrame != true || !mounted) return;
             setState(() => _failed = true);
           },
         ),
-      )
-      ..loadRequest(Uri.parse(medErpSiteUrl));
-    _configureAndroid();
+      );
+    _openSite();
+  }
+
+  Future<void> _openSite() async {
+    await SystemNotifications.ensureReady();
+    final current = await _controller.getUserAgent();
+    await _controller.setUserAgent(mobileUserAgent(current));
+    if (!mounted) return;
+    await _controller.loadRequest(Uri.parse(medErpSiteUrl));
+    await _configureAndroid();
+  }
+
+  void _openNotice(String href) {
+    final trimmed = href.trim();
+    if (trimmed.isEmpty) return;
+    final site = Uri.parse(medErpSiteUrl);
+    final target = trimmed.startsWith('http') ? Uri.tryParse(trimmed) : site.resolve(trimmed);
+    if (target == null) return;
+    if (target.host.isNotEmpty && target.host != site.host) return;
+    _controller.loadRequest(target);
   }
 
   Future<void> _configureAndroid() async {
@@ -126,7 +155,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
                           FilledButton(
                             onPressed: () {
                               setState(() => _failed = false);
-                              _controller.loadRequest(Uri.parse(medErpSiteUrl));
+                              _openSite();
                             },
                             child: const Text('Try again'),
                           ),

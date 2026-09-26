@@ -82,46 +82,68 @@ export function WelcomeBanner({
 
   return (
     <section
-      className={`relative overflow-hidden rounded-xl border border-primary-light bg-gradient-to-r from-surface via-primary-light/40 to-primary-light px-5 py-6 sm:px-8 sm:py-7 ${
-        compact ? "" : "mb-6 sm:mb-8"
+      className={`relative overflow-hidden rounded-xl border border-primary-light bg-gradient-to-r from-surface via-primary-light/40 to-primary-light ${
+        compact ? "px-4 py-3 sm:px-5" : "mb-6 px-5 py-6 sm:mb-8 sm:px-8 sm:py-7"
       } ${className}`}
     >
       <div className={`pointer-events-none absolute -right-6 top-0 hidden h-full w-[42%] ${compact ? "" : "md:block"}`}>
         <div className="absolute right-8 top-6 h-40 w-40 rounded-full bg-primary-light/60" />
         <div className="absolute bottom-6 right-24 h-24 w-24 rounded-full bg-primary/10" />
       </div>
-      <div className="relative z-10 flex h-full flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
+      <div
+        className={`relative z-10 flex h-full flex-col items-start lg:flex-row lg:items-center ${
+          compact ? "justify-center gap-3 overflow-y-auto" : "justify-between gap-6"
+        }`}
+      >
         <div className={compact ? "max-w-lg" : "max-w-xl"}>
-          <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+          <h2
+            className={`font-bold tracking-tight text-text-primary ${
+              compact ? "text-xl sm:text-2xl" : "text-3xl sm:text-4xl"
+            }`}
+          >
             {greeting}
-            <span className="mt-1 block text-primary">
+            <span className={`block text-primary ${compact ? "mt-0.5" : "mt-1"}`}>
               {displayName}! <span aria-hidden>👋</span>
             </span>
           </h2>
-          <p className="mt-3 max-w-md text-sm text-text-secondary sm:text-base">{tagline}</p>
-          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-8">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-light text-primary">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+          <p className={`max-w-md text-text-secondary ${compact ? "mt-1.5 text-xs sm:text-sm" : "mt-3 text-sm sm:text-base"}`}>
+            {tagline}
+          </p>
+          <div
+            className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-center ${
+              compact ? "mt-3 gap-2 sm:gap-4" : "mt-6 gap-4 sm:gap-8"
+            }`}
+          >
+            <div className="flex items-start gap-2.5">
+              <span
+                className={`mt-0.5 inline-flex items-center justify-center rounded-full bg-primary-light text-primary ${
+                  compact ? "h-7 w-7" : "h-9 w-9"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className={compact ? "h-4 w-4" : "h-5 w-5"} fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="8" />
                   <path d="M12 8v5l3 2" />
                 </svg>
               </span>
               <div>
-                <p className="font-semibold text-text-primary">{time}</p>
-                <p className="text-sm text-text-secondary">{date}</p>
+                <p className={`font-semibold text-text-primary ${compact ? "text-sm" : ""}`}>{time}</p>
+                <p className={`text-text-secondary ${compact ? "text-xs" : "text-sm"}`}>{date}</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-light text-primary">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="flex items-start gap-2.5">
+              <span
+                className={`mt-0.5 inline-flex items-center justify-center rounded-full bg-primary-light text-primary ${
+                  compact ? "h-7 w-7" : "h-9 w-9"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className={compact ? "h-4 w-4" : "h-5 w-5"} fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z" />
                   <circle cx="12" cy="10" r="2.2" />
                 </svg>
               </span>
               <div>
-                <p className="font-semibold text-text-primary">{locationTitle}</p>
-                <p className="text-sm text-text-secondary">{locationSubtitle}</p>
+                <p className={`font-semibold text-text-primary ${compact ? "text-sm" : ""}`}>{locationTitle}</p>
+                <p className={`text-text-secondary ${compact ? "text-xs" : "text-sm"}`}>{locationSubtitle}</p>
               </div>
             </div>
           </div>

@@ -28,6 +28,24 @@ function socketUrl() {
   return process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
 }
 
+const MOBILE_APP_TOKEN = "MedERPMobile";
+
+function isMedErpMobileApp() {
+  return typeof navigator !== "undefined" && navigator.userAgent.includes(MOBILE_APP_TOKEN);
+}
+
+function postMobileAppNotice(notice: StaffNotice) {
+  const bridge = (window as Window & { MedErpNative?: { postMessage: (message: string) => void } }).MedErpNative;
+  bridge?.postMessage(
+    JSON.stringify({
+      id: notice.id,
+      title: notice.title,
+      body: notice.body,
+      href: notice.href ?? "",
+    }),
+  );
+}
+
 function showDeviceNotification(notice: StaffNotice, onOpen: (href: string) => void) {
   if (typeof window === "undefined" || typeof Notification === "undefined") return;
   if (Notification.permission === "default") {
@@ -107,8 +125,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on(REALTIME_EVENTS.notification, (notice: StaffNotice) => {
       setItems((current) => [notice, ...current.filter((item) => item.id !== notice.id)].slice(0, 40));
       if (!notice.isRead) setUnreadCount((current) => current + 1);
-      setToast(notice);
-      showDeviceNotification(notice, (href) => router.push(href));
+      if (isMedErpMobileApp()) {
+        postMobileAppNotice(notice);
+      } else {
+        setToast(notice);
+        showDeviceNotification(notice, (href) => router.push(href));
+      }
       router.refresh();
     });
     socket.on(REALTIME_EVENTS.notificationsRead, applyRead);

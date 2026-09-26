@@ -460,33 +460,86 @@ export async function upsertAdminDoctorStaff(params: {
   }
 }
 
+/** Inactive doctor logins left behind after an earlier link, with no staff profile of their own. */
+async function retireOrphanedDoctorLogins(tx: Prisma.TransactionClient, hospitalId: string) {
+  const leftovers = await tx.appUser.findMany({
+    where: {
+      hospitalId,
+      role: "DOCTOR",
+      isActive: false,
+      staffProfile: { is: null },
+    },
+    select: { id: true },
+  });
+  for (const row of leftovers) {
+    await retireDoctorLogin(tx, row.id);
+  }
+}
+
+/** Drop a doctor login that is no longer a hospital account. The admin mobile is the only sign-in. */
+async function retireDoctorLogin(
+  tx: Prisma.TransactionClient,
+  userId: string,
+) {
+  await tx.appSession.deleteMany({ where: { userId } });
+  const retiredKey = `retired-${userId}`;
+  await tx.appUser.update({
+    where: { id: userId },
+    data: {
+      isActive: false,
+      isVerified: false,
+      hospitalId: null,
+      username: retiredKey,
+      mobile: retiredKey,
+      userCode: null,
+      employeeId: null,
+      otpCode: null,
+      otpExpiresAt: null,
+      otpAttempts: 0,
+    },
+  });
+}
+
 /**
  * Point an existing DOCTOR Staff row at the super admin login.
- * Previous doctor AppUser (if any) is unlinked and deactivated so appointments stay on the same staff id.
+ * A separate doctor login is retired: one combined account, and only the admin mobile can sign in.
+ * Appointments stay on the same staff id.
  */
 export async function linkAdminToExistingDoctorStaff(params: {
   hospitalId: string;
   adminUserId: string;
   staffId: string;
 }) {
-  const staff = await prisma.staff.findFirst({
-    where: {
-      id: params.staffId,
-      hospitalId: params.hospitalId,
-      role: "DOCTOR",
-    },
-    include: {
-      appUser: { select: { id: true, role: true, username: true, isActive: true } },
-    },
-  });
+  const [staff, admin] = await Promise.all([
+    prisma.staff.findFirst({
+      where: {
+        id: params.staffId,
+        hospitalId: params.hospitalId,
+        role: "DOCTOR",
+      },
+      include: {
+        appUser: { select: { id: true, role: true, username: true, isActive: true, mobile: true } },
+      },
+    }),
+    prisma.appUser.findFirst({
+      where: { id: params.adminUserId, hospitalId: params.hospitalId, role: "SUPER_ADMIN" },
+      select: { id: true, mobile: true },
+    }),
+  ]);
   if (!staff) {
     return { ok: false as const, error: "Select a valid doctor from this hospital.", status: 404 };
   }
+  if (!admin) {
+    return { ok: false as const, error: "Hospital admin account was not found.", status: 404 };
+  }
 
   if (staff.appUserId === params.adminUserId) {
-    const updated = await prisma.staff.update({
-      where: { id: staff.id },
-      data: { isActive: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      await retireOrphanedDoctorLogins(tx, params.hospitalId);
+      return tx.staff.update({
+        where: { id: staff.id },
+        data: { isActive: true, phone: admin.mobile },
+      });
     });
     return { ok: true as const, staff: updated, previousDoctorUserId: null as string | null };
   }
@@ -505,7 +558,6 @@ export async function linkAdminToExistingDoctorStaff(params: {
   const result = await prisma.$transaction(async (tx) => {
     const currentAdminStaff = await tx.staff.findUnique({ where: { appUserId: params.adminUserId } });
     if (currentAdminStaff && currentAdminStaff.id !== staff.id) {
-      // Admin already had a different doctor profile — free that login link.
       await tx.staff.update({
         where: { id: currentAdminStaff.id },
         data: { appUserId: null, isActive: false },
@@ -517,15 +569,18 @@ export async function linkAdminToExistingDoctorStaff(params: {
         where: { id: staff.id },
         data: { appUserId: null },
       });
-      await tx.appUser.update({
-        where: { id: previousDoctorUserId },
-        data: { isActive: false },
-      });
+      await retireDoctorLogin(tx, previousDoctorUserId);
     }
+    await retireOrphanedDoctorLogins(tx, params.hospitalId);
 
     return tx.staff.update({
       where: { id: staff.id },
-      data: { appUserId: params.adminUserId, isActive: true, role: "DOCTOR" },
+      data: {
+        appUserId: params.adminUserId,
+        isActive: true,
+        role: "DOCTOR",
+        phone: admin.mobile,
+      },
     });
   });
 

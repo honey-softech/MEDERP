@@ -49,6 +49,10 @@ export function DoctorVisitActions({
       setError(data.error ?? "Could not update the visit.");
       return;
     }
+    if (action === "start" && assessmentHref) {
+      router.push(assessmentHref);
+      return;
+    }
     router.refresh();
   }
 
@@ -82,11 +86,11 @@ export function DoctorVisitActions({
     );
   }
 
-  const showStart = status !== "IN_PROGRESS";
+  const consultStarted = status === "IN_PROGRESS";
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {showStart ? (
+      {consultStarted ? null : (
         <button
           className={compactButtonClass}
           type="button"
@@ -95,8 +99,8 @@ export function DoctorVisitActions({
         >
           {pending === "start" ? "Starting…" : "Start consult"}
         </button>
-      ) : null}
-      {assessmentHref ? (
+      )}
+      {consultStarted && assessmentHref ? (
         <Link href={assessmentHref} className={compactButtonClass}>
           {assessmentLabel ?? "Doctor assessment"}
         </Link>

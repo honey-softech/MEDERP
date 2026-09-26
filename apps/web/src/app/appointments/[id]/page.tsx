@@ -8,7 +8,7 @@ import { ConsultAssessmentForm } from "@/components/consult-assessment-form";
 import { ConsultQueueNav } from "@/components/consult-queue-nav";
 import { PatientContextPanel } from "@/components/patient-context-panel";
 import { LabOrderPanel } from "@/components/lab-order-panel";
-import { VisitAssessmentReadonly } from "@/components/visit-assessment-readonly";
+import { VisitAssessmentReadonly, VisitSummaryBanner } from "@/components/visit-assessment-readonly";
 import { VisitLabTestsForm } from "@/components/visit-lab-tests-form";
 import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
@@ -191,6 +191,8 @@ export default async function AppointmentDetailPage({
   const showEditableAssessment =
     canAssess && appointment.status !== "CANCELLED" && (!visitClosed || editing);
   const useCockpit = showEditableAssessment || (canAssess && visitClosed && !editing);
+  const pinTopNotice =
+    (editing && visitClosed && showEditableAssessment) || (!showEditableAssessment && canAssess && visitClosed);
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
@@ -343,7 +345,49 @@ export default async function AppointmentDetailPage({
       </div>
 
       <div className={`print:hidden ${useCockpit ? "grid min-w-0 gap-2 overflow-x-hidden lg:grid-cols-[minmax(0,170px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,190px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,220px)_minmax(0,1fr)] 2xl:gap-3" : "mx-auto max-w-5xl space-y-4"}`}>
-        <div className={useCockpit ? "min-w-0 lg:sticky lg:top-3" : undefined}>
+        {editing && visitClosed && showEditableAssessment ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 lg:col-start-2 lg:row-start-1">
+            <p className="text-sm text-amber-900">Editing approved visit — publish again when finished.</p>
+            <Link href={`/appointments/${appointment.id}`} className={compactButtonClass}>
+              Cancel edit
+            </Link>
+          </div>
+        ) : null}
+        {!showEditableAssessment && canAssess && visitClosed ? (
+          <div className="lg:col-start-2 lg:row-start-1">
+            <VisitSummaryBanner
+              appointmentId={appointment.id}
+              statusLabel={prettyEnum(appointment.status)}
+              summaryApproved={summaryApproved}
+              canEdit={canAssess}
+              canPrint={canPrintSummary}
+              patientPhone={appointment.patient.phone}
+            />
+          </div>
+        ) : null}
+        {!useCockpit && summaryApproved ? (
+          <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50 p-4">
+            <p className="text-sm text-teal-900">Visit summary approved. Send it on WhatsApp or print the record.</p>
+            {canPrintSummary ? (
+              <div className="flex flex-wrap gap-2">
+                <SendPatientMessageButton
+                  endpoint={`/api/appointments/${appointment.id}/summary/send`}
+                  patientPhone={appointment.patient.phone}
+                  label="Send on WhatsApp"
+                />
+                <Link href={`/appointments/${appointment.id}/summary`} className={`${primaryButtonClass} inline-flex`}>
+                  View / print record
+                </Link>
+              </div>
+            ) : null}
+            {assessment?.followUpAt ? (
+              <p className="text-sm text-slate-700">
+                Follow-up on {assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <div className={useCockpit ? `min-w-0 lg:sticky lg:top-3 lg:col-start-1 lg:row-start-1 ${pinTopNotice ? "lg:row-span-2" : ""}` : undefined}>
         <PatientContextPanel
           patient={{
             id: appointment.patient.id,
@@ -366,15 +410,7 @@ export default async function AppointmentDetailPage({
         </div>
 
         {showEditableAssessment ? (
-          <div className="min-w-0 space-y-3">
-          {editing && visitClosed ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-              <p className="text-sm text-amber-900">Editing approved visit — publish again when finished.</p>
-              <Link href={`/appointments/${appointment.id}`} className={compactButtonClass}>
-                Cancel edit
-              </Link>
-            </div>
-          ) : null}
+          <div className={`min-w-0 space-y-3 ${pinTopNotice ? "lg:col-start-2 lg:row-start-2" : "lg:col-start-2"}`}>
           <ConsultAssessmentForm
             appointmentId={appointment.id}
             canPreview={Boolean(assessment)}
@@ -452,8 +488,9 @@ export default async function AppointmentDetailPage({
           </ConsultAssessmentForm>
           </div>
         ) : canAssess && visitClosed ? (
-          <div className="min-w-0 space-y-3">
+          <div className="min-w-0 space-y-3 lg:col-start-2 lg:row-start-2">
             <VisitAssessmentReadonly
+              omitBanner
               appointmentId={appointment.id}
               statusLabel={prettyEnum(appointment.status)}
               summaryApproved={summaryApproved}
@@ -509,28 +546,7 @@ export default async function AppointmentDetailPage({
             </p>
           ) : null}
 
-          {summaryApproved ? (
-            <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50 p-4">
-              <p className="text-sm text-teal-900">Visit summary approved. Send it on WhatsApp or print the record.</p>
-              {canPrintSummary ? (
-                <div className="flex flex-wrap gap-2">
-                  <SendPatientMessageButton
-                    endpoint={`/api/appointments/${appointment.id}/summary/send`}
-                    patientPhone={appointment.patient.phone}
-                    label="Send on WhatsApp"
-                  />
-                  <Link href={`/appointments/${appointment.id}/summary`} className={`${primaryButtonClass} inline-flex`}>
-                    View / print record
-                  </Link>
-                </div>
-              ) : null}
-              {assessment?.followUpAt ? (
-                <p className="text-sm text-slate-700">
-                  Follow-up on {assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}.
-                </p>
-              ) : null}
-            </div>
-          ) : (
+          {summaryApproved ? null : (
             <p className="rounded-xl border border-border bg-app-bg px-3 py-2 text-sm text-text-secondary">
               The doctor has not approved a visit summary yet.
             </p>

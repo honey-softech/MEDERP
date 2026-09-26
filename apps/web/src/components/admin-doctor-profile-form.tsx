@@ -108,7 +108,7 @@ export function AdminDoctorProfileForm({
     setMessage(
       enabled
         ? mode === "link"
-          ? "Linked to the selected doctor. Use the Doctor | Admin switch in the header to change views."
+          ? "Combined into this admin account. Only this admin mobile can sign in. Use the Doctor | Admin switch in the header to change views."
           : "Doctor profile saved. Use the Doctor | Admin switch in the header to change views."
         : "Doctor practice disabled. Admin console stays available.",
     );
@@ -120,9 +120,8 @@ export function AdminDoctorProfileForm({
       <div>
         <h3 className="font-semibold">Admin as doctor</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Practice as a doctor on the same login and mobile ({user.mobile}). This uses the same seat as hospital
-          admin — it does not add another user. Link an existing doctor if one already works here, or add new
-          doctor details. Then switch between Admin and Doctor views from the header.
+          Practice as a doctor on this same login. Sign-in stays this admin mobile ({user.mobile}). Linking an
+          existing doctor removes that doctor’s separate login, so admin and doctor are one account.
         </p>
       </div>
 
@@ -214,8 +213,8 @@ export function AdminDoctorProfileForm({
                   </p>
                   {selectedDoctor.linkedUsername && !selectedDoctor.linkedToAdmin ? (
                     <p className="mt-2 text-xs text-amber-800">
-                      Currently linked to login {selectedDoctor.linkedUsername}. Linking here moves clinical
-                      practice to this admin login and deactivates that doctor login.
+                      Currently a separate login ({selectedDoctor.linkedUsername}). Linking removes that account.
+                      Only this admin mobile can sign in.
                     </p>
                   ) : null}
                 </div>

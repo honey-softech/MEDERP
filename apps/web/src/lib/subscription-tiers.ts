@@ -14,7 +14,11 @@ export type SubscriptionTier = {
   tagline: string;
   /** Monthly fee in INR */
   monthlyFee: number;
-  /** Total hospital login seats (any mix of roles). null = unlimited. Hospital SUPER_ADMIN counts as one seat. */
+  /**
+   * Staff login seats. null = unlimited.
+   * Plan 1: hospital admin does not use a seat unless they also practice as a doctor.
+   * Plan 2 and Plan 3: hospital admin uses one seat.
+   */
   seatLimit: number | null;
   /** Suggested role mix for registration UI only — hospitals may allocate seats freely. */
   roleSuggestion: string;
@@ -29,9 +33,11 @@ export type SubscriptionTier = {
 
 /**
  * Three OPD plans. Modules (pharmacy, lab, inventory, wards) are off until offered later.
- * Seats are fungible across hospital admin / doctor / nurse / receptionist / other staff.
- * Hospital super admin counts as one seat. Admin-as-doctor and nurse-as-receptionist do not
- * add seats — they only change what an existing user can do.
+ * Seats are fungible across doctor / nurse / receptionist / other staff.
+ * Plan 1: the hospital admin login is extra. It uses a seat only when that admin also
+ * practices as a doctor (one account, not two). Separate doctor → 4 accounts including
+ * admin. Admin-as-doctor → 3 accounts.
+ * Plan 2 and Plan 3: hospital admin uses one seat. Admin-as-doctor does not add another.
  */
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
@@ -40,16 +46,17 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     tagline: "Base OPD clinic",
     monthlyFee: 2_499,
     seatLimit: 3,
-    roleSuggestion: "1 admin doctor + 2 nurses/receptionists",
+    roleSuggestion: "Admin login plus 1 doctor and 2 nurses — or admin-as-doctor plus 2 staff",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "3 login seats total (hospital admin counts as 1)",
-      "Suggested: 1 admin as doctor + 2 nurses (nurses can cover reception)",
-      "Admin-as-doctor and nurse-as-receptionist do not add seats",
+      "3 staff logins (doctor, nurse, receptionist, or other staff)",
+      "Hospital admin is an extra login when they are not a doctor — 4 accounts total",
+      "If the admin is also the doctor, that one login uses a staff seat — 3 accounts total",
+      "Nurse-as-receptionist does not add a second login",
       "OPD, billing, appointments",
       "Nurse station (OPD vitals)",
       "Visit summary and prescription print",

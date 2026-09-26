@@ -627,7 +627,10 @@ export default function RegisterHospitalPage() {
                 <span>
                   <span className="font-medium">Admin is also a doctor</span>
                   <span className="mt-0.5 block text-slate-500">
-                    Same mobile and login for hospital admin and clinical practice — still one seat on your plan.
+                    Same mobile and login for hospital admin and clinical practice.
+                    {tierId === "CLINIC"
+                      ? " On Plan 1 that login then uses one of the 3 staff seats. Leave this off and the admin login stays extra (4 accounts: admin plus 3 staff)."
+                      : " That login still uses one seat on your plan — it does not add a second user."}{" "}
                     Fill doctor details below — enabled automatically after registration.
                   </span>
                 </span>

@@ -11,21 +11,8 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { loginSchema } from "@/lib/validation/auth";
 import { parseJsonBody } from "@/lib/validation/parse";
-import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
-  const limited = checkRateLimit(clientKey(request, "login"), {
-    limit: 10,
-    windowMs: 15 * 60 * 1000,
-    lockMs: 15 * 60 * 1000,
-  });
-  if (!limited.ok) {
-    return NextResponse.json(
-      { error: `Too many login attempts. Try again in ${limited.retryAfterSec} seconds.` },
-      { status: 429 },
-    );
-  }
-
   const parsed = await parseJsonBody(request, loginSchema);
   if (!parsed.ok) return parsed.response;
   const { mobile, password } = parsed.data;

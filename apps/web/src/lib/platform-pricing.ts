@@ -32,7 +32,11 @@ export function subscriptionTotalWithGst(baseInr: number) {
 export function pricingFromTier(tierId: string) {
   const tier = requireSubscriptionTier(tierId);
   const seatLabel =
-    tier.seatLimit == null ? "unlimited login seats" : `${tier.seatLimit} login seats (admin included)`;
+    tier.id === "CLINIC"
+      ? "3 staff logins (admin extra unless that admin is the doctor)"
+      : tier.seatLimit == null
+        ? "unlimited login seats"
+        : `${tier.seatLimit} login seats (admin included)`;
   const subtotal = tier.monthlyFee;
   const gstAmount = subscriptionGstAmount(subtotal);
   const total = subtotal + gstAmount;
@@ -88,7 +92,7 @@ export function staffSeatLimit(
   return hospital.includedStaffSlots + hospital.extraStaffSlots;
 }
 
-/** Hospital login seats count toward the plan limit (including SUPER_ADMIN). Platform roles do not. */
+/** Platform roles never use a hospital seat. Plan 1 admin exemption is applied in countHospitalStaffSeats. */
 export function isStaffSeatRole(role: string) {
   return role !== "SOFTWARE_ADMIN" && role !== "HELPDESK";
 }

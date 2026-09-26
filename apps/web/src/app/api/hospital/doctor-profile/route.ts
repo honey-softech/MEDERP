@@ -7,6 +7,7 @@ import {
   upsertAdminDoctorStaff,
 } from "@/lib/employee";
 import { requireHospitalActor } from "@/lib/front-desk";
+import { assertSeatIfAdminBecomesDoctor } from "@/lib/platform-billing";
 
 function dateIso(value: Date | null | undefined) {
   if (!value) return "";

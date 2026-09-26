@@ -4,6 +4,7 @@ import { HospitalUsersPanel } from "@/components/hospital-users-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { countHospitalStaffSeats } from "@/lib/platform-billing";
 import { staffSeatLimit } from "@/lib/platform-pricing";
+import { normalizeSubscriptionTierId } from "@/lib/subscription-tiers";
 import { prisma } from "@/lib/prisma";
 import { backfillHospitalUserIdentity } from "@/lib/employee";
 

@@ -46,35 +46,34 @@ export function parseCurlOutput(stdout: string): AskEvaHttpResult {
 function nodePost(url: URL, body: string, profile: TlsProfile): Promise<AskEvaHttpResult> {
   return new Promise((resolve, reject) => {
     const payload = Buffer.from(body);
-    const req = https.request(
-      {
-        protocol: "https:",
-        hostname: url.hostname,
-        port: url.port || 443,
-        path: `${url.pathname}${url.search}`,
-        method: "POST",
-        family: profile.family,
-        servername: url.hostname,
-        minVersion: profile.minVersion,
-        maxVersion: profile.maxVersion,
-        ciphers: profile.ciphers,
-        ALPNProtocols: ["http/1.1"],
-        agent: false,
-        honorCipherOrder: true,
-        secureOptions: constants.SSL_OP_NO_TICKET | (constants.SSL_OP_NO_COMPRESSION ?? 0),
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": String(payload.byteLength),
-          Accept: "application/json",
-          Connection: "close",
-        },
+    // Cast: older @types/node omit ALPNProtocols on https.RequestOptions; runtime Node accepts it.
+    const options = {
+      protocol: "https:",
+      hostname: url.hostname,
+      port: url.port || "443",
+      path: `${url.pathname}${url.search}`,
+      method: "POST",
+      family: profile.family,
+      servername: url.hostname,
+      minVersion: profile.minVersion,
+      maxVersion: profile.maxVersion,
+      ciphers: profile.ciphers,
+      ALPNProtocols: ["http/1.1"],
+      agent: false,
+      honorCipherOrder: true,
+      secureOptions: constants.SSL_OP_NO_TICKET | (constants.SSL_OP_NO_COMPRESSION ?? 0),
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": String(payload.byteLength),
+        Accept: "application/json",
+        Connection: "close",
       },
-      (res) => {
+    } as https.RequestOptions;
+    const req = https.request(options, (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (chunk) => chunks.push(chunk));
         res.on("end", () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString("utf8") }));
-      },
-    );
+      });
     req.setTimeout(12_000, () => {
       req.destroy(new Error("AskEva request timed out."));
     });

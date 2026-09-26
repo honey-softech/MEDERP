@@ -16,21 +16,27 @@ class SystemNotifications {
 
   static Future<void> ensureReady() async {
     if (_ready || kIsWeb) return;
-    const android = AndroidInitializationSettings('ic_stat_mederp');
-    const ios = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-    await _plugin.initialize(
-      settings: const InitializationSettings(android: android, iOS: ios),
-      onDidReceiveNotificationResponse: (response) {
-        final href = response.payload;
-        if (href != null && href.isNotEmpty) onOpen?.call(href);
-      },
-    );
-    _ready = true;
-    await _requestPermission();
+    try {
+      const android = AndroidInitializationSettings('ic_stat_mederp');
+      const ios = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      await _plugin.initialize(
+        settings: const InitializationSettings(android: android, iOS: ios),
+        onDidReceiveNotificationResponse: (response) {
+          final href = response.payload;
+          if (href != null && href.isNotEmpty) onOpen?.call(href);
+        },
+      );
+      _ready = true;
+      // Never await a long permission prompt on the critical path of opening the app.
+      // ignore: unawaited_futures
+      _requestPermission();
+    } catch (_) {
+      // App must still open the hospital site even if notifications fail to init.
+    }
   }
 
   static Future<void> _requestPermission() async {

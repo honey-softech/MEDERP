@@ -74,16 +74,22 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
           },
         ),
       );
+    // Show the site first. Notification setup must never block the WebView load.
     _openSite();
+    SystemNotifications.ensureReady().catchError((_) {});
   }
 
   Future<void> _openSite() async {
-    await SystemNotifications.ensureReady();
-    final current = await _controller.getUserAgent();
-    await _controller.setUserAgent(mobileUserAgent(current));
-    if (!mounted) return;
-    await _controller.loadRequest(Uri.parse(medErpSiteUrl));
-    await _configureAndroid();
+    try {
+      final current = await _controller.getUserAgent();
+      await _controller.setUserAgent(mobileUserAgent(current));
+      await _configureAndroid();
+      if (!mounted) return;
+      await _controller.loadRequest(Uri.parse(medErpSiteUrl));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _failed = true);
+    }
   }
 
   void _openNotice(String href) {

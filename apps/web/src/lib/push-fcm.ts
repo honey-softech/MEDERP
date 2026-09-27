@@ -112,8 +112,11 @@ async function sendToToken(params: {
           android: {
             priority: "HIGH",
             notification: {
-              channelId: "mederp_alerts",
+              channelId: "mederp_alerts_v2",
               notificationCount: 1,
+              defaultSound: true,
+              defaultVibrateTimings: true,
+              notificationPriority: "PRIORITY_HIGH",
             },
           },
         },

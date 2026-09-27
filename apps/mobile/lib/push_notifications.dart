@@ -39,11 +39,14 @@ class PushNotifications {
     await messaging.requestPermission(alert: true, badge: true, sound: true);
     await SystemNotifications.ensureReady();
 
+    // App open: OS will not shade-display FCM "notification" payloads — we post a
+    // system notification ourselves so Samsung / Xiaomi / Oppo styles can apply.
     FirebaseMessaging.onMessage.listen((message) {
       final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MedERP';
       final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
       final href = message.data['href']?.toString() ?? '';
       final id = message.data['notificationId']?.toString() ?? message.messageId ?? title;
+      // ignore: unawaited_futures
       SystemNotifications.showLocal(id: id, title: title, body: body, href: href);
     });
 

@@ -1,10 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 typedef NoticeOpener = void Function(String href);
+
+/// High-importance channel so OEMs (Samsung Edge Lighting, MIUI pop-up, etc.)
+/// can apply their own heads-up / lighting styles. Channel id bumped when
+/// importance/sound settings change — Android never upgrades an existing channel.
+const String medErpAlertChannelId = 'mederp_alerts_v2';
+const String medErpAlertChannelName = 'MedERP alerts';
+const String medErpAlertChannelDesc = 'Hospital alerts for appointments, messages, and tasks';
 
 /// Phone status-bar notifications. Shown only after the app notification permission is granted.
 class SystemNotifications {
@@ -13,6 +21,7 @@ class SystemNotifications {
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   static NoticeOpener? onOpen;
   static bool _ready = false;
+  static final Map<String, DateTime> _recentIds = {};
 
   static Future<void> ensureReady() async {
     if (_ready || kIsWeb) return;
@@ -32,11 +41,16 @@ class SystemNotifications {
       );
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'mederp_alerts',
-          'MedERP alerts',
-          description: 'Hospital alerts for appointments, messages, and tasks',
-          importance: Importance.max,
+        AndroidNotificationChannel(
+          medErpAlertChannelId,
+          medErpAlertChannelName,
+          description: medErpAlertChannelDesc,
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+          enableLights: true,
+          ledColor: const Color(0xFFDC2626),
+          showBadge: true,
         ),
       );
       _ready = true;
@@ -73,6 +87,17 @@ class SystemNotifications {
     return false;
   }
 
+  /// Socket + FCM often deliver the same notice within a second — show once.
+  static bool _alreadyShown(String id) {
+    final key = id.trim();
+    if (key.isEmpty) return false;
+    final now = DateTime.now();
+    _recentIds.removeWhere((_, at) => now.difference(at).inSeconds > 8);
+    if (_recentIds.containsKey(key)) return true;
+    _recentIds[key] = now;
+    return false;
+  }
+
   static Future<void> showFromBridge(String raw) async {
     if (!_ready) await ensureReady();
     if (!await _allowed()) return;
@@ -94,18 +119,45 @@ class SystemNotifications {
     String href = '',
   }) async {
     if (!_ready) await ensureReady();
-    if (!await _allowed()) return;
+    if (!await _allowed()) {
+      await _requestPermission();
+      if (!await _allowed()) return;
+    }
     if (title.trim().isEmpty) return;
+    if (_alreadyShown(id)) return;
 
-    const details = NotificationDetails(
+    final trimmedTitle = title.trim();
+    final trimmedBody = body.trim();
+
+    final details = NotificationDetails(
       android: AndroidNotificationDetails(
-        'mederp_alerts',
-        'MedERP alerts',
-        channelDescription: 'Hospital alerts for appointments, messages, and tasks',
-        importance: Importance.max,
+        medErpAlertChannelId,
+        medErpAlertChannelName,
+        channelDescription: medErpAlertChannelDesc,
+        importance: Importance.high,
         priority: Priority.high,
+        category: AndroidNotificationCategory.message,
+        visibility: NotificationVisibility.public,
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+        color: const Color(0xFFDC2626),
+        ledColor: const Color(0xFFDC2626),
+        ledOnMs: 800,
+        ledOffMs: 400,
+        vibrationPattern: Int64List.fromList([0, 280, 120, 280]),
+        ticker: trimmedTitle,
+        icon: 'ic_stat_mederp',
+        channelShowBadge: true,
+        autoCancel: true,
+        // Heads-up / OEM edge-lighting hooks when the shade is allowed to peek.
+        styleInformation: BigTextStyleInformation(
+          trimmedBody.isEmpty ? trimmedTitle : trimmedBody,
+          contentTitle: trimmedTitle,
+          summaryText: 'MedERP',
+        ),
       ),
-      iOS: DarwinNotificationDetails(
+      iOS: const DarwinNotificationDetails(
         presentAlert: true,
         presentBanner: true,
         presentList: true,
@@ -114,8 +166,8 @@ class SystemNotifications {
     );
     await _plugin.show(
       id: _notificationId(id),
-      title: title,
-      body: body,
+      title: trimmedTitle,
+      body: trimmedBody,
       notificationDetails: details,
       payload: href,
     );

@@ -18,9 +18,12 @@ import type { VitalRange, VitalsValues } from "@/lib/vitals";
 export function VitalsForm({
   appointmentId,
   initial,
+  returnTo = "/nurse",
 }: {
   appointmentId: string;
   initial?: VitalsValues | null;
+  /** After save, return to nurse station (or another list). */
+  returnTo?: string;
 }) {
   const router = useRouter();
   const [heightCm, setHeightCm] = useState(initial ? String(initial.heightCm) : "");
@@ -88,6 +91,7 @@ export function VitalsForm({
       setError(data.error ?? "Could not save vitals.");
       return;
     }
+    router.push(returnTo);
     router.refresh();
   }
 

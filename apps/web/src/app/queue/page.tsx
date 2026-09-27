@@ -303,22 +303,18 @@ export default async function QueuePage({
                         </Link>
                       ) : null}
 
-                      {!canDoctorVisit &&
-                      !canManage &&
-                      canRecordVitals &&
-                      isToday &&
-                      !row.vitals ? (
+                      {!canDoctorVisit && canRecordVitals && isToday ? (
                         <Link
                           href={`/appointments/${row.id}`}
                           className="mt-2.5 inline-block text-[13px] font-medium text-primary hover:underline"
                         >
-                          Record vitals
+                          {row.vitals ? "Update vitals" : "Record vitals"}
                         </Link>
                       ) : null}
 
                       {!canDoctorVisit &&
                       !canManage &&
-                      !(canRecordVitals && isToday && !row.vitals) &&
+                      !(canRecordVitals && isToday) &&
                       !(canPrintSummary && row.assessment?.status === "APPROVED") ? (
                         <Link
                           href={`/appointments/${row.id}`}

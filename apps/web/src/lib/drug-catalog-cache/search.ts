@@ -5,11 +5,13 @@ export type CatalogSearchFields = {
   pack: string | null;
   manufacturer: string | null;
   searchText: string;
+  medicineCount?: number;
 };
 
 export type CachedDrug = CatalogSearchFields & {
   nameLower: string;
   tokens: string[];
+  medicineCount: number;
 };
 
 export type DrugSuggestHit = {
@@ -37,6 +39,7 @@ export function toCachedDrug(row: CatalogSearchFields): CachedDrug {
     searchText,
     nameLower: row.name.trim().toLowerCase(),
     tokens: catalogTokens(searchText),
+    medicineCount: row.medicineCount ?? 0,
   };
 }
 
@@ -56,19 +59,55 @@ export function matchesBrand(manufacturer: string | null, brands: ReadonlySet<st
   return brands.has(manufacturer.toLowerCase());
 }
 
-/** Same order as /api/medicines/suggest: name prefix first, then name A–Z. */
-export function rankCatalogMatches<T extends { name: string }>(items: T[], query: string, limit: number) {
+type RankableDrug = {
+  name: string;
+  manufacturer: string | null;
+  medicineCount?: number;
+};
+
+function compareSuggestions(query: string) {
   const q = query.trim().toLowerCase();
-  const prefix: T[] = [];
-  const rest: T[] = [];
+  return (a: RankableDrug, b: RankableDrug) => {
+    const byCount = (b.medicineCount ?? 0) - (a.medicineCount ?? 0);
+    if (byCount !== 0) return byCount;
+    const aPrefix = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+    const bPrefix = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+    if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+    return a.name.localeCompare(b.name);
+  };
+}
+
+/**
+ * Admin-selected brands first. Other brands follow, largest catalogs first.
+ * When both groups match, a few other-brand rows stay at the bottom of the list.
+ * When the selected brands have no match, the list is filled from other brands.
+ */
+export function rankDrugSuggestions<T extends RankableDrug>(
+  items: T[],
+  query: string,
+  preferredManufacturers: readonly string[],
+  limit: number,
+) {
+  const preferred = new Set(preferredManufacturers.map((name) => name.toLowerCase()));
+  const preferredHits: T[] = [];
+  const otherHits: T[] = [];
   for (const item of items) {
-    if (item.name.toLowerCase().startsWith(q)) prefix.push(item);
-    else rest.push(item);
+    const manufacturer = item.manufacturer?.toLowerCase() ?? "";
+    if (preferred.size > 0 && preferred.has(manufacturer)) preferredHits.push(item);
+    else otherHits.push(item);
   }
-  const byName = (a: T, b: T) => a.name.localeCompare(b.name);
-  prefix.sort(byName);
-  rest.sort(byName);
-  return [...prefix, ...rest].slice(0, limit);
+
+  const compare = compareSuggestions(query);
+  preferredHits.sort(compare);
+  otherHits.sort(compare);
+
+  if (preferredHits.length === 0) return otherHits.slice(0, limit);
+  if (otherHits.length === 0) return preferredHits.slice(0, limit);
+
+  const otherSlots = Math.min(otherHits.length, Math.max(1, Math.floor(limit / 4)));
+  const preferredSlots = Math.min(preferredHits.length, limit - otherSlots);
+  const otherTake = Math.min(otherHits.length, limit - preferredSlots);
+  return [...preferredHits.slice(0, preferredSlots), ...otherHits.slice(0, otherTake)];
 }
 
 export function parseCatalogLine(line: string): CatalogSearchFields | null {
@@ -85,5 +124,6 @@ export function parseCatalogLine(line: string): CatalogSearchFields | null {
     pack: typeof parsed.pack === "string" ? parsed.pack : null,
     manufacturer: typeof parsed.manufacturer === "string" ? parsed.manufacturer : null,
     searchText: typeof parsed.searchText === "string" ? parsed.searchText : parsed.name,
+    medicineCount: typeof parsed.medicineCount === "number" ? parsed.medicineCount : 0,
   };
 }

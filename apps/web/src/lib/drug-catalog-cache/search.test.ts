@@ -5,7 +5,7 @@ import {
   catalogTokens,
   matchesBrand,
   parseCatalogLine,
-  rankCatalogMatches,
+  rankDrugSuggestions,
   toCachedDrug,
 } from "@/lib/drug-catalog-cache/search";
 
@@ -21,17 +21,47 @@ describe("drug catalog local search", () => {
   });
 
   it("ranks name prefixes ahead of other matches, then alphabetically", () => {
-    const ranked = rankCatalogMatches(
+    const ranked = rankDrugSuggestions(
       [
-        { name: "Calpol 500" },
-        { name: "Paracip" },
-        { name: "Dolo 650" },
-        { name: "Para 500" },
+        { name: "Calpol 500", manufacturer: null },
+        { name: "Paracip", manufacturer: null },
+        { name: "Dolo 650", manufacturer: null },
+        { name: "Para 500", manufacturer: null },
       ],
       "para",
+      [],
       3,
     );
     expect(ranked.map((row) => row.name)).toEqual(["Para 500", "Paracip", "Calpol 500"]);
+  });
+
+  it("puts admin brands first, then the largest other catalogs, and still shows other brands", () => {
+    const ranked = rankDrugSuggestions(
+      [
+        { name: "Azithral", manufacturer: "Alembic", medicineCount: 20 },
+        { name: "Azee", manufacturer: "Cipla", medicineCount: 200 },
+        { name: "Azibact", manufacturer: "Ipca", medicineCount: 8000 },
+        { name: "Azithro", manufacturer: "Cipla", medicineCount: 100 },
+      ],
+      "azi",
+      ["Cipla"],
+      3,
+    );
+    expect(ranked.map((row) => row.name)).toEqual(["Azee", "Azithro", "Azibact"]);
+  });
+
+  it("fills the list from other brands when the selected manufacturer has no match", () => {
+    const ranked = rankDrugSuggestions(
+      [
+        { name: "Dolokind", manufacturer: "Mankind", medicineCount: 50 },
+        { name: "Dolopar", manufacturer: "Micro Labs", medicineCount: 400 },
+        { name: "Dolo 650", manufacturer: "Micro Labs", medicineCount: 400 },
+      ],
+      "dol",
+      ["Cipla"],
+      2,
+    );
+    expect(ranked.map((row) => row.name)).toEqual(["Dolo 650", "Dolopar"]);
   });
 
   it("builds a cache record from a snapshot line", () => {

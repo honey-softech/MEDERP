@@ -1,11 +1,5 @@
 import { isMedErpMobileApp } from "./platform";
-import {
-  matchesBrand,
-  rankCatalogMatches,
-  toSuggestHit,
-  type CachedDrug,
-  type DrugSuggestHit,
-} from "./search";
+import { rankDrugSuggestions, toSuggestHit, type CachedDrug, type DrugSuggestHit } from "./search";
 
 const DB_NAME = "mederp-drug-catalog";
 const DB_VERSION = 1;
@@ -15,6 +9,8 @@ const META_KEY = "catalog";
 
 /** Stop a broad token scan so a 2-letter query stays fast. Selective queries finish before the cap. */
 const TOKEN_CURSOR_CAP = 800;
+const NAME_CURSOR_CAP = 400;
+const COLLECT_CAP = 80;
 
 export type CacheMeta = {
   key: typeof META_KEY;
@@ -136,11 +132,6 @@ export async function deleteCachedDrugs(ids: string[]) {
   await txDone(tx);
 }
 
-function brandSet(brands: string[]) {
-  if (brands.length === 0) return null;
-  return new Set(brands.map((brand) => brand.toLowerCase()));
-}
-
 function walkCursor(
   source: IDBIndex,
   range: IDBKeyRange,
@@ -164,33 +155,50 @@ function walkCursor(
   });
 }
 
-async function collectNamePrefix(db: IDBDatabase, query: string, limit: number, brands: ReadonlySet<string> | null) {
+async function collectPreferred(db: IDBDatabase, query: string, brands: string[], limit: number) {
   const hits: CachedDrug[] = [];
+  const perBrandCap = 250;
+  for (const brand of brands) {
+    let steps = 0;
+    let found = 0;
+    const index = db.transaction(DRUGS, "readonly").objectStore(DRUGS).index("manufacturer");
+    await walkCursor(index, IDBKeyRange.only(brand), (drug) => {
+      steps += 1;
+      const matches =
+        drug.nameLower.startsWith(query) || drug.tokens.some((token) => token.startsWith(query));
+      if (matches) {
+        hits.push(drug);
+        found += 1;
+      }
+      return found >= limit || steps >= perBrandCap ? "stop" : "continue";
+    });
+  }
+  return hits;
+}
+
+async function collectNamePrefix(db: IDBDatabase, query: string) {
+  const hits: CachedDrug[] = [];
+  let steps = 0;
   const index = db.transaction(DRUGS, "readonly").objectStore(DRUGS).index("nameLower");
   await walkCursor(index, IDBKeyRange.bound(query, `${query}\uffff`), (drug) => {
-    if (!matchesBrand(drug.manufacturer, brands)) return "continue";
+    steps += 1;
     hits.push(drug);
-    return hits.length >= limit ? "stop" : "continue";
+    return hits.length >= COLLECT_CAP || steps >= NAME_CURSOR_CAP ? "stop" : "continue";
   });
   return hits;
 }
 
-async function collectTokenPrefix(
-  db: IDBDatabase,
-  query: string,
-  brands: ReadonlySet<string> | null,
-  seen: Set<string>,
-) {
+async function collectTokenPrefix(db: IDBDatabase, query: string, seen: Set<string>) {
   const hits: CachedDrug[] = [];
   let steps = 0;
   const index = db.transaction(DRUGS, "readonly").objectStore(DRUGS).index("tokens");
   await walkCursor(index, IDBKeyRange.bound(query, `${query}\uffff`), (drug) => {
     steps += 1;
     if (steps >= TOKEN_CURSOR_CAP) return "stop";
-    if (seen.has(drug.id) || !matchesBrand(drug.manufacturer, brands)) return "continue";
+    if (seen.has(drug.id)) return "continue";
     seen.add(drug.id);
     hits.push(drug);
-    return "continue";
+    return hits.length >= COLLECT_CAP ? "stop" : "continue";
   });
   return hits;
 }
@@ -209,15 +217,13 @@ export async function searchDrugCatalogCache(query: string, limit = 12): Promise
     const meta = await readCacheMeta(Promise.resolve(db));
     if (!meta?.ready) return null;
 
-    const brands = brandSet(meta.brands);
-    const prefixHits = await collectNamePrefix(db, q, limit, brands);
-    if (prefixHits.length >= limit) {
-      return prefixHits.slice(0, limit).map(toSuggestHit);
-    }
-
-    const seen = new Set(prefixHits.map((drug) => drug.id));
-    const tokenHits = await collectTokenPrefix(db, q, brands, seen);
-    return rankCatalogMatches([...prefixHits, ...tokenHits], q, limit).map(toSuggestHit);
+    const preferredHits = await collectPreferred(db, q, meta.brands, limit);
+    const prefixHits = await collectNamePrefix(db, q);
+    const seen = new Set([...preferredHits, ...prefixHits].map((drug) => drug.id));
+    const tokenHits = await collectTokenPrefix(db, q, seen);
+    const merged = new Map<string, CachedDrug>();
+    for (const drug of [...preferredHits, ...prefixHits, ...tokenHits]) merged.set(drug.id, drug);
+    return rankDrugSuggestions([...merged.values()], q, meta.brands, limit).map(toSuggestHit);
   } catch {
     return null;
   }

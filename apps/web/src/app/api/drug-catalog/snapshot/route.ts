@@ -19,6 +19,7 @@ type SnapshotRow = {
   pack: string | null;
   manufacturer: string | null;
   searchText: string;
+  medicineCount: number;
 };
 
 type CatalogPageRow = {
@@ -42,6 +43,10 @@ export async function GET(request: NextRequest) {
 
   const meta = await getCatalogMeta(prisma);
   const version = meta.version;
+  const manufacturers = await prisma.drugManufacturer.findMany({
+    select: { name: true, medicineCount: true },
+  });
+  const medicineCounts = new Map(manufacturers.map((row) => [row.name, row.medicineCount]));
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -77,6 +82,7 @@ export async function GET(request: NextRequest) {
               pack: row.packSize,
               manufacturer: row.manufacturer,
               searchText: row.searchText,
+              medicineCount: row.manufacturer ? (medicineCounts.get(row.manufacturer) ?? 0) : 0,
             };
             chunk += `${JSON.stringify(line)}\n`;
           }

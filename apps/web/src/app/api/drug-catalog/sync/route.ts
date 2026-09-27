@@ -40,6 +40,17 @@ export async function GET(request: NextRequest) {
       isDiscontinued: true,
     },
   });
+  const manufacturerNames = [
+    ...new Set(rows.map((row) => row.manufacturer).filter((name): name is string => Boolean(name))),
+  ];
+  const manufacturers =
+    manufacturerNames.length > 0
+      ? await prisma.drugManufacturer.findMany({
+          where: { name: { in: manufacturerNames } },
+          select: { name: true, medicineCount: true },
+        })
+      : [];
+  const medicineCounts = new Map(manufacturers.map((row) => [row.name, row.medicineCount]));
 
   return NextResponse.json({
     version: meta.version,
@@ -51,6 +62,7 @@ export async function GET(request: NextRequest) {
       pack: row.packSize,
       manufacturer: row.manufacturer,
       searchText: row.searchText,
+      medicineCount: row.manufacturer ? (medicineCounts.get(row.manufacturer) ?? 0) : 0,
       deleted: row.isDiscontinued,
     })),
   });

@@ -30,6 +30,15 @@ class SystemNotifications {
           if (href != null && href.isNotEmpty) onOpen?.call(href);
         },
       );
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'mederp_alerts',
+          'MedERP alerts',
+          description: 'Hospital alerts for appointments, messages, and tasks',
+          importance: Importance.max,
+        ),
+      );
       _ready = true;
       // Never await a long permission prompt on the critical path of opening the app.
       // ignore: unawaited_futures
@@ -74,7 +83,19 @@ class SystemNotifications {
     final body = (data['body'] as String?)?.trim() ?? '';
     if (title.isEmpty) return;
     final href = (data['href'] as String?)?.trim() ?? '';
-    final id = _notificationId((data['id'] as String?)?.trim().isNotEmpty == true ? data['id'] as String : title);
+    final id = (data['id'] as String?)?.trim().isNotEmpty == true ? data['id'] as String : title;
+    await showLocal(id: id, title: title, body: body, href: href);
+  }
+
+  static Future<void> showLocal({
+    required String id,
+    required String title,
+    required String body,
+    String href = '',
+  }) async {
+    if (!_ready) await ensureReady();
+    if (!await _allowed()) return;
+    if (title.trim().isEmpty) return;
 
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -92,7 +113,7 @@ class SystemNotifications {
       ),
     );
     await _plugin.show(
-      id: id,
+      id: _notificationId(id),
       title: title,
       body: body,
       notificationDetails: details,

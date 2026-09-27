@@ -97,6 +97,10 @@ ASKEVA_API_TOKEN="...."
 WHATSAPP_ACCESS_TOKEN="...."
 WHATSAPP_TEMPLATE_LANG="en,en_IN"
 WHATSAPP_OTP_TEMPLATE="as"
+
+# Android FCM (optional until push is enabled — paste service-account JSON as one line)
+# FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+
 WHATSAPP_REMINDER_PARAMS="named"
 WHATSAPP_REMINDER_TEMPLATE="appointment_reminder1"
 WHATSAPP_INVESTIGATION_TEMPLATE="investigation_list"

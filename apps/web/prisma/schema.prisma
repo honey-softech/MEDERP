@@ -525,9 +525,23 @@ model AppUser {
   signatures           UserSignature[]       @relation("UserSignatures")
   announcements        HospitalAnnouncement[] @relation("AnnouncementAuthor")
   announcementReplies  HospitalAnnouncementReply[] @relation("AnnouncementReplyAuthor")
+  pushTokens           DevicePushToken[]
 
   @@unique([hospitalId, userCode])
   @@unique([hospitalId, employeeId])
+}
+
+/** FCM / APNs device token for background push (Android first; iOS later). */
+model DevicePushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 /// Scanned signature + seal for a staff member. Rows are write-once: replacing a

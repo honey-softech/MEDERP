@@ -1,4 +1,5 @@
 import type { Server } from "socket.io";
+import { sendFcmToUser } from "@/lib/push-fcm";
 import { REALTIME_EVENTS, type HelpdeskTicketUpdate, type StaffNotice } from "./realtime-events";
 
 const g = globalThis as typeof globalThis & { mederpIo?: Server };
@@ -13,6 +14,8 @@ export function getIO() {
 
 export function pushNotificationToUser(userId: string, notice: StaffNotice) {
   getIO()?.to(`user:${userId}`).emit(REALTIME_EVENTS.notification, notice);
+  // Background devices — fire-and-forget so socket delivery stays fast.
+  void sendFcmToUser(userId, notice);
 }
 
 export function pushNotificationsRead(userId: string, payload: { ids?: string[]; all?: boolean }) {

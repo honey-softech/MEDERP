@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -67,6 +68,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
           },
           onPageFinished: (_) {
             _controller.runJavaScript(inAppToastGuardScript);
+            PushNotifications.registerTokenOnSite();
           },
           onWebResourceError: (error) {
             if (error.isForMainFrame != true || !mounted) return;
@@ -74,9 +76,10 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
           },
         ),
       );
-    // Show the site first. Notification setup must never block the WebView load.
+    // Show the site first. Notification / FCM setup must never block the WebView load.
     _openSite();
     SystemNotifications.ensureReady().catchError((_) {});
+    PushNotifications.start(webView: _controller).catchError((_) {});
   }
 
   Future<void> _openSite() async {

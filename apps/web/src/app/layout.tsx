@@ -10,6 +10,14 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "MedERP — Hospital ERP",
   description: "Hospital ERP for web and mobile: patients, appointments, billing, pharmacy, and lab.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/mederp-icon.png", type: "image/png", sizes: "1024x1024" },
+    ],
+    apple: [{ url: "/mederp-icon.png", sizes: "180x180" }],
+  },
+  applicationName: "MedERP",
 };
 
 // App pages load hospital data at runtime; skip build-time prerender (no DB in Docker build).

@@ -23,7 +23,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
     where: { id, hospitalId: user.hospitalId },
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
       hospital: { select: { name: true, address: true, phone: true, logoData: true } },
       assessment: { select: { status: true } },

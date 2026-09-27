@@ -1,4 +1,4 @@
-import { doctorName } from "@/lib/display";
+import { doctorName, isLoginHandleDisplayName } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 import { staffIsOnApprovedLeave } from "@/lib/staff-leave";
 
@@ -44,18 +44,45 @@ export function localDayKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function doctorNameParts(params: {
+  firstName?: string | null;
+  lastName?: string | null;
+  username: string;
+}) {
+  const firstName = String(params.firstName ?? "").trim();
+  const lastName = String(params.lastName ?? "").trim();
+  if (firstName) return { firstName, lastName };
+  // Last resort only when Doctor Name was never saved on the account.
+  const handle = params.username.includes("@") ? params.username.split("@")[0]! : params.username;
+  const parts = handle.replace(/[._]/g, " ").split(/\s+/).filter(Boolean);
+  return { firstName: parts[0] ?? handle, lastName: parts.slice(1).join(" ") };
+}
+
 export async function ensureDoctorStaff(params: {
   hospitalId: string;
   appUserId: string;
   username: string;
   mobile: string;
+  firstName?: string | null;
+  lastName?: string | null;
 }) {
+  const names = doctorNameParts(params);
   const existing = await prisma.staff.findUnique({ where: { appUserId: params.appUserId } });
-  if (existing) return existing;
+  if (existing) {
+    const accountHasDoctorName = Boolean(String(params.firstName ?? "").trim());
+    const staffLabel = `${existing.firstName} ${existing.lastName}`.trim();
+    if (
+      accountHasDoctorName &&
+      isLoginHandleDisplayName(staffLabel, params.username)
+    ) {
+      return prisma.staff.update({
+        where: { id: existing.id },
+        data: { firstName: names.firstName, lastName: names.lastName },
+      });
+    }
+    return existing;
+  }
 
-  const parts = params.username.replace(/[._]/g, " ").split(/\s+/).filter(Boolean);
-  const firstName = parts[0] ?? params.username;
-  const lastName = parts.slice(1).join(" ");
   const email = `${params.username.toLowerCase()}@hospital.local`;
 
   return prisma.staff.create({
@@ -63,8 +90,8 @@ export async function ensureDoctorStaff(params: {
       hospitalId: params.hospitalId,
       appUserId: params.appUserId,
       email: `${params.hospitalId.slice(-6)}.${email}`,
-      firstName,
-      lastName,
+      firstName: names.firstName,
+      lastName: names.lastName,
       role: "DOCTOR",
       phone: params.mobile,
     },
@@ -75,7 +102,14 @@ export async function listBookableDoctors(hospitalId: string) {
   const [doctorUsers, adminDoctorStaff] = await Promise.all([
     prisma.appUser.findMany({
       where: { hospitalId, role: "DOCTOR", isActive: true },
-      orderBy: { username: "asc" },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { username: "asc" }],
+      select: {
+        id: true,
+        username: true,
+        mobile: true,
+        firstName: true,
+        lastName: true,
+      },
     }),
     prisma.staff.findMany({
       where: {
@@ -84,7 +118,9 @@ export async function listBookableDoctors(hospitalId: string) {
         isActive: true,
         appUser: { role: "SUPER_ADMIN", isActive: true, hospitalId },
       },
-      include: { appUser: { select: { username: true } } },
+      include: {
+        appUser: { select: { username: true, firstName: true, lastName: true } },
+      },
       orderBy: { firstName: "asc" },
     }),
   ]);
@@ -98,12 +134,18 @@ export async function listBookableDoctors(hospitalId: string) {
       appUserId: user.id,
       username: user.username,
       mobile: user.mobile,
+      firstName: user.firstName,
+      lastName: user.lastName,
     });
     if (!staff.isActive) continue;
     seenStaffIds.add(staff.id);
     doctors.push({
       ...staff,
-      appUser: { username: user.username },
+      appUser: {
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
     });
   }
 
@@ -112,11 +154,7 @@ export async function listBookableDoctors(hospitalId: string) {
     doctors.push(staff);
   }
 
-  return doctors.sort((a, b) => {
-    const aName = `${a.firstName} ${a.lastName}`.trim() || a.appUser?.username || "";
-    const bName = `${b.firstName} ${b.lastName}`.trim() || b.appUser?.username || "";
-    return aName.localeCompare(bName);
-  });
+  return doctors.sort((a, b) => doctorName(a).localeCompare(doctorName(b)));
 }
 
 export async function staffIdForAppUser(appUserId: string, hospitalId: string) {

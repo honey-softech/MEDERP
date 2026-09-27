@@ -696,7 +696,7 @@ export async function admitPatient(params: {
       include: {
         patient: true,
         bed: { include: { ward: true } },
-        admittingDoctor: { include: { appUser: { select: { username: true } } } },
+        admittingDoctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       },
     });
   });
@@ -906,8 +906,8 @@ export const admissionInclude = {
   patient: true,
   department: true,
   bed: { include: { ward: { include: { department: true } } } },
-  admittingDoctor: { include: { appUser: { select: { username: true } } } },
-  attendingDoctor: { include: { appUser: { select: { username: true } } } },
+  admittingDoctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
+  attendingDoctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
   invoices: { orderBy: { issuedAt: "desc" as const }, take: 5 },
   transfers: {
     orderBy: { transferredAt: "desc" as const },

@@ -38,6 +38,8 @@ export default async function NewAppointmentPage({
       appUserId: user.id,
       username: user.username,
       mobile: user.mobile,
+      firstName: user.firstName,
+      lastName: user.lastName,
     });
   }
   const myStaffId = doctorWalkIn

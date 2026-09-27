@@ -107,7 +107,7 @@ export default async function AppointmentsPage({
       orderBy: { scheduledAt: "asc" },
       include: {
         patient: true,
-        doctor: { include: { appUser: { select: { username: true } } } },
+        doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
         department: true,
         assessment: { select: { status: true } },
       },
@@ -125,7 +125,7 @@ export default async function AppointmentsPage({
         endAt: { gte: leaveRangeStart },
         startAt: { lt: leaveRangeEnd },
       },
-      include: { staff: { include: { appUser: { select: { username: true } } } } },
+      include: { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
     }),
   ]);
 

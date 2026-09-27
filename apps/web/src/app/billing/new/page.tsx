@@ -14,7 +14,7 @@ export default async function NewInvoicePage() {
       scheduledAt: { gte: start, lt: end },
       status: { notIn: ["CANCELLED"] },
     },
-    include: { patient: true, doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+    include: { patient: true, doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
     orderBy: { scheduledAt: "desc" },
     take: 40,
   });

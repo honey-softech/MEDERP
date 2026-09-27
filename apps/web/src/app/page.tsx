@@ -25,10 +25,14 @@ import { prisma } from "@/lib/prisma";
 import { resolveViewContext } from "@/lib/view-mode";
 import type { AppRole } from "@prisma/client";
 
-function prettyName(username: string, role: AppRole, asDoctor = false) {
-  const cleaned = username.replace(/[._]/g, " ");
+function prettyName(
+  user: { username: string; firstName?: string | null; lastName?: string | null; role: AppRole },
+  asDoctor = false,
+) {
+  const fromAccount = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  const cleaned = (fromAccount || user.username.replace(/[._]/g, " ")).replace(/\s+/g, " ").trim();
   const titled = cleaned.replace(/\b\w/g, (letter) => letter.toUpperCase());
-  if ((role === "DOCTOR" || asDoctor) && !/^dr\b/i.test(titled)) return `Dr. ${titled}`;
+  if ((user.role === "DOCTOR" || asDoctor) && !/^dr\b/i.test(titled)) return `Dr. ${titled}`;
   return titled;
 }
 
@@ -299,7 +303,7 @@ export default async function Home({
             include: {
               patient: true,
               department: true,
-              doctor: { include: { appUser: { select: { username: true } } } },
+              doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
               vitals: { select: { id: true } },
             },
           }),
@@ -337,7 +341,7 @@ export default async function Home({
       >
         {user ? (
           <WelcomeBanner
-            displayName={prettyName(user.username, user.role, asDoctor)}
+            displayName={prettyName(user, asDoctor)}
             tagline={copy.tagline}
             locationTitle={copy.locationTitle}
             locationSubtitle={copy.locationSubtitle}

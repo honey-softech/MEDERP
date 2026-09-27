@@ -16,7 +16,7 @@ export default async function PharmacyPrescriptionDetailPage({ params }: Props) 
   const { appointmentId } = await params;
   const appointment = await prisma.appointment.findFirst({
     where: { id: appointmentId, hospitalId: user.hospitalId },
-    include: { patient: true, doctor: { include: { appUser: { select: { username: true } } } } },
+    include: { patient: true, doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
   });
   if (!appointment) notFound();
 

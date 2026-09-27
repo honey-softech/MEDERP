@@ -70,7 +70,7 @@ export default async function QueuePage({
       orderBy: [{ tokenNumber: "asc" }, { scheduledAt: "asc" }],
       include: {
         patient: true,
-        doctor: { include: { appUser: { select: { username: true } } } },
+        doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
         department: true,
         vitals: { select: { id: true } },
         assessment: { select: { id: true, status: true } },

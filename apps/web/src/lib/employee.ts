@@ -428,7 +428,7 @@ export async function upsertAdminDoctorStaff(params: {
   const data = staffDataFromEmployee(hospitalId, { ...input, role: "DOCTOR" });
   data.role = "DOCTOR";
   data.isActive = isActive;
-  data.firstName = input.firstName || appUser.firstName || appUser.username;
+  data.firstName = input.firstName || appUser.firstName || "Doctor";
   data.lastName = input.lastName || appUser.lastName || "";
   data.phone = appUser.mobile;
   const localEmail =

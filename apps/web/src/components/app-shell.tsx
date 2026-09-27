@@ -1,6 +1,7 @@
 import { AppShellFrame, type NavSection } from "@/components/app-shell-frame";
 import { getCurrentUser, isPlatformRole, SESSION_COOKIE } from "@/lib/auth";
 import { isNurseReceptionist } from "@/lib/authz/hospital";
+import { doctorName } from "@/lib/display";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { hospitalAccessBlocked, isExpiredTrialAllowedPath } from "@/lib/hospital-access";
 import { resolveViewContext } from "@/lib/view-mode";
@@ -429,8 +430,12 @@ export async function AppShell({
 
   const displayName = user
     ? useDoctorNav
-      ? `Dr. ${[user.firstName, user.lastName].filter(Boolean).join(" ") || user.username}`
-      : user.username
+      ? doctorName({
+          firstName: user.firstName,
+          lastName: user.lastName,
+          appUser: { username: user.username, firstName: user.firstName, lastName: user.lastName },
+        })
+      : [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.username
     : undefined;
   const roleLabel = useDoctorNav ? "Doctor" : user?.role.replace(/_/g, " ");
 

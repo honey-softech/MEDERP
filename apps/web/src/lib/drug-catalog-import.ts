@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeWebReadableStream } from "node:stream/web";
 import type { PrismaClient } from "@prisma/client";
+import { bumpCatalogVersion, publishUnversionedCatalogRows } from "./drug-catalog-sync";
 
 export const DEFAULT_LOCAL_CSV =
   "C:\\Users\\Dhanush\\Downloads\\Indian-Medicine-Dataset-main\\Indian-Medicine-Dataset-main\\DATA\\updated_indian_medicine_data.csv";
@@ -24,6 +25,7 @@ type Row = {
   type: string | null;
   searchText: string;
   isDiscontinued: boolean;
+  syncVersion: number;
 };
 
 export type CatalogImportResult = {
@@ -211,12 +213,14 @@ export async function importDrugCatalog(
         type,
         searchText,
         isDiscontinued: false,
+        syncVersion: 0,
       });
 
       if (batch.length >= BATCH) await flush();
     }
 
     await flush();
+    await publishUnversionedCatalogRows(prisma);
     const catalogSize = await prisma.drugCatalog.count();
     console.log(`\nDone. Rows processed: ${processed - 1}. Catalog size: ${catalogSize}`);
     job = {
@@ -229,6 +233,7 @@ export async function importDrugCatalog(
     };
     return { processed: processed - 1, inserted, skipped, catalogSize, source };
   } catch (error) {
+    await publishUnversionedCatalogRows(prisma).catch(() => undefined);
     const message = error instanceof Error ? error.message : "Import failed";
     job = {
       running: false,
@@ -326,18 +331,22 @@ export async function addMedicineToCatalog(
   const max = await prisma.drugCatalog.aggregate({ _max: { sourceId: true } });
   const sourceId = Math.max(9_000_000, (max._max.sourceId ?? 0) + 1);
 
-  const row = await prisma.drugCatalog.create({
-    data: {
-      id: cuidLike(),
-      sourceId,
-      name,
-      manufacturer,
-      packSize,
-      saltComposition,
-      type,
-      searchText,
-      isDiscontinued: false,
-    },
+  const row = await prisma.$transaction(async (tx) => {
+    const syncVersion = await bumpCatalogVersion(tx);
+    return tx.drugCatalog.create({
+      data: {
+        id: cuidLike(),
+        sourceId,
+        name,
+        manufacturer,
+        packSize,
+        saltComposition,
+        type,
+        searchText,
+        isDiscontinued: false,
+        syncVersion,
+      },
+    });
   });
 
   if (manufacturer) {

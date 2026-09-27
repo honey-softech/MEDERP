@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
+import { ensureDrugCatalogCache, searchDrugCatalogCache } from "@/lib/drug-catalog-cache";
 import { parseMedications } from "@/lib/prescription-text";
 
 type DrugSuggest = {
@@ -102,6 +103,7 @@ export function PrescriptionBuilder({
 
   useEffect(() => {
     setRecent(loadRecent());
+    void ensureDrugCatalogCache();
   }, []);
 
   useEffect(() => {
@@ -130,20 +132,30 @@ export function PrescriptionBuilder({
       const controller = new AbortController();
       abortRef.current = controller;
       setLoading(true);
-      void fetch(`/api/medicines/suggest?q=${encodeURIComponent(q)}&limit=12`, { signal: controller.signal })
-        .then(async (response) => {
+      void (async () => {
+        try {
+          const local = await searchDrugCatalogCache(q, 12);
+          if (controller.signal.aborted) return;
+          if (local && local.length > 0) {
+            setSuggestions(local);
+            setOpen(true);
+            return;
+          }
+
+          const response = await fetch(`/api/medicines/suggest?q=${encodeURIComponent(q)}&limit=12`, {
+            signal: controller.signal,
+          });
           const data = (await response.json()) as { items?: DrugSuggest[] };
           if (!controller.signal.aborted) {
             setSuggestions(Array.isArray(data.items) ? data.items : []);
             setOpen(true);
           }
-        })
-        .catch(() => {
+        } catch {
           if (!controller.signal.aborted) setSuggestions([]);
-        })
-        .finally(() => {
+        } finally {
           if (!controller.signal.aborted) setLoading(false);
-        });
+        }
+      })();
     }, 280);
 
     return () => {

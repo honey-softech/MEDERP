@@ -30,7 +30,7 @@ export async function createInvoice(params: {
   if (params.appointmentId) {
     const appointment = await prisma.appointment.findFirst({
       where: { id: params.appointmentId, ...scope, patientId: patient.id },
-      include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+      include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
     });
     if (!appointment) {
       return { ok: false, error: "Appointment not found for this patient.", status: 404 };

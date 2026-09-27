@@ -131,6 +131,8 @@ export async function approveJoinRequest(params: {
       appUserId: request.userId,
       username: request.user.username,
       mobile: request.user.mobile,
+      firstName: request.user.firstName,
+      lastName: request.user.lastName,
     });
   }
 

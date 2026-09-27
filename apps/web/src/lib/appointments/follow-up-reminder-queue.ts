@@ -178,7 +178,7 @@ export async function scheduleFollowUpReminder(params: {
     where: { id: params.appointmentId, hospitalId: params.hospitalId },
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       hospital: { select: { name: true } },
     },
   });
@@ -231,7 +231,7 @@ export async function processDueFollowUpReminders() {
       appointment: {
         include: {
           patient: true,
-          doctor: { include: { appUser: { select: { username: true } } } },
+          doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
         },
       },
     },

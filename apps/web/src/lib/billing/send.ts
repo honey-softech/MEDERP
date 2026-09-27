@@ -37,7 +37,7 @@ export async function sendInvoiceWhatsApp(params: {
       },
       appointment: {
         include: {
-          doctor: { include: { appUser: { select: { username: true } } } },
+          doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
           department: { select: { name: true } },
         },
       },

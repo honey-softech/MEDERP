@@ -17,7 +17,7 @@ export async function PATCH(request: Request, context: Ctx) {
   const { id } = await context.params;
   const appointment = await prisma.appointment.findFirst({
     where: { id, hospitalId: user.hospitalId },
-    include: { patient: true, doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+    include: { patient: true, doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
   });
   if (!appointment) {
     return NextResponse.json({ error: "Appointment not found." }, { status: 404 });

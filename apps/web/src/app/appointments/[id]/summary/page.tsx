@@ -24,7 +24,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
     where: { id, hospitalId: user.hospitalId },
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
       vitals: true,
       assessment: { include: { approvedBySignature: { select: { imageData: true } } } },

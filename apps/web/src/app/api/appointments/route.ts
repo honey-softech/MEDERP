@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     orderBy: { scheduledAt: "asc" },
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
     },
   });
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
         isActive: true,
         appUserId: { not: null },
       },
-      include: { appUser: { select: { username: true } } },
+      include: { appUser: { select: { username: true, firstName: true, lastName: true } } },
     }),
     prisma.department.findFirst({ where: { id: departmentId, hospitalId: scoped.user.hospitalId } }),
   ]);
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
       status: shouldCheckIn ? "CHECKED_IN" : "SCHEDULED",
       checkInAt: shouldCheckIn ? new Date() : null,
     },
-    include: { patient: true, doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+    include: { patient: true, doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
   });
 
   if (photoData && !patient.photoData) {

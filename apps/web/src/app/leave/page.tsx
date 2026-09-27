@@ -15,7 +15,7 @@ export default async function MyLeavePage() {
       hospitalId: user.hospitalId,
       OR: [{ requestedByUserId: user.id }, { staff: { appUserId: user.id } }],
     },
-    include: { staff: { include: { appUser: { select: { username: true } } } } },
+    include: { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
     orderBy: { createdAt: "desc" },
     take: 50,
   });

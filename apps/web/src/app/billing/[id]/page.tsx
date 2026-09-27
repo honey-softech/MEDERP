@@ -36,7 +36,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           receivedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
         },
       },
-      appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true } },
+      appointment: { include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true } },
     },
   });
   if (!invoice) {

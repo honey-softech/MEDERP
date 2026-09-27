@@ -60,29 +60,84 @@ export function patientName(patient: { firstName?: string | null; lastName?: str
   return `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim();
 }
 
+function normalizePersonName(value: string) {
+  return value.replace(/\s+Doctor$/i, "").replace(/\s+/g, " ").trim();
+}
+
+function lettersOnly(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** True when a stored staff label was seeded from the login handle / email local-part. */
+export function isLoginHandleDisplayName(
+  display: string,
+  username?: string | null,
+) {
+  const cleaned = normalizePersonName(display);
+  if (!cleaned) return true;
+  if (cleaned.includes("@")) return true;
+  if (!username?.trim()) return false;
+  const handle = username.includes("@") ? username.split("@")[0]! : username.trim();
+  const displayKey = lettersOnly(cleaned);
+  const handleKey = lettersOnly(handle);
+  if (!displayKey || !handleKey) return false;
+  // Exact match only — do not strip role suffixes like "doc", or "Priya Sharma"
+  // would look like login handle "priyasharmadoc".
+  return displayKey === handleKey;
+}
+
+function formatDoctorDisplayName(full: string) {
+  const cleaned = normalizePersonName(full);
+  if (!cleaned) return "Dr.";
+  return /^dr\.?\s/i.test(cleaned) ? cleaned : `Dr. ${cleaned}`;
+}
+
+/**
+ * Printed doctor name for UI, PDFs, and WhatsApp.
+ * Prefer the Doctor Name fields (staff / account first + last), never the raw login or email.
+ */
 export function doctorName(doctor: {
-  firstName: string;
-  lastName: string;
-  appUser?: { username: string } | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  appUser?: {
+    username?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
 }) {
-  const full = `${doctor.firstName} ${doctor.lastName}`.replace(/\s+Doctor$/i, "").trim();
-  if (full) {
-    return /^dr\.?\s/i.test(full) ? full : `Dr. ${full}`;
-  }
-  const username = doctor.appUser?.username?.trim();
+  const fromStaff = normalizePersonName(`${doctor.firstName ?? ""} ${doctor.lastName ?? ""}`);
+  const fromAccount = normalizePersonName(
+    `${doctor.appUser?.firstName ?? ""} ${doctor.appUser?.lastName ?? ""}`,
+  );
+  const username = doctor.appUser?.username?.trim() ?? "";
+
+  const proper = [fromAccount, fromStaff].find(
+    (name) => name && !isLoginHandleDisplayName(name, username),
+  );
+  if (proper) return formatDoctorDisplayName(proper);
+
+  const seeded = [fromAccount, fromStaff].find((name) => name && !name.includes("@"));
+  if (seeded) return formatDoctorDisplayName(seeded);
+
   if (username) {
-    return /^dr/i.test(username) ? username : `Dr. ${username}`;
+    const handle = username.includes("@") ? username.split("@")[0]! : username;
+    const humanized = handle.replace(/[._]/g, " ").replace(/\s*doc$/i, "").trim();
+    if (humanized) return formatDoctorDisplayName(humanized);
   }
-  return /^dr/i.test(full) ? full : `Dr. ${full}`;
+  return "Dr.";
 }
 
 export function physicianLine(doctor: {
-  firstName: string;
-  lastName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   medicalDegree?: string | null;
   postgraduate?: string | null;
   specialization?: string | null;
-  appUser?: { username: string } | null;
+  appUser?: {
+    username?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
 }) {
   const name = doctorName(doctor);
   const quals = [doctor.medicalDegree, doctor.postgraduate, doctor.specialization].filter(Boolean);

@@ -41,7 +41,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         orderBy: { scheduledAt: "desc" },
         take: 20,
         include: {
-          doctor: { include: { appUser: { select: { username: true } } } },
+          doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
           department: true,
           vitals: true,
           assessment: {

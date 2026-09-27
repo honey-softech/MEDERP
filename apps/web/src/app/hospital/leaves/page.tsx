@@ -12,7 +12,7 @@ export default async function HospitalLeavesPage() {
 
   const leaves = await prisma.staffLeave.findMany({
     where: { hospitalId: user.hospitalId },
-    include: { staff: { include: { appUser: { select: { username: true } } } } },
+    include: { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
     orderBy: [{ status: "asc" }, { startAt: "desc" }],
     take: 200,
   });

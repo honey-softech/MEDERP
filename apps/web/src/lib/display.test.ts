@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ageFromDateInput, ageYears, dateOfBirthFromAge, parsePatientAge } from "@/lib/display";
+import {
+  ageFromDateInput,
+  ageYears,
+  dateOfBirthFromAge,
+  doctorName,
+  isLoginHandleDisplayName,
+  parsePatientAge,
+} from "@/lib/display";
 
 describe("patient age helpers", () => {
   it("parses whole years from 0 to 150 and rejects invalid values", () => {
@@ -22,5 +29,32 @@ describe("patient age helpers", () => {
   it("computes age from a date input without timezone shift", () => {
     expect(ageFromDateInput("1991-09-20", new Date(2026, 8, 20))).toBe("35");
     expect(ageFromDateInput("invalid")).toBeNull();
+  });
+});
+
+describe("doctorName", () => {
+  it("uses Doctor Name fields instead of login or email", () => {
+    expect(
+      doctorName({
+        firstName: "john.doe",
+        lastName: "",
+        appUser: { username: "john.doe@clinic.com", firstName: "John", lastName: "Doe" },
+      }),
+    ).toBe("Dr. John Doe");
+  });
+
+  it("keeps a proper staff name when the account has none", () => {
+    expect(
+      doctorName({
+        firstName: "Priya",
+        lastName: "Sharma",
+        appUser: { username: "priyasharmadoc" },
+      }),
+    ).toBe("Dr. Priya Sharma");
+  });
+
+  it("detects username-seeded staff labels", () => {
+    expect(isLoginHandleDisplayName("john doe", "john.doe")).toBe(true);
+    expect(isLoginHandleDisplayName("Priya Sharma", "priyasharmadoc")).toBe(false);
   });
 });

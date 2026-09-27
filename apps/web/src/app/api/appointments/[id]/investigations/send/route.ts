@@ -30,7 +30,7 @@ export async function POST(request: Request, context: Ctx) {
     include: {
       patient: true,
       hospital: { select: { name: true, address: true, phone: true, logoData: true } },
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: { select: { name: true } },
       assessment: { select: { status: true } },
       labOrders: {

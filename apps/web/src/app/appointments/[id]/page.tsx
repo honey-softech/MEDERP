@@ -63,7 +63,7 @@ export default async function AppointmentDetailPage({
           familyAsPrimary: { include: { relatedPatient: true } },
         },
       },
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
       reminders: { orderBy: { createdAt: "desc" }, take: 6 },
       vitals: true,
@@ -107,7 +107,7 @@ export default async function AppointmentDetailPage({
       take: 20,
       include: {
         department: { select: { name: true } },
-        doctor: { include: { appUser: { select: { username: true } } } },
+        doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
         assessment: {
           select: {
             diagnosis: true,

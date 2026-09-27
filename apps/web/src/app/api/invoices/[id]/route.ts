@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: Ctx) {
       patient: true,
       items: true,
       payments: true,
-      appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true } },
+      appointment: { include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true } },
     },
   });
   if (!invoice) {

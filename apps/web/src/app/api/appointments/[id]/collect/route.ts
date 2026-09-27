@@ -32,7 +32,7 @@ export async function POST(request: Request, context: Ctx) {
     where: { id, hospitalId: scoped.user.hospitalId },
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
       invoices: { orderBy: { issuedAt: "desc" }, take: 1 },
     },

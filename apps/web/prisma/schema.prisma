@@ -1271,10 +1271,23 @@ model DrugCatalog {
   /// lower(name + salt) for fast ILIKE / trigram search
   searchText      String
   isDiscontinued  Boolean  @default(false)
+  /// Stamped from DrugCatalogMeta.version whenever this row is inserted or changed.
+  syncVersion     Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([name])
   @@index([searchText])
   @@index([manufacturer])
+  @@index([updatedAt])
+  @@index([syncVersion])
+}
+
+/// Singleton cursor so devices can delta-sync DrugCatalog without a full download.
+model DrugCatalogMeta {
+  id        Int      @id @default(1)
+  version   Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 /// Distinct manufacturers from DrugCatalog — used by Super Admin brand picker.

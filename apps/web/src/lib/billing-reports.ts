@@ -28,7 +28,7 @@ export async function loadBillingReport(hospitalId: string, start: Date, end: Da
         invoice: {
           include: {
             appointment: {
-              include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+              include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
             },
           },
         },

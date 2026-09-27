@@ -22,7 +22,7 @@ export async function GET() {
       hospitalId: scoped.user.hospitalId,
       ...(isAdmin ? {} : { requestedByUserId: scoped.user.id }),
     },
-    include: { staff: { include: { appUser: { select: { username: true } } } } },
+    include: { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
     orderBy: [{ status: "asc" }, { startAt: "asc" }],
     take: 200,
   });

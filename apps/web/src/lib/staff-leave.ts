@@ -204,7 +204,7 @@ export async function applyStaffLeave(params: {
       endAt: params.endAt,
       reason: params.reason,
     },
-    include: { staff: { include: { appUser: { select: { username: true } } } } },
+    include: { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
   });
 
   await notifyHospitalRole({
@@ -258,7 +258,7 @@ export async function recordApprovedLeave(params: {
       reason: params.reason,
       reviewedAt: new Date(),
     },
-    include: { staff: { include: { appUser: { select: { username: true } } } } },
+    include: { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
   });
 
   if (staff.appUserId) {
@@ -357,5 +357,5 @@ export async function reviewStaffLeave(params: {
 }
 
 export function staffInclude() {
-  return { staff: { include: { appUser: { select: { username: true } } } } } as const;
+  return { staff: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } } as const;
 }

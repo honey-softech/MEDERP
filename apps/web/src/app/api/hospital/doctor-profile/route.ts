@@ -6,7 +6,7 @@ import {
   parseEmployeeBody,
   upsertAdminDoctorStaff,
 } from "@/lib/employee";
-import { requireHospitalActor } from "@/lib/front-desk";
+import { requireHospitalActor, doctorName } from "@/lib/front-desk";
 import { assertSeatIfAdminBecomesDoctor } from "@/lib/platform-billing";
 
 function dateIso(value: Date | null | undefined) {
@@ -108,7 +108,7 @@ export async function GET() {
         isActive: true,
         appUserId: true,
         department: { select: { name: true, code: true } },
-        appUser: { select: { username: true, role: true, isActive: true } },
+        appUser: { select: { username: true, firstName: true, lastName: true, role: true, isActive: true } },
       },
     }),
   ]);
@@ -121,7 +121,7 @@ export async function GET() {
     linkedStaffId: staff && staff.role === "DOCTOR" ? staff.id : null,
     doctors: doctors.map((row) => ({
       id: row.id,
-      label: `${row.firstName} ${row.lastName}`.trim(),
+      label: doctorName(row),
       specialization: row.specialization ?? "",
       medicalRegNo: row.medicalRegNo ?? "",
       department: row.department ? `${row.department.name} (${row.department.code})` : "",

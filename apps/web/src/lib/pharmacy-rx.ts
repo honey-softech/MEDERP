@@ -1,6 +1,6 @@
 import type { AppRole, PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { invoiceStatusFromTotals, nextInvoiceNo, patientName } from "@/lib/front-desk";
+import { invoiceStatusFromTotals, nextInvoiceNo, patientName, doctorName } from "@/lib/front-desk";
 import { notifyFrontDesk, notifyHospitalRole } from "@/lib/notifications";
 import { parseMedications } from "@/lib/prescription-text";
 import { activeSignatureFor } from "@/lib/signatures";
@@ -54,7 +54,7 @@ export async function pickFefoBatch(itemId: string, quantity: number) {
 const pharmacyRxInclude = {
   lines: { include: { pharmacyItem: true, batch: true } },
   patient: true,
-  appointment: { include: { doctor: { include: { appUser: { select: { username: true } } } } } },
+  appointment: { include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } } },
   invoice: true,
 } as const;
 
@@ -190,7 +190,7 @@ export async function listPendingPharmacyRx(hospitalId: string) {
     include: {
       patient: true,
       appointment: {
-        include: { doctor: { include: { appUser: { select: { username: true } } } } },
+        include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } } },
       },
       lines: true,
     },
@@ -201,7 +201,7 @@ export async function listPendingPharmacyRx(hospitalId: string) {
     appointmentId: order.appointmentId,
     patient: patientName(order.patient),
     mrn: order.patient.mrn,
-    doctor: order.appointment.doctor.appUser?.username ?? order.appointment.doctor.firstName,
+    doctor: doctorName(order.appointment.doctor),
     lines: order.lines.length,
     inStockLines: order.lines.filter((line) => line.inStock).length,
     totalAmount: Number(order.totalAmount),

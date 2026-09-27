@@ -32,7 +32,7 @@ export default async function CollectVisitPaymentPage({
     where: { id: appointmentId, hospitalId: user.hospitalId },
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
       hospital: { select: { opdFee: true } },
       invoices: {

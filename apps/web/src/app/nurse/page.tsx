@@ -28,7 +28,7 @@ export default async function NurseStationPage() {
     orderBy: [{ tokenNumber: "asc" }, { scheduledAt: "asc" }],
     include: {
       patient: true,
-      doctor: { include: { appUser: { select: { username: true } } } },
+      doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
       vitals: { select: { id: true, recordedAt: true } },
     },

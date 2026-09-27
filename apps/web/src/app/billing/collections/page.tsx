@@ -22,7 +22,7 @@ export default async function CollectionsPage({
       invoice: {
         include: {
           appointment: {
-            include: { doctor: { include: { appUser: { select: { username: true } } } }, department: true },
+            include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
           },
         },
       },

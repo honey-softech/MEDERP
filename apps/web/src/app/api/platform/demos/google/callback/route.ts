@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/platform/demos/settings?error=oauth", request.url));
   }
   try {
-    await connectGoogleCalendar(code, user.id);
+    await connectGoogleCalendar(code, user.id, request);
   } catch {
     return NextResponse.redirect(new URL("/platform/demos/settings?error=oauth", request.url));
   }

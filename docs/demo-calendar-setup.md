@@ -16,16 +16,17 @@ Public demo booking lives at `/demo`. A platform admin connects one Google Calen
    - `https://www.googleapis.com/auth/calendar.readonly`
    - `https://www.googleapis.com/auth/userinfo.email`
 
-Put the client id and secret in `apps/web/.env`:
+Put the client id and secret in `apps/web/.env` (**no spaces around `=`**):
 
 ```
-GOOGLE_CLIENT_ID=""
-GOOGLE_CLIENT_SECRET=""
-GOOGLE_REDIRECT_URI="http://localhost:3000/api/platform/demos/google/callback"
-TOKEN_ENCRYPTION_KEY=""
+GOOGLE_CLIENT_ID="...."
+GOOGLE_CLIENT_SECRET="...."
+GOOGLE_REDIRECT_URI="https://mederp.co.in/api/platform/demos/google/callback"
+TOKEN_ENCRYPTION_KEY="...."
+NEXT_PUBLIC_API_URL="https://mederp.co.in"
 ```
 
-`TOKEN_ENCRYPTION_KEY` is any long random string. The refresh token is encrypted with it before it is stored. Do not commit the key.
+On production, `GOOGLE_REDIRECT_URI` and `NEXT_PUBLIC_API_URL` must be the public HTTPS site, not `localhost`. Spaces around `=` (e.g. `GOOGLE_REDIRECT_URI = "..."`) prevent the variable from loading, and Connect then falls back to localhost.
 
 Sign in as a software admin, open **Demo bookings → Settings**, and choose **Connect Google Calendar**. Use the sales account whose calendar should block busy time and receive the events.
 

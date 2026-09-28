@@ -18,26 +18,78 @@ type CalendarEvent = {
   conferenceData?: { entryPoints?: { uri?: string | null }[] };
 };
 
-export function googleRedirectUri() {
-  if (process.env.GOOGLE_REDIRECT_URI?.trim()) return process.env.GOOGLE_REDIRECT_URI.trim();
-  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").replace(/\/$/, "");
-  return `${base}/api/platform/demos/google/callback`;
+function envValue(name: string) {
+  const raw = process.env[name];
+  if (raw == null) return "";
+  return raw.trim().replace(/^["']|["']$/g, "");
+}
+
+function isLocalHost(host: string) {
+  const h = host.split(":")[0]?.toLowerCase() ?? "";
+  return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "web" || h.endsWith(".local");
+}
+
+function publicSiteBase() {
+  const api = envValue("NEXT_PUBLIC_API_URL").replace(/\/$/, "");
+  if (api && !isLocalHost(new URL(api.includes("://") ? api : `https://${api}`).host)) {
+    return api.includes("://") ? api : `https://${api}`;
+  }
+  const site = envValue("SITE_ADDRESS").split(",")[0]?.trim();
+  if (site && !isLocalHost(site)) {
+    return site.includes("://") ? site.replace(/\/$/, "") : `https://${site}`;
+  }
+  return "";
+}
+
+/** Prefer explicit env / public site URL. Never trust a localhost Host from Docker. */
+export function googleRedirectUri(request?: Request) {
+  const fromEnv = envValue("GOOGLE_REDIRECT_URI");
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+
+  const publicBase = publicSiteBase();
+  if (publicBase) return `${publicBase}/api/platform/demos/google/callback`;
+
+  if (request) {
+    const url = new URL(request.url);
+    const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host)
+      .split(",")[0]
+      ?.trim();
+    const protoRaw = (
+      request.headers.get("x-forwarded-proto") ||
+      url.protocol.replace(":", "") ||
+      "https"
+    )
+      .split(",")[0]
+      ?.trim();
+    if (host && !isLocalHost(host)) {
+      const proto = protoRaw === "http" && !isLocalHost(host) ? "https" : protoRaw;
+      return `${proto}://${host}/api/platform/demos/google/callback`;
+    }
+  }
+
+  return "http://localhost:3000/api/platform/demos/google/callback";
 }
 
 export function googleConfigured() {
-  return Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim());
+  return Boolean(envValue("GOOGLE_CLIENT_ID") && envValue("GOOGLE_CLIENT_SECRET"));
 }
 
-export function oauthClient() {
-  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, googleRedirectUri());
+export function oauthClient(redirectUri?: string) {
+  return new OAuth2Client(
+    envValue("GOOGLE_CLIENT_ID"),
+    envValue("GOOGLE_CLIENT_SECRET"),
+    redirectUri ?? googleRedirectUri(),
+  );
 }
 
-export function googleAuthUrl(state: string) {
-  return oauthClient().generateAuthUrl({
+export function googleAuthUrl(state: string, request?: Request) {
+  const redirectUri = googleRedirectUri(request);
+  return oauthClient(redirectUri).generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: SCOPES,
     state,
+    redirect_uri: redirectUri,
   });
 }
 
@@ -45,9 +97,10 @@ export async function getCalendarConnection() {
   return prisma.demoCalendarConnection.findUnique({ where: { id: CONNECTION_ID } });
 }
 
-export async function connectGoogleCalendar(code: string, userId: string) {
-  const client = oauthClient();
-  const { tokens } = await client.getToken(code);
+export async function connectGoogleCalendar(code: string, userId: string, request?: Request) {
+  const redirectUri = googleRedirectUri(request);
+  const client = oauthClient(redirectUri);
+  const { tokens } = await client.getToken({ code, redirect_uri: redirectUri });
   if (!tokens.refresh_token) {
     const existing = await getCalendarConnection();
     if (!existing?.refreshTokenEnc) {

@@ -12,5 +12,5 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/platform/demos/settings?error=google-config", request.url));
   }
   const state = await issueOauthState(user.id);
-  return NextResponse.redirect(googleAuthUrl(state));
+  return NextResponse.redirect(googleAuthUrl(state, request));
 }

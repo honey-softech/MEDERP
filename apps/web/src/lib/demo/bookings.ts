@@ -156,7 +156,7 @@ export async function bookDemo(input: {
   }
 
   const cancelUrl = `${publicBaseUrl()}/demo/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
-  const emailWarnings = await sendBookingEmails({
+  const emailResult = await sendBookingEmails({
     name: booking.name,
     email: booking.email,
     organization: booking.organization,
@@ -177,7 +177,8 @@ export async function bookDemo(input: {
     startsAt: booking.startsAt.toISOString(),
     endsAt: booking.endsAt.toISOString(),
     meetLink: booking.meetLink,
-    emailWarning: emailWarnings[0] ?? null,
+    emailStatus: emailResult.status,
+    emailWarning: emailResult.warning,
   };
 }
 

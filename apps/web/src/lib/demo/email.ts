@@ -8,11 +8,19 @@ type MailInput = {
   ics?: { filename: string; content: string };
 };
 
-export async function sendDemoMail(input: MailInput): Promise<{ ok: true; skipped?: boolean } | { ok: false; error: string }> {
+export type DemoMailResult =
+  | { ok: true; skipped?: false }
+  | { ok: true; skipped: true }
+  | { ok: false; error: string };
+
+export async function sendDemoMail(input: MailInput): Promise<DemoMailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.DEMO_FROM_EMAIL?.trim();
   if (!apiKey || !from) {
-    console.info("[demo-email]", { to: input.to, subject: input.subject, text: input.text });
+    console.warn(
+      "[demo-email] Skipped — set RESEND_API_KEY and DEMO_FROM_EMAIL to send mail.",
+      { to: input.to, subject: input.subject },
+    );
     return { ok: true, skipped: true };
   }
 
@@ -22,15 +30,15 @@ export async function sendDemoMail(input: MailInput): Promise<{ ok: true; skippe
     to: input.to,
     subject: input.subject,
     text: input.text,
-      attachments: input.ics
-        ? [
-            {
-              filename: input.ics.filename,
-              content: Buffer.from(input.ics.content, "utf8"),
-              contentType: "text/calendar",
-            },
-          ]
-        : undefined,
+    attachments: input.ics
+      ? [
+          {
+            filename: input.ics.filename,
+            content: Buffer.from(input.ics.content, "utf8"),
+            contentType: "text/calendar",
+          },
+        ]
+      : undefined,
   });
   if (result.error) {
     return { ok: false, error: result.error.message };
@@ -60,7 +68,7 @@ export async function sendBookingEmails(params: {
   notifyEmail?: string | null;
   uid: string;
   cancelled?: boolean;
-}) {
+}): Promise<{ status: "sent" | "skipped" | "failed"; warning: string | null }> {
   const when = whenLabel(params.start, params.timeZone);
   const summary = params.cancelled ? "Cancelled: MedERP product demo" : "MedERP product demo";
   const description = [
@@ -89,24 +97,31 @@ export async function sendBookingEmails(params: {
     ? `Demo cancelled.\n\n${params.name} <${params.email}>\n${when}\n`
     : `New demo booked.\n\n${params.name} <${params.email}>\n${params.organization ?? ""}\n${params.phone ?? ""}\n${when}\n${params.notes ?? ""}\n${params.meetLink ?? ""}\n`;
 
-  const warnings: string[] = [];
   const prospect = await sendDemoMail({
     to: params.email,
     subject: summary,
     text: prospectText,
     ics: { filename: params.cancelled ? "mederp-demo-cancel.ics" : "mederp-demo.ics", content: ics },
   });
-  if (!prospect.ok) warnings.push(prospect.error);
 
   const notify = params.notifyEmail?.trim();
   if (notify) {
-    const sales = await sendDemoMail({
+    await sendDemoMail({
       to: notify,
       subject: `${params.cancelled ? "Cancelled demo" : "New demo"} — ${params.name}`,
       text: salesText,
       ics: { filename: "mederp-demo.ics", content: ics },
     });
-    if (!sales.ok) warnings.push(sales.error);
   }
-  return warnings;
+
+  if (!prospect.ok) {
+    return { status: "failed", warning: prospect.error };
+  }
+  if (prospect.skipped) {
+    return {
+      status: "skipped",
+      warning: "Email is not configured (RESEND_API_KEY / DEMO_FROM_EMAIL). Google may still email the calendar invite.",
+    };
+  }
+  return { status: "sent", warning: null };
 }

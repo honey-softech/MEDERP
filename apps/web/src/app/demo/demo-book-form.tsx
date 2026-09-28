@@ -76,7 +76,9 @@ export function DemoBookForm() {
       setError(data.error ?? "Could not book the demo.");
       return;
     }
-    router.push(`/demo/confirmed?token=${encodeURIComponent(data.cancelToken)}`);
+    router.push(
+      `/demo/confirmed?token=${encodeURIComponent(data.cancelToken)}&mail=${encodeURIComponent(data.emailStatus ?? "sent")}`,
+    );
   }
 
   return (

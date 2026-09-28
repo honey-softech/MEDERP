@@ -262,7 +262,7 @@ async function insertEvent(
   const created = await client.request<CalendarEvent>({
     url: `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
     method: "POST",
-    params: meet ? { conferenceDataVersion: 1, sendUpdates: "none" } : { sendUpdates: "none" },
+    params: meet ? { conferenceDataVersion: 1, sendUpdates: "all" } : { sendUpdates: "all" },
     data: body,
   });
   return created.data;
@@ -295,6 +295,6 @@ export async function deleteDemoEvent(eventId: string) {
   await client.request({
     url: `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
     method: "DELETE",
-    params: { sendUpdates: "none" },
+    params: { sendUpdates: "all" },
   });
 }

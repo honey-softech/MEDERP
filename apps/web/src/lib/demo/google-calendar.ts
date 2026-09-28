@@ -62,14 +62,26 @@ function publicSiteBase() {
   return "";
 }
 
-/** Public HTTPS callback only. Never returns localhost. */
+/** Public HTTPS callback only. Ignores localhost env values. */
 export function googleRedirectUri(request?: Request) {
+  const PRODUCTION_CALLBACK = "https://mederp.co.in/api/platform/demos/google/callback";
+
   const fromEnv = envValue("GOOGLE_REDIRECT_URI");
-  if (fromEnv) return assertPublicUrl(fromEnv, "GOOGLE_REDIRECT_URI");
+  if (fromEnv) {
+    try {
+      if (!isLocalHost(new URL(fromEnv).host)) return fromEnv.replace(/\/$/, "");
+    } catch {
+      /* ignore bad env */
+    }
+  }
 
   const publicBase = publicSiteBase();
   if (publicBase) {
-    return assertPublicUrl(`${publicBase}/api/platform/demos/google/callback`, "Demo Google redirect");
+    try {
+      return assertPublicUrl(`${publicBase}/api/platform/demos/google/callback`, "Demo Google redirect");
+    } catch {
+      /* fall through */
+    }
   }
 
   if (request) {
@@ -79,23 +91,19 @@ export function googleRedirectUri(request?: Request) {
     const protoRaw = (request.headers.get("x-forwarded-proto") || "https").split(",")[0]?.trim() || "https";
     if (host && !isLocalHost(host)) {
       const proto = protoRaw === "http" ? "https" : protoRaw;
-      return assertPublicUrl(`${proto}://${host}/api/platform/demos/google/callback`, "Demo Google redirect");
+      try {
+        return assertPublicUrl(`${proto}://${host}/api/platform/demos/google/callback`, "Demo Google redirect");
+      } catch {
+        /* fall through */
+      }
     }
   }
 
-  throw new Error(
-    "Set GOOGLE_REDIRECT_URI or NEXT_PUBLIC_API_URL to https://mederp.co.in (not localhost).",
-  );
+  return PRODUCTION_CALLBACK;
 }
 
 export function googleConfigured() {
-  if (!envValue("GOOGLE_CLIENT_ID") || !envValue("GOOGLE_CLIENT_SECRET")) return false;
-  try {
-    googleRedirectUri();
-    return true;
-  } catch {
-    return false;
-  }
+  return Boolean(envValue("GOOGLE_CLIENT_ID") && envValue("GOOGLE_CLIENT_SECRET"));
 }
 
 export function oauthClient(redirectUri?: string) {

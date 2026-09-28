@@ -11,7 +11,7 @@ export default async function DemoSettingsPage({
     params.connected === "1"
       ? "Google Calendar connected."
       : params.error === "google-config"
-        ? "Add Google OAuth credentials to the server environment first."
+        ? "Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI=https://mederp.co.in/api/platform/demos/google/callback (not localhost)."
         : params.error === "oauth"
           ? "Google Calendar connection failed. Try again."
           : undefined;

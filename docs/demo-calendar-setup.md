@@ -26,7 +26,7 @@ TOKEN_ENCRYPTION_KEY="...."
 NEXT_PUBLIC_API_URL="https://mederp.co.in"
 ```
 
-On production, `GOOGLE_REDIRECT_URI` and `NEXT_PUBLIC_API_URL` must be the public HTTPS site, not `localhost`. Spaces around `=` (e.g. `GOOGLE_REDIRECT_URI = "..."`) prevent the variable from loading, and Connect then falls back to localhost.
+On production, `GOOGLE_REDIRECT_URI` and `NEXT_PUBLIC_API_URL` must be the public HTTPS site. The app **never** uses localhost for Google OAuth. Spaces around `=` (e.g. `GOOGLE_REDIRECT_URI = "..."`) prevent the variable from loading.
 
 Sign in as a software admin, open **Demo bookings → Settings**, and choose **Connect Google Calendar**. Use the sales account whose calendar should block busy time and receive the events.
 

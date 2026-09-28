@@ -64,5 +64,11 @@ export function notifyAddress(settingsNotify: string | null | undefined) {
 }
 
 export function publicBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").replace(/\/$/, "");
+  const api = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/^["']|["']$/g, "").replace(/\/$/, "");
+  if (api && !/localhost|127\.0\.0\.1/i.test(api)) return api;
+  const site = (process.env.SITE_ADDRESS ?? "").split(",")[0]?.trim();
+  if (site && !/localhost|127\.0\.0\.1/i.test(site)) {
+    return site.includes("://") ? site.replace(/\/$/, "") : `https://${site}`;
+  }
+  return "https://mederp.co.in";
 }

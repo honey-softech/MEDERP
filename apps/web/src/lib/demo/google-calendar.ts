@@ -29,10 +29,31 @@ function isLocalHost(host: string) {
   return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "web" || h.endsWith(".local");
 }
 
+function assertPublicUrl(url: string, label: string) {
+  const cleaned = url.replace(/\/$/, "");
+  let host: string;
+  try {
+    host = new URL(cleaned).host;
+  } catch {
+    throw new Error(`${label} is not a valid URL.`);
+  }
+  if (isLocalHost(host)) {
+    throw new Error(`${label} must be the public MedERP site (not localhost).`);
+  }
+  return cleaned;
+}
+
 function publicSiteBase() {
   const api = envValue("NEXT_PUBLIC_API_URL").replace(/\/$/, "");
-  if (api && !isLocalHost(new URL(api.includes("://") ? api : `https://${api}`).host)) {
-    return api.includes("://") ? api : `https://${api}`;
+  if (api) {
+    try {
+      const host = new URL(api.includes("://") ? api : `https://${api}`).host;
+      if (!isLocalHost(host)) {
+        return api.includes("://") ? api : `https://${api}`;
+      }
+    } catch {
+      /* ignore */
+    }
   }
   const site = envValue("SITE_ADDRESS").split(",")[0]?.trim();
   if (site && !isLocalHost(site)) {
@@ -41,37 +62,40 @@ function publicSiteBase() {
   return "";
 }
 
-/** Prefer explicit env / public site URL. Never trust a localhost Host from Docker. */
+/** Public HTTPS callback only. Never returns localhost. */
 export function googleRedirectUri(request?: Request) {
   const fromEnv = envValue("GOOGLE_REDIRECT_URI");
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv) return assertPublicUrl(fromEnv, "GOOGLE_REDIRECT_URI");
 
   const publicBase = publicSiteBase();
-  if (publicBase) return `${publicBase}/api/platform/demos/google/callback`;
+  if (publicBase) {
+    return assertPublicUrl(`${publicBase}/api/platform/demos/google/callback`, "Demo Google redirect");
+  }
 
   if (request) {
-    const url = new URL(request.url);
-    const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host)
+    const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || "")
       .split(",")[0]
       ?.trim();
-    const protoRaw = (
-      request.headers.get("x-forwarded-proto") ||
-      url.protocol.replace(":", "") ||
-      "https"
-    )
-      .split(",")[0]
-      ?.trim();
+    const protoRaw = (request.headers.get("x-forwarded-proto") || "https").split(",")[0]?.trim() || "https";
     if (host && !isLocalHost(host)) {
-      const proto = protoRaw === "http" && !isLocalHost(host) ? "https" : protoRaw;
-      return `${proto}://${host}/api/platform/demos/google/callback`;
+      const proto = protoRaw === "http" ? "https" : protoRaw;
+      return assertPublicUrl(`${proto}://${host}/api/platform/demos/google/callback`, "Demo Google redirect");
     }
   }
 
-  return "http://localhost:3000/api/platform/demos/google/callback";
+  throw new Error(
+    "Set GOOGLE_REDIRECT_URI or NEXT_PUBLIC_API_URL to https://mederp.co.in (not localhost).",
+  );
 }
 
 export function googleConfigured() {
-  return Boolean(envValue("GOOGLE_CLIENT_ID") && envValue("GOOGLE_CLIENT_SECRET"));
+  if (!envValue("GOOGLE_CLIENT_ID") || !envValue("GOOGLE_CLIENT_SECRET")) return false;
+  try {
+    googleRedirectUri();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function oauthClient(redirectUri?: string) {

@@ -769,6 +769,10 @@ export default function RegisterHospitalPage() {
         <Link className="font-medium text-teal-700 hover:underline" href="/login">
           Sign in
         </Link>
+        {" · "}
+        <Link className="font-medium text-teal-700 hover:underline" href="/demo">
+          Book a demo
+        </Link>
       </p>
     </AuthShell>
   );

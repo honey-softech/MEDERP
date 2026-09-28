@@ -191,6 +191,12 @@ function LoginForm() {
           Create an account
         </Link>
       </p>
+      <p className="mt-2 text-center text-sm text-slate-500">
+        Want a walkthrough?{" "}
+        <Link className="font-medium text-teal-700 hover:underline" href="/demo">
+          Book a demo
+        </Link>
+      </p>
       <DeveloperCredit />
       <div className="mt-3 text-center">
         <ManagedByCredit />

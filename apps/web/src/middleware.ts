@@ -11,6 +11,7 @@ const publicPaths = [
   "/register-hospital",
   "/terms",
   "/help",
+  "/demo",
 ];
 
 export function middleware(request: NextRequest) {
@@ -25,7 +26,10 @@ export function middleware(request: NextRequest) {
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
   const isPublicApi =
-    pathname.startsWith("/api/auth/") || pathname.startsWith("/api/public/") || pathname === "/api/health";
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/public/") ||
+    pathname === "/api/health" ||
+    pathname === "/api/platform/demos/google/callback";
   const isLoggedIn =
     Boolean(request.cookies.get(SESSION_COOKIE)?.value) ||
     (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ");

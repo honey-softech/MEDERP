@@ -1676,3 +1676,57 @@ model Payment {
   receivedBySignature   UserSignature? @relation(fields: [receivedBySignatureId], references: [id])
   receivedAt       DateTime      @default(now())
 }
+
+enum DemoBookingStatus {
+  BOOKED
+  CANCELLED
+  COMPLETED
+}
+
+enum DemoCalendarStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+model DemoSettings {
+  id            String   @id @default("default")
+  durationMins  Int      @default(30)
+  bufferMins    Int      @default(15)
+  timezone      String   @default("Asia/Kolkata")
+  lookAheadDays Int      @default(14)
+  dayStartMin   Int      @default(600)
+  dayEndMin     Int      @default(1080)
+  notifyEmail   String?
+  updatedAt     DateTime @updatedAt
+}
+
+model DemoCalendarConnection {
+  id                String             @id @default("default")
+  status            DemoCalendarStatus @default(DISCONNECTED)
+  calendarId        String             @default("primary")
+  googleEmail       String?
+  refreshTokenEnc   String?            @db.Text
+  connectedByUserId String?
+  connectedAt       DateTime?
+  updatedAt         DateTime           @updatedAt
+}
+
+model DemoBooking {
+  id            String            @id @default(cuid())
+  name          String
+  email         String
+  phone         String?
+  organization  String?
+  notes         String?
+  startsAt      DateTime
+  endsAt        DateTime
+  status        DemoBookingStatus @default(BOOKED)
+  googleEventId String?
+  meetLink      String?
+  cancelToken   String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([status, startsAt])
+  @@index([email, createdAt])
+}

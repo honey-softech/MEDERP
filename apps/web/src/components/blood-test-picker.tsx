@@ -45,6 +45,7 @@ export function BloodTestPicker({
   labEnabled = true,
   priorOrderCount = 0,
   printHref = "",
+  variant = "card",
 }: {
   selectedIds?: string[];
   selectedInvestigations?: InvestigationPick[];
@@ -56,6 +57,8 @@ export function BloodTestPicker({
   priorOrderCount?: number;
   compact?: boolean;
   printHref?: string;
+  /** toolbar = header action button before Start consult */
+  variant?: "card" | "toolbar";
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("blood");
@@ -150,37 +153,7 @@ export function BloodTestPicker({
   const activeScanTest = activeModality ? byCode.get(activeModality.code) : undefined;
   const usgTest = byCode.get("USG");
 
-  return (
-    <div className="rounded-lg border border-border bg-app-bg/50 p-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-text-primary">Tests / scans</h4>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {printHref && selectedLines.length > 0 ? (
-            <Link href={printHref} className={compactButtonClass}>
-              Print
-            </Link>
-          ) : null}
-          {locked ? null : (
-            <button className={compactPrimaryButtonClass} type="button" onClick={() => setOpen(true)}>
-              {draft.length ? "Change" : priorOrderCount > 0 ? "Add more" : "Add"}
-            </button>
-          )}
-        </div>
-      </div>
-      {selectedLines.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {selectedLines.map((row) => (
-            <li
-              key={row.key}
-              className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-text-primary ring-1 ring-border"
-            >
-              {row.label}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {open ? (
+  const modal = open ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-text-primary/40" onClick={() => setOpen(false)}>
           <div className="flex min-h-full items-start justify-center p-4 sm:p-8">
             <div
@@ -360,7 +333,68 @@ export function BloodTestPicker({
             </div>
           </div>
         </div>
+      ) : null;
+
+  if (variant === "toolbar") {
+    const label = locked
+      ? "Tests / scans"
+      : draft.length
+        ? `Tests / scans (${draft.length})`
+        : priorOrderCount > 0
+          ? "Tests / scans · more"
+          : "Tests / scans";
+    return (
+      <>
+        <div className="inline-flex items-center gap-1.5">
+          {locked ? (
+            <span className={compactButtonClass}>{label}</span>
+          ) : (
+            <button className={compactPrimaryButtonClass} type="button" onClick={() => setOpen(true)}>
+              {label}
+            </button>
+          )}
+          {printHref && selectedLines.length > 0 ? (
+            <Link href={printHref} className={compactButtonClass}>
+              Print
+            </Link>
+          ) : null}
+        </div>
+        {modal}
+      </>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-app-bg/50 p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-text-primary">Tests / scans</h4>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {printHref && selectedLines.length > 0 ? (
+            <Link href={printHref} className={compactButtonClass}>
+              Print
+            </Link>
+          ) : null}
+          {locked ? null : (
+            <button className={compactPrimaryButtonClass} type="button" onClick={() => setOpen(true)}>
+              {draft.length ? "Change" : priorOrderCount > 0 ? "Add more" : "Add"}
+            </button>
+          )}
+        </div>
+      </div>
+      {selectedLines.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {selectedLines.map((row) => (
+            <li
+              key={row.key}
+              className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-text-primary ring-1 ring-border"
+            >
+              {row.label}
+            </li>
+          ))}
+        </ul>
       ) : null}
+
+      {modal}
     </div>
   );
 }

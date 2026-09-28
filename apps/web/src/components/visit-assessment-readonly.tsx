@@ -1,55 +1,24 @@
-import Link from "next/link";
-import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell";
-import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { parseMedications } from "@/lib/prescription-text";
 import { readableClinicalText } from "@/lib/visit-summary";
 
+/** Status-only strip — actions live once in the page header. */
 export function VisitSummaryBanner({
-  appointmentId,
   statusLabel,
   summaryApproved,
-  canEdit,
-  canPrint,
-  patientPhone,
 }: {
-  appointmentId: string;
+  appointmentId?: string;
   statusLabel: string;
   summaryApproved: boolean;
-  canEdit: boolean;
-  canPrint: boolean;
+  canEdit?: boolean;
+  canPrint?: boolean;
   patientPhone?: string | null;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5">
-      <div>
-        <p className="text-sm font-semibold text-teal-900">
-          {summaryApproved ? "Visit summary approved" : "Visit closed"}
-        </p>
-        <p className="mt-0.5 text-xs text-teal-800">
-          {statusLabel}. Send the record on WhatsApp or open print view
-          {canEdit ? ", or edit to change the assessment" : ""}.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {canPrint && summaryApproved ? (
-          <>
-            <SendPatientMessageButton
-              endpoint={`/api/appointments/${appointmentId}/summary/send`}
-              patientPhone={patientPhone}
-              compact
-              label="Send on WhatsApp"
-            />
-            <Link href={`/appointments/${appointmentId}/summary`} className={primaryButtonClass}>
-              Print record
-            </Link>
-          </>
-        ) : null}
-        {canEdit ? (
-          <Link href={`/appointments/${appointmentId}?edit=1`} className={compactButtonClass}>
-            Edit assessment
-          </Link>
-        ) : null}
-      </div>
+    <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
+      <p className="text-sm font-semibold text-teal-900">
+        {summaryApproved ? "Visit summary approved" : "Visit closed"}
+        <span className="font-normal text-teal-800"> · {statusLabel}</span>
+      </p>
     </div>
   );
 }
@@ -108,37 +77,30 @@ export function VisitAssessmentReadonly({
   return (
     <div className="min-w-0 space-y-3">
       {omitBanner ? null : (
-        <VisitSummaryBanner
-          appointmentId={appointmentId}
-          statusLabel={statusLabel}
-          summaryApproved={summaryApproved}
-          canEdit={canEdit}
-          canPrint={canPrint}
-          patientPhone={patientPhone}
-        />
+        <VisitSummaryBanner statusLabel={statusLabel} summaryApproved={summaryApproved} />
       )}
 
-      <div className="grid min-w-0 gap-3 md:grid-cols-2">
-        <section className="min-w-0 space-y-3 rounded-xl border border-border bg-surface p-3 shadow-card">
-          <h3 className="text-sm font-semibold text-text-primary">Patient today</h3>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2 lg:gap-4">
+        <section className="min-w-0 space-y-4 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
+          <h3 className="text-base font-semibold text-text-primary">Patient today</h3>
           <ReadonlyBlock label="Chief complaints" value={complaintText} />
           <ReadonlyBlock label="Examination" value={examText} />
           <ReadonlyBlock label="History of present illness" value={historyText} />
         </section>
 
-        <section className="min-w-0 space-y-3 rounded-xl border border-border bg-surface p-3 shadow-card">
-          <h3 className="text-sm font-semibold text-text-primary">Plan</h3>
+        <section className="min-w-0 space-y-4 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
+          <h3 className="text-base font-semibold text-text-primary">Plan</h3>
           <ReadonlyBlock label="Diagnosis" value={diagnosisText} strong />
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Prescription
             </p>
             {medicines.length === 0 ? (
-              <p className="mt-1 text-sm text-text-secondary">No medicines recorded.</p>
+              <p className="mt-1.5 text-sm text-text-secondary">No medicines recorded.</p>
             ) : (
-              <ul className="mt-1.5 space-y-1.5">
+              <ul className="mt-2 space-y-2">
                 {medicines.map((row, index) => (
-                  <li key={`${row.name}-${index}`} className="text-sm text-text-primary">
+                  <li key={`${row.name}-${index}`} className="text-sm leading-relaxed text-text-primary">
                     <span className="font-medium">{row.name}</span>
                     {row.notes ? (
                       <span className="text-text-secondary"> · {row.notes}</span>
@@ -169,7 +131,7 @@ function ReadonlyBlock({
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
       <p
-        className={`mt-1 whitespace-pre-wrap text-sm ${strong ? "font-semibold text-text-primary" : "text-text-primary"} ${value ? "" : "text-text-secondary"}`}
+        className={`mt-1.5 whitespace-pre-wrap text-sm leading-relaxed ${strong ? "font-semibold text-text-primary" : "text-text-primary"} ${value ? "" : "text-text-secondary"}`}
       >
         {value || "—"}
       </p>

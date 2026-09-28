@@ -66,23 +66,35 @@ export function canUploadLabReport(input: {
   status: string;
 }): { ok: true } | { ok: false; error: string; status: number } {
   const external = input.fulfillment === "EXTERNAL";
-  const allowed = external
-    ? ["SUPER_ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"].includes(input.role)
-    : ["SUPER_ADMIN", "LAB_TECH"].includes(input.role);
-  if (!allowed) {
-    return { ok: false, error: "You cannot upload this report.", status: 403 };
-  }
-  if (external) {
-    if (input.status === "CANCELLED") {
-      return { ok: false, error: "This investigation was cancelled.", status: 409 };
-    }
-  } else if (input.status === "AWAITING_PAYMENT" || input.status === "CANCELLED") {
-    return { ok: false, error: "Collect payment before uploading a report.", status: 409 };
+  const clinicalStaff = ["SUPER_ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"].includes(input.role);
+  const labTech = ["SUPER_ADMIN", "LAB_TECH"].includes(input.role);
+
+  if (input.status === "CANCELLED") {
+    return { ok: false, error: "This investigation was cancelled.", status: 409 };
   }
   if (input.status === "RESULTED" && input.role !== "SUPER_ADMIN") {
     return { ok: false, error: "This order is already marked done.", status: 409 };
   }
-  return { ok: true };
+
+  // Outside / hand-carried: doctor, nurse, receptionist (and super admin).
+  if (external) {
+    if (!clinicalStaff) {
+      return { ok: false, error: "You cannot upload this report.", status: 403 };
+    }
+    return { ok: true };
+  }
+
+  // In-house lab tech workflow, or clinical staff attaching a hand-carried file.
+  if (labTech) {
+    if (input.status === "AWAITING_PAYMENT") {
+      return { ok: false, error: "Collect payment before uploading a report.", status: 409 };
+    }
+    return { ok: true };
+  }
+  if (clinicalStaff) {
+    return { ok: true };
+  }
+  return { ok: false, error: "You cannot upload this report.", status: 403 };
 }
 
 export function canViewLabReport(input: {

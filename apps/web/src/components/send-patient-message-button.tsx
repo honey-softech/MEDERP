@@ -8,17 +8,26 @@ export function SendPatientMessageButton({
   patientPhone,
   compact = false,
   label = "Send WhatsApp",
+  resendLabel = "Resend WhatsApp",
+  alreadySent = false,
+  className: classNameProp,
 }: {
   endpoint: string;
   patientPhone?: string | null;
   compact?: boolean;
   label?: string;
+  /** Shown after a successful send (and when alreadySent). */
+  resendLabel?: string;
+  /** True when this message was sent before (e.g. prior WhatsApp summary). */
+  alreadySent?: boolean;
+  className?: string;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState("");
+  const [sentOnce, setSentOnce] = useState(alreadySent);
   const phone = (patientPhone ?? "").replace(/\D/g, "");
-  const className = compact ? compactButtonClass : secondaryButtonClass;
+  const className = classNameProp ?? (compact ? compactButtonClass : secondaryButtonClass);
+  const buttonLabel = sentOnce ? resendLabel : label;
 
   async function send() {
     if (phone.length < 10) {
@@ -27,7 +36,6 @@ export function SendPatientMessageButton({
     }
     setPending(true);
     setError("");
-    setDone("");
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -39,15 +47,25 @@ export function SendPatientMessageButton({
       setError(data.error ?? "Could not queue the message.");
       return;
     }
-    setDone(data.status === "SENT" ? "Sent" : "Queued");
+    setSentOnce(true);
   }
 
   return (
-    <span className="inline-flex flex-col items-start">
-      <button type="button" className={className} disabled={pending} onClick={() => void send()}>
-        {pending ? "Sending…" : done || label}
+    <span className="relative inline-flex items-center">
+      <button
+        type="button"
+        className={className}
+        disabled={pending}
+        title={error || undefined}
+        onClick={() => void send()}
+      >
+        {pending ? "Sending…" : buttonLabel}
       </button>
-      {error ? <span className="mt-1 text-[11px] text-red-600">{error}</span> : null}
+      {error ? (
+        <span className="absolute left-0 top-full z-10 mt-1 max-w-[14rem] rounded bg-surface px-1.5 py-0.5 text-[11px] text-red-600 shadow-card">
+          {error}
+        </span>
+      ) : null}
     </span>
   );
 }

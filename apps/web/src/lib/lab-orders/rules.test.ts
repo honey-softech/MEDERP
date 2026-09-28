@@ -51,6 +51,13 @@ describe("lab order rules", () => {
       canUploadLabReport({ role: "LAB_TECH", fulfillment: "IN_HOUSE", status: "AWAITING_PAYMENT" }),
     ).toMatchObject({ ok: false, status: 409 });
     expect(canUploadLabReport({ role: "LAB_TECH", fulfillment: "IN_HOUSE", status: "PAID" }).ok).toBe(true);
+    expect(canUploadLabReport({ role: "DOCTOR", fulfillment: "EXTERNAL", status: "AWAITING_EXTERNAL_REPORT" }).ok).toBe(
+      true,
+    );
+    expect(canUploadLabReport({ role: "NURSE", fulfillment: "IN_HOUSE", status: "AWAITING_PAYMENT" }).ok).toBe(true);
+    expect(
+      canUploadLabReport({ role: "RECEPTIONIST", fulfillment: "EXTERNAL", status: "AWAITING_EXTERNAL_REPORT" }).ok,
+    ).toBe(true);
     expect(canViewLabReport({ role: "ACCOUNTANT", fulfillment: "IN_HOUSE", status: "RESULTED" })).toMatchObject({
       ok: false,
       status: 403,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BloodTestPicker } from "@/components/blood-test-picker";
@@ -112,6 +113,7 @@ export function ConsultAssessmentForm({
   priorVisit = null,
   cockpit = false,
   followUpReminderNote = null,
+  testsMountId = null,
   children,
 }: {
   appointmentId: string;
@@ -130,6 +132,8 @@ export function ConsultAssessmentForm({
   priorVisit?: PriorVisitReuse;
   cockpit?: boolean;
   followUpReminderNote?: string | null;
+  /** When set (cockpit), Tests / scans render under the history column instead of Findings. */
+  testsMountId?: string | null;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -162,6 +166,24 @@ export function ConsultAssessmentForm({
   const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">(
     canPreview ? "saved" : "idle",
   );
+  const [testsMountEl, setTestsMountEl] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!testsMountId || typeof document === "undefined") {
+      setTestsMountEl(null);
+      return;
+    }
+    function resolve() {
+      setTestsMountEl(
+        document.getElementById("visit-tests-mount") ??
+          document.getElementById("visit-tests-mount-mobile"),
+      );
+    }
+    resolve();
+    const mq = window.matchMedia("(min-width: 640px)");
+    mq.addEventListener("change", resolve);
+    return () => mq.removeEventListener("change", resolve);
+  }, [testsMountId]);
 
   const valuesRef = useRef(values);
   const investigationsRef = useRef(investigations);
@@ -493,30 +515,32 @@ export function ConsultAssessmentForm({
         {needsDiagnosis ? <p className="mt-1 text-[11px] text-critical">Required</p> : null}
       </div>
 
-      <div>
-        <BloodTestPicker
-          compact={cockpit}
-          selectedInvestigations={investigations}
-          onInvestigationsChange={(items) => {
-            setInvestigations(items);
-            if (items.length > 0) {
-              setValues((current) =>
-                current.visitOutcome ? current : { ...current, visitOutcome: "FOLLOW_UP" },
-              );
-            }
-          }}
-          locked={testsLocked}
-          labEnabled={labEnabled}
-          patientPhone={patientPhone}
-          priorOrderCount={priorOrderCount}
-          printHref={`/appointments/${appointmentId}/investigations`}
-        />
-        {investigations.length > 0 ? (
-          <p className="mt-1.5 text-[11px] text-text-secondary">
-            Schedule a follow-up to review results once reports are ready.
-          </p>
-        ) : null}
-      </div>
+      {!testsMountId ? (
+        <div>
+          <BloodTestPicker
+            compact={cockpit}
+            selectedInvestigations={investigations}
+            onInvestigationsChange={(items) => {
+              setInvestigations(items);
+              if (items.length > 0) {
+                setValues((current) =>
+                  current.visitOutcome ? current : { ...current, visitOutcome: "FOLLOW_UP" },
+                );
+              }
+            }}
+            locked={testsLocked}
+            labEnabled={labEnabled}
+            patientPhone={patientPhone}
+            priorOrderCount={priorOrderCount}
+            printHref={`/appointments/${appointmentId}/investigations`}
+          />
+          {investigations.length > 0 ? (
+            <p className="mt-1.5 text-[11px] text-text-secondary">
+              Schedule a follow-up to review results once reports are ready.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border">
         <div className="flex items-center justify-between gap-2 px-3 py-2">
@@ -834,6 +858,29 @@ export function ConsultAssessmentForm({
       </section>
     </div>
     {followUpDialog}
+    {testsMountEl
+      ? createPortal(
+          <BloodTestPicker
+            compact={cockpit}
+            variant="toolbar"
+            selectedInvestigations={investigations}
+            onInvestigationsChange={(items) => {
+              setInvestigations(items);
+              if (items.length > 0) {
+                setValues((current) =>
+                  current.visitOutcome ? current : { ...current, visitOutcome: "FOLLOW_UP" },
+                );
+              }
+            }}
+            locked={testsLocked}
+            labEnabled={labEnabled}
+            patientPhone={patientPhone}
+            priorOrderCount={priorOrderCount}
+            printHref={`/appointments/${appointmentId}/investigations`}
+          />,
+          testsMountEl,
+        )
+      : null}
     </>
   );
 }

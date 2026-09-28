@@ -42,6 +42,19 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
   if (approved && !canPrint && !canPreviewDraft) notFound();
 
   const letterhead = visitLetterhead(appointment.assessment, appointment.hospital);
+  const summaryAlreadySent = approved
+    ? Boolean(
+        await prisma.outboundMessage.findFirst({
+          where: {
+            hospitalId: user.hospitalId,
+            appointmentId: appointment.id,
+            templateKey: "visit_summary",
+            status: "SENT",
+          },
+          select: { id: true },
+        }),
+      )
+    : false;
 
   const printedAt = new Date().toLocaleString("en-IN", {
     day: "2-digit",
@@ -55,14 +68,22 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
 
   return (
     <AppShell title="Visit summary">
-      <div className="visit-summary-frame mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 print:hidden">
+      <div
+        className={`visit-summary-frame mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 print:hidden ${
+          approved
+            ? "border-teal-200 bg-teal-50"
+            : "border-amber-200 bg-amber-50"
+        }`}
+      >
         <div>
-          <p className="text-sm font-semibold text-slate-900">
+          <p className={`text-sm font-semibold ${approved ? "text-teal-950" : "text-amber-950"}`}>
             {approved ? "Approved visit record" : "Draft visit record"}
           </p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className={`mt-0.5 text-xs ${approved ? "text-teal-800" : "text-amber-800"}`}>
             {approved
-              ? "This is the printable clinical summary. Send it on WhatsApp or print it."
+              ? summaryAlreadySent
+                ? "Summary was sent on WhatsApp. You can resend or print it."
+                : "This is the printable clinical summary. Send it on WhatsApp or print it."
               : "Preview the printed page, then approve the assessment so reception can send it on WhatsApp or print it."}
           </p>
         </div>
@@ -75,6 +96,8 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
               endpoint={`/api/appointments/${appointment.id}/summary/send`}
               patientPhone={appointment.patient.phone}
               label="Send on WhatsApp"
+              resendLabel="Resend WhatsApp"
+              alreadySent={summaryAlreadySent}
             />
           ) : null}
           {approved || canPreviewDraft ? <PrintButton label="Print record" variant="primary" /> : null}

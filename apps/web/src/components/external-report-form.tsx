@@ -8,15 +8,18 @@ export function ExternalReportForm({
   orderId,
   reportFileName,
   locked = false,
+  label,
 }: {
   orderId: string;
   reportFileName?: string | null;
   locked?: boolean;
+  label?: string;
 }) {
   const router = useRouter();
   const [fileName, setFileName] = useState(reportFileName ?? "");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const idleLabel = label ?? (fileName ? "Replace" : "Attach report");
 
   async function upload(file: File) {
     setError("");
@@ -41,7 +44,7 @@ export function ExternalReportForm({
           locked || pending ? "pointer-events-none opacity-60" : ""
         }`}
       >
-        <span className={compactButtonClass}>{pending ? "Uploading…" : fileName ? "Replace" : "Attach report"}</span>
+        <span className={compactButtonClass}>{pending ? "Uploading…" : fileName ? "Replace report" : idleLabel}</span>
         {fileName ? <span className="truncate text-[11px] text-text-secondary">{fileName}</span> : null}
         <input
           className="sr-only"

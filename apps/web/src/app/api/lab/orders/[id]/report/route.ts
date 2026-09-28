@@ -72,6 +72,8 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: allowed.error }, { status: allowed.status });
   }
   const external = order.fulfillment === "EXTERNAL";
+  const handCarriedByClinical = ["DOCTOR", "NURSE", "RECEPTIONIST"].includes(scoped.user.role);
+  const markResulted = external || handCarriedByClinical;
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
@@ -97,12 +99,12 @@ export async function POST(request: Request, context: Ctx) {
       reportUploadedByUsername: scoped.user.username,
       sampleCollectedAt: order.sampleCollectedAt ?? now,
       sampleCollectedBy: order.sampleCollectedBy ?? scoped.user.username,
-      status: external ? "RESULTED" : order.status === "PAID" ? "SAMPLE_COLLECTED" : order.status,
-      resultedAt: external ? now : order.resultedAt,
+      status: markResulted ? "RESULTED" : order.status === "PAID" ? "SAMPLE_COLLECTED" : order.status,
+      resultedAt: markResulted ? now : order.resultedAt,
     },
   });
 
-  if (external && order.status !== "RESULTED") {
+  if (markResulted && order.status !== "RESULTED") {
     await notifyLabResults({
       hospitalId: scoped.user.hospitalId,
       appointmentId: order.appointmentId,
@@ -110,7 +112,7 @@ export async function POST(request: Request, context: Ctx) {
       patientId: order.patientId,
       patientName: patientName(order.patient),
       doctorUserId: order.appointment?.doctor.appUserId ?? null,
-      external: true,
+      external: external || handCarriedByClinical,
     });
   }
 
@@ -120,10 +122,10 @@ export async function POST(request: Request, context: Ctx) {
     actorUserId: scoped.user.id,
     actorUsername: scoped.user.username,
     actorRole: scoped.user.role,
-    action: external ? "EXTERNAL_REPORT_UPLOADED" : "LAB_REPORT_UPLOADED",
+    action: external || handCarriedByClinical ? "EXTERNAL_REPORT_UPLOADED" : "LAB_REPORT_UPLOADED",
     entity: "LabOrder",
     entityId: order.id,
-    summary: `${scoped.user.username} uploaded ${external ? "outside" : "lab"} report ${fileName} for ${patientName(order.patient)}.`,
+    summary: `${scoped.user.username} uploaded ${external || handCarriedByClinical ? "hand-carried/outside" : "lab"} report ${fileName} for ${patientName(order.patient)}.`,
     metadata: {
       changes: diffAuditFields(
         { reportFileName: order.reportFileName, status: order.status },

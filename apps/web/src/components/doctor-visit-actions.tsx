@@ -68,9 +68,10 @@ export function DoctorVisitActions({
   const closed = ["CANCELLED", "COMPLETED", "NO_SHOW"].includes(status) || summaryApproved;
   if (closed) {
     if (status === "CANCELLED" || status === "NO_SHOW") return null;
+    // Visit detail page already shows WhatsApp / Print / Edit in the header — avoid duplicates.
+    if (!assessmentHref && !summaryHref) return null;
     return (
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <p className="text-xs font-medium text-teal-800">Visit completed.</p>
+      <div className="flex flex-wrap items-center gap-1.5">
         {assessmentHref ? (
           <Link href={assessmentHref} className={compactButtonClass}>
             {assessmentLabel ?? "View visit"}

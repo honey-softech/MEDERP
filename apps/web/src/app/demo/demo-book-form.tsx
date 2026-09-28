@@ -76,15 +76,13 @@ export function DemoBookForm() {
       setError(data.error ?? "Could not book the demo.");
       return;
     }
-    router.push(
-      `/demo/confirmed?token=${encodeURIComponent(data.cancelToken)}&mail=${encodeURIComponent(data.emailStatus ?? "sent")}`,
-    );
+    router.push(`/demo/confirmed?token=${encodeURIComponent(data.cancelToken)}`);
   }
 
   return (
     <AuthShell
       title="Book a MedERP demo"
-      subtitle="Pick an open slot. We will email a calendar invite to you and our team."
+      subtitle="Pick an open slot. Google Calendar will email you the invite and Meet link."
       wide
     >
       <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">

@@ -14,11 +14,17 @@ export type DemoMailResult =
   | { ok: false; error: string };
 
 export async function sendDemoMail(input: MailInput): Promise<DemoMailResult> {
+  // Optional: set DEMO_EMAIL_ENABLED=1 plus Resend domain + keys to send MedERP emails.
+  // Default is Google Calendar invites only (no Resend domain required).
+  if (process.env.DEMO_EMAIL_ENABLED?.trim() !== "1") {
+    return { ok: true, skipped: true };
+  }
+
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.DEMO_FROM_EMAIL?.trim();
   if (!apiKey || !from) {
     console.warn(
-      "[demo-email] Skipped — set RESEND_API_KEY and DEMO_FROM_EMAIL to send mail.",
+      "[demo-email] Skipped — set DEMO_EMAIL_ENABLED=1, RESEND_API_KEY, and DEMO_FROM_EMAIL.",
       { to: input.to, subject: input.subject },
     );
     return { ok: true, skipped: true };
@@ -41,6 +47,7 @@ export async function sendDemoMail(input: MailInput): Promise<DemoMailResult> {
       : undefined,
   });
   if (result.error) {
+    console.error("[demo-email] Resend error:", result.error.message, { to: input.to, from });
     return { ok: false, error: result.error.message };
   }
   return { ok: true };

@@ -30,21 +30,23 @@ On production, `GOOGLE_REDIRECT_URI` and `NEXT_PUBLIC_API_URL` must be the publi
 
 Sign in as a software admin, open **Demo bookings → Settings**, and choose **Connect Google Calendar**. Use the sales account whose calendar should block busy time and receive the events.
 
-## Resend
+## Email (optional — Resend)
 
-1. Create an account at [resend.com](https://resend.com/).
-2. Verify the sending domain (for example `mederp.co.in`) and add the DNS records Resend shows.
-3. Create an API key.
+By default MedERP does **not** send its own emails. Google Calendar emails the prospect the invite and Meet link.
+
+Only if you later want a separate MedERP confirmation email:
+
+1. Verify a domain in Resend (required by Resend — cannot be skipped for real recipients).
+2. Set:
 
 ```
-RESEND_API_KEY=""
-DEMO_FROM_EMAIL="MedERP <demos@mederp.co.in>"
-DEMO_NOTIFY_EMAIL="sales@mederp.co.in"
+DEMO_EMAIL_ENABLED="1"
+RESEND_API_KEY="re_...."
+DEMO_FROM_EMAIL="MedERP <demos@your-verified-domain.com>"
+DEMO_NOTIFY_EMAIL="hello@honeysoftech.com"
 ```
 
-`DEMO_FROM_EMAIL` must use the verified domain. `DEMO_NOTIFY_EMAIL` is the default sales inbox; the settings page can override it per deployment.
-
-If `RESEND_API_KEY` is empty, booking still creates the calendar event and the email text is printed to the server log.
+Until then, leave `DEMO_EMAIL_ENABLED` unset.
 
 ## Product defaults
 

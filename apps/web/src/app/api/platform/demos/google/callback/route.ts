@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (!userId || !code) {
     return NextResponse.redirect(new URL("/platform/demos/settings?error=oauth", request.url));
   }
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
+  const user = await prisma.appUser.findUnique({ where: { id: userId }, select: { id: true, role: true } });
   if (!user || user.role !== "SOFTWARE_ADMIN") {
     return NextResponse.redirect(new URL("/platform/demos/settings?error=oauth", request.url));
   }

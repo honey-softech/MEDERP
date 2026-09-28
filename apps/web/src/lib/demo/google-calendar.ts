@@ -1,4 +1,4 @@
-import { google } from "googleapis";
+import { OAuth2Client } from "google-auth-library";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "./crypto";
 
@@ -9,6 +9,14 @@ const SCOPES = [
 ];
 
 const CONNECTION_ID = "default";
+
+type BusyRow = { start?: string; end?: string };
+type FreeBusyResponse = { calendars?: Record<string, { busy?: BusyRow[] }> };
+type CalendarEvent = {
+  id?: string;
+  hangoutLink?: string;
+  conferenceData?: { entryPoints?: { uri?: string | null }[] };
+};
 
 export function googleRedirectUri() {
   if (process.env.GOOGLE_REDIRECT_URI?.trim()) return process.env.GOOGLE_REDIRECT_URI.trim();
@@ -21,11 +29,7 @@ export function googleConfigured() {
 }
 
 export function oauthClient() {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    googleRedirectUri(),
-  );
+  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, googleRedirectUri());
 }
 
 export function googleAuthUrl(state: string) {
@@ -53,16 +57,13 @@ export async function connectGoogleCalendar(code: string, userId: string) {
   client.setCredentials(tokens);
   let googleEmail: string | null = null;
   try {
-    const oauth2 = google.oauth2({ version: "v2", auth: client });
-    const me = await oauth2.userinfo.get();
+    const me = await client.request<{ email?: string }>({ url: "https://www.googleapis.com/oauth2/v2/userinfo" });
     googleEmail = me.data.email ?? null;
   } catch {
     googleEmail = null;
   }
   const existing = await getCalendarConnection();
-  const refreshToken = tokens.refresh_token
-    ? encryptSecret(tokens.refresh_token)
-    : existing?.refreshTokenEnc;
+  const refreshToken = tokens.refresh_token ? encryptSecret(tokens.refresh_token) : existing?.refreshTokenEnc;
   if (!refreshToken) {
     throw new Error("Missing Google refresh token.");
   }
@@ -109,16 +110,15 @@ async function calendarApi() {
   }
   const client = oauthClient();
   client.setCredentials({ refresh_token: decryptSecret(connection.refreshTokenEnc) });
-  return {
-    calendarId: connection.calendarId || "primary",
-    calendar: google.calendar({ version: "v3", auth: client }),
-  };
+  return { calendarId: connection.calendarId || "primary", client };
 }
 
 export async function freeBusy(rangeStart: Date, rangeEnd: Date, timeZone: string) {
-  const { calendar, calendarId } = await calendarApi();
-  const response = await calendar.freebusy.query({
-    requestBody: {
+  const { client, calendarId } = await calendarApi();
+  const response = await client.request<FreeBusyResponse>({
+    url: "https://www.googleapis.com/calendar/v3/freeBusy",
+    method: "POST",
+    data: {
       timeMin: rangeStart.toISOString(),
       timeMax: rangeEnd.toISOString(),
       timeZone,
@@ -131,6 +131,58 @@ export async function freeBusy(rangeStart: Date, rangeEnd: Date, timeZone: strin
     .map((row) => ({ start: new Date(row.start as string), end: new Date(row.end as string) }));
 }
 
+function eventBody(params: {
+  name: string;
+  email: string;
+  organization?: string | null;
+  start: Date;
+  end: Date;
+  timeZone: string;
+  notes?: string | null;
+  meet: boolean;
+}) {
+  const description = [
+    `Prospect: ${params.name}`,
+    `Email: ${params.email}`,
+    params.organization ? `Organisation: ${params.organization}` : "",
+    params.notes ? `Notes: ${params.notes}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    summary: `MedERP demo — ${params.name}`,
+    description,
+    start: { dateTime: params.start.toISOString(), timeZone: params.timeZone },
+    end: { dateTime: params.end.toISOString(), timeZone: params.timeZone },
+    attendees: [{ email: params.email }],
+    ...(params.meet
+      ? {
+          conferenceData: {
+            createRequest: {
+              requestId: `mederp${params.start.getTime()}${params.email.replace(/[^a-z0-9]/gi, "").slice(0, 24)}`,
+              conferenceSolutionKey: { type: "hangoutsMeet" },
+            },
+          },
+        }
+      : {}),
+  };
+}
+
+async function insertEvent(
+  client: OAuth2Client,
+  calendarId: string,
+  body: ReturnType<typeof eventBody>,
+  meet: boolean,
+) {
+  const created = await client.request<CalendarEvent>({
+    url: `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    method: "POST",
+    params: meet ? { conferenceDataVersion: 1, sendUpdates: "none" } : { sendUpdates: "none" },
+    data: body,
+  });
+  return created.data;
+}
+
 export async function createDemoEvent(params: {
   name: string;
   email: string;
@@ -140,56 +192,24 @@ export async function createDemoEvent(params: {
   timeZone: string;
   notes?: string | null;
 }) {
-  const { calendar, calendarId } = await calendarApi();
-    const requestId = `mederp${params.start.getTime()}${params.email.replace(/[^a-z0-9]/gi, "").slice(0, 24)}`;
-  const description = [
-    `Prospect: ${params.name}`,
-    `Email: ${params.email}`,
-    params.organization ? `Organisation: ${params.organization}` : "",
-    params.notes ? `Notes: ${params.notes}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const { client, calendarId } = await calendarApi();
   try {
-    const created = await calendar.events.insert({
-      calendarId,
-      conferenceDataVersion: 1,
-      sendUpdates: "none",
-      requestBody: {
-        summary: `MedERP demo — ${params.name}`,
-        description,
-        start: { dateTime: params.start.toISOString(), timeZone: params.timeZone },
-        end: { dateTime: params.end.toISOString(), timeZone: params.timeZone },
-        attendees: [{ email: params.email }],
-        conferenceData: {
-          createRequest: {
-            requestId,
-            conferenceSolutionKey: { type: "hangoutsMeet" },
-          },
-        },
-      },
-    });
+    const created = await insertEvent(client, calendarId, eventBody({ ...params, meet: true }), true);
     return {
-      eventId: created.data.id ?? null,
-      meetLink: created.data.hangoutLink ?? created.data.conferenceData?.entryPoints?.find((entry) => entry.uri)?.uri ?? null,
+      eventId: created.id ?? null,
+      meetLink: created.hangoutLink ?? created.conferenceData?.entryPoints?.find((entry) => entry.uri)?.uri ?? null,
     };
   } catch {
-    const created = await calendar.events.insert({
-      calendarId,
-      sendUpdates: "none",
-      requestBody: {
-        summary: `MedERP demo — ${params.name}`,
-        description,
-        start: { dateTime: params.start.toISOString(), timeZone: params.timeZone },
-        end: { dateTime: params.end.toISOString(), timeZone: params.timeZone },
-        attendees: [{ email: params.email }],
-      },
-    });
-    return { eventId: created.data.id ?? null, meetLink: null };
+    const created = await insertEvent(client, calendarId, eventBody({ ...params, meet: false }), false);
+    return { eventId: created.id ?? null, meetLink: null };
   }
 }
 
 export async function deleteDemoEvent(eventId: string) {
-  const { calendar, calendarId } = await calendarApi();
-  await calendar.events.delete({ calendarId, eventId, sendUpdates: "none" });
+  const { client, calendarId } = await calendarApi();
+  await client.request({
+    url: `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    method: "DELETE",
+    params: { sendUpdates: "none" },
+  });
 }

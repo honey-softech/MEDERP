@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthShell, fieldClass, iconButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
-import { DeveloperCredit, ManagedByCredit, PasswordField } from "@/components/auth-branding";
+import { AuthFooterCredits, PasswordField } from "@/components/auth-branding";
 import { isValidIndianMobile, mobileValidationError, normalizeMobile } from "@/lib/phone";
 import { signInPasswordError } from "@/lib/password-policy";
 
@@ -135,6 +135,8 @@ function LoginForm() {
   return (
     <AuthShell
       title="Sign in"
+      doodles
+      footer={<AuthFooterCredits />}
       headerAction={
         <button
           type="button"
@@ -197,10 +199,11 @@ function LoginForm() {
           Book a demo
         </Link>
       </p>
-      <DeveloperCredit />
-      <div className="mt-3 text-center">
-        <ManagedByCredit />
-      </div>
+      <p className="mt-2 text-center text-sm text-slate-500">
+        <Link className="font-medium text-teal-700 hover:underline" href="/">
+          Back to MedERP home
+        </Link>
+      </p>
     </AuthShell>
   );
 }

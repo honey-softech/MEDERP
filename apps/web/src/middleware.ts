@@ -22,9 +22,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const isPublicPage = publicPaths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  const isRoot = pathname === "/";
+  const isPublicPage =
+    isRoot ||
+    publicPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   const isPublicApi =
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/public/") ||

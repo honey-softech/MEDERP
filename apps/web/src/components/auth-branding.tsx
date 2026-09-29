@@ -61,7 +61,25 @@ export function PasswordField({
   );
 }
 
-export function DeveloperCredit() {
+export function DeveloperCredit({ compact = false }: { compact?: boolean } = {}) {
+  if (compact) {
+    return (
+      <div className="inline-flex items-center gap-2 text-[10px] text-slate-400">
+        <span>Built by</span>
+        <span className="inline-flex items-center rounded bg-black px-1.5 py-0.5">
+          <Image
+            src="/honeysoftech-logo.png"
+            alt="honeysoftech"
+            width={88}
+            height={18}
+            className="h-3.5 w-auto"
+            priority={false}
+          />
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-8 border-t border-slate-100 pt-5 text-center">
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Built &amp; developed by</p>
@@ -79,10 +97,31 @@ export function DeveloperCredit() {
   );
 }
 
-export function ManagedByCredit() {
+export function ManagedByCredit({ compact = false }: { compact?: boolean } = {}) {
+  if (compact) {
+    return (
+      <p className="text-[10px] text-slate-400">
+        Managed by <span className="font-medium text-slate-500">Hanisha Exim</span>
+      </p>
+    );
+  }
+
   return (
     <p className="text-center text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
       Managed by <span className="font-semibold tracking-[0.2em] text-slate-600">HANISHA EXIM</span>
     </p>
+  );
+}
+
+/** Compact credits for auth page footers (outside the card). */
+export function AuthFooterCredits() {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+      <DeveloperCredit compact />
+      <span className="hidden text-slate-300 sm:inline" aria-hidden>
+        ·
+      </span>
+      <ManagedByCredit compact />
+    </div>
   );
 }

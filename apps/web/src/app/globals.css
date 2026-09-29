@@ -660,3 +660,193 @@ html {
 .consult-rail::-webkit-scrollbar-thumb:hover {
   background: #616161;
 }
+
+/* -- Public marketing landing -- */
+.landing {
+  font-family: var(--font-landing-body), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  background: #eaf6f3;
+}
+
+.landing-brand {
+  font-family: var(--font-landing-display), Georgia, "Times New Roman", serif;
+}
+
+.landing-hero-bg {
+  background:
+    radial-gradient(ellipse 75% 55% at 78% 18%, rgb(255 214 196 / 0.45), transparent 52%),
+    radial-gradient(ellipse 65% 50% at 12% 78%, rgb(140 210 200 / 0.45), transparent 48%),
+    linear-gradient(155deg, #d8f0eb 0%, #b8ddd8 38%, #7eb8b0 72%, #4a8f88 100%);
+}
+
+.landing-hero-mesh {
+  background-image:
+    linear-gradient(rgb(12 47 44 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(12 47 44 / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black 40%, transparent 95%);
+  animation: landing-mesh 28s linear infinite;
+}
+
+.landing-section {
+  background: #f4fbf9;
+}
+
+/* Solid CTAs — readable on the mint hero */
+.landing-cta {
+  background: #0a5858 !important;
+  color: #ffffff !important;
+  border: 1px solid #084646;
+  box-shadow: 0 8px 22px rgb(10 88 88 / 0.32);
+  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.landing-cta:hover {
+  background: #063f3f !important;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgb(10 88 88 / 0.38);
+}
+
+.landing-ghost {
+  border: 2px solid #0c2f2c !important;
+  background: #ffffff !important;
+  color: #0c2f2c !important;
+  box-shadow: 0 6px 16px rgb(12 47 44 / 0.12);
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.landing-ghost:hover {
+  background: #f3fffc !important;
+  transform: translateY(-1px);
+}
+
+.landing-link-btn {
+  border: 2px solid rgb(12 47 44 / 0.35);
+  background: rgb(255 255 255 / 0.72);
+  color: #0c2f2c;
+  box-shadow: 0 4px 12px rgb(12 47 44 / 0.08);
+}
+
+.landing-link-btn:hover {
+  background: #ffffff;
+  border-color: #0c2f2c;
+}
+
+.landing-feature-icon {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: #d7efe9;
+  color: #0a5858;
+}
+
+.auth-doodle-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  overflow: hidden;
+  /* Soft landing wash — not bleached */
+  background:
+    radial-gradient(ellipse 55% 40% at 88% 8%, rgb(255 214 196 / 0.22), transparent 55%),
+    radial-gradient(ellipse 50% 38% at 8% 92%, rgb(110 180 170 / 0.2), transparent 52%),
+    linear-gradient(160deg, #f3faf8 0%, #e4f2ef 55%, #d5eae5 100%);
+}
+
+.auth-doodle-page::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgb(12 47 44 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(12 47 44 / 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black, transparent);
+}
+
+.auth-doodle-page .auth-doodle-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.55;
+}
+
+.auth-doodle-page > *:not(.auth-doodle-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-doodle-page .auth-card {
+  border-color: rgb(12 47 44 / 0.12);
+  background: rgb(255 255 255 / 0.94);
+  box-shadow:
+    0 1px 2px rgb(12 47 44 / 0.04),
+    0 12px 32px rgb(12 47 44 / 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.landing-fade {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: landing-rise 700ms ease forwards;
+}
+
+.landing-delay-1 { animation-delay: 80ms; }
+.landing-delay-2 { animation-delay: 180ms; }
+.landing-delay-3 { animation-delay: 280ms; }
+.landing-delay-4 { animation-delay: 380ms; }
+
+@keyframes landing-rise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-mesh {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 48px 48px, 48px 48px; }
+}
+
+.landing-doodle-float {
+  animation: landing-float 6s ease-in-out infinite;
+}
+
+.landing-doodle-float-slow {
+  animation: landing-float 8s ease-in-out infinite reverse;
+}
+
+.landing-doodle-pulse {
+  animation: landing-pulse-line 3.2s ease-in-out infinite;
+}
+
+@keyframes landing-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-8px) rotate(2deg); }
+}
+
+@keyframes landing-pulse-line {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-fade,
+  .landing-hero-mesh,
+  .landing-doodle-float,
+  .landing-doodle-float-slow,
+  .landing-doodle-pulse {
+    animation: none;
+  }
+  .landing-fade {
+    opacity: 1;
+    transform: none;
+  }
+}

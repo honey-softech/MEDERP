@@ -84,6 +84,7 @@ export function DemoBookForm() {
       title="Book a MedERP demo"
       subtitle="Pick an open slot. Google Calendar will email you the invite and Meet link."
       wide
+      doodles
     >
       <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <div>

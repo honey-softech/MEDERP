@@ -487,6 +487,7 @@ export default function RegisterHospitalPage() {
   return (
     <AuthShell
       wide
+      doodles
       title="Register hospital"
       subtitle="A unique hospital code is assigned automatically. Fill the required fields to register. Sign in later with the super admin mobile. Your form draft is kept if you refresh."
     >

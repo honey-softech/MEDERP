@@ -11,7 +11,7 @@ export default async function DemoConfirmedPage({
   const booking = token ? await getBookingByToken(token) : null;
 
   return (
-    <AuthShell title="Demo booked" subtitle={booking ? booking.label : "We could not find that booking."}>
+    <AuthShell title="Demo booked" subtitle={booking ? booking.label : "We could not find that booking."} doodles>
       {booking ? (
         <div className="space-y-3 text-sm text-slate-700">
           <p>

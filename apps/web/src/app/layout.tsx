@@ -8,8 +8,10 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "MedERP — Hospital ERP",
-  description: "Hospital ERP for web and mobile: patients, appointments, billing, pharmacy, and lab.",
+  title: "MedERP — Clinic ERP",
+  description:
+    "Clinic ERP for Indian clinics: OPD queue, nurse vitals, doctor consult, billing, pharmacy, lab, WhatsApp, and mobile.",
+
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

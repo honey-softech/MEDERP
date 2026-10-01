@@ -55,7 +55,16 @@ export async function POST(request: Request) {
           },
         });
 
-    await issueOtp(user.id, user.mobile, "signup");
+    const otpResult = await issueOtp(user.id, user.mobile, "signup");
+    if (!otpResult.delivered) {
+      return NextResponse.json(
+        {
+          error: `Could not send OTP on WhatsApp. ${otpResult.error} Check WHATSAPP_OTP_TEMPLATE=reminder is approved, then try again.`,
+          mobile: user.mobile,
+        },
+        { status: 502 },
+      );
+    }
 
     await writeAuditLog({
       request,
@@ -74,7 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       mobile: user.mobile,
-      message: "Enter the OTP sent to your mobile to finish signup, then request to join a listed hospital.",
+      message: "Enter the OTP sent to your WhatsApp to finish signup, then request to join a listed hospital.",
     });
   } catch (error) {
     console.error("Signup failed", error);

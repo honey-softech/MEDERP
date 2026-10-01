@@ -6,11 +6,20 @@ import { renderTemplate } from "@/lib/messaging/templates";
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 
-/** Temporary stand-in until WhatsApp OTP is wired. Set OTP_DUMMY=0 to require a real issued code. */
+/** Local-dev only. On production with WhatsApp configured this is off unless OTP_DUMMY=1. */
 export const DUMMY_OTP = "123456";
 
+/**
+ * Dummy OTP (123456):
+ * - OTP_DUMMY=1 → always allow (forced test mode)
+ * - OTP_DUMMY=0 → never allow
+ * - unset → allow only when WhatsApp / AskEva is NOT configured (local console mode)
+ */
 export function dummyOtpEnabled() {
-  return process.env.OTP_DUMMY !== "0";
+  const flag = (process.env.OTP_DUMMY ?? "").trim();
+  if (flag === "1") return true;
+  if (flag === "0") return false;
+  return messagingProvider() !== "whatsapp";
 }
 
 export function hashOtp(otp: string) {
@@ -18,8 +27,6 @@ export function hashOtp(otp: string) {
 }
 
 export function generateOtp() {
-  // Keep 123456 only when WhatsApp is not configured. Once it is on, send a real code
-  // so the WhatsApp message is useful; dummy verify still accepts 123456 until OTP_DUMMY=0.
   if (dummyOtpEnabled() && messagingProvider() !== "whatsapp") return DUMMY_OTP;
   return String(randomInt(100_000, 1_000_000));
 }
@@ -60,8 +67,15 @@ export async function issueOtp(userId: string, mobile: string, purpose: string) 
     where: { id: userId },
     select: { hospitalId: true },
   });
-  await deliverOtp(mobile, otp, purpose, user?.hospitalId);
-  return { expiresAt };
+  const delivery = await deliverOtp(mobile, otp, purpose, user?.hospitalId);
+  if (!delivery.ok && messagingProvider() === "whatsapp") {
+    return {
+      expiresAt,
+      delivered: false as const,
+      error: delivery.error || "Could not send OTP on WhatsApp.",
+    };
+  }
+  return { expiresAt, delivered: true as const };
 }
 
 function safeEqualHex(a: string, b: string) {
@@ -90,7 +104,7 @@ async function clearOtp(userId: string) {
   });
 }
 
-/** Verifies OTP. On success clears it (single-use). Dummy 123456 is accepted until WhatsApp OTP is live. */
+/** Verifies OTP. On success clears it (single-use). Dummy 123456 only when dummyOtpEnabled(). */
 export async function verifyAndConsumeOtp(
   user: { id: string; otpCode: string | null; otpExpiresAt: Date | null; otpAttempts: number },
   otp: string,

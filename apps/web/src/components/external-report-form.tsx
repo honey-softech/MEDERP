@@ -21,11 +21,13 @@ export function ExternalReportForm({
   const [pending, setPending] = useState(false);
   const idleLabel = label ?? (fileName ? "Replace" : "Attach report");
 
-  async function upload(file: File) {
+  async function upload(files: FileList | File[]) {
+    const list = Array.from(files).filter((file) => file.size > 0);
+    if (list.length === 0) return;
     setError("");
     setPending(true);
     const form = new FormData();
-    form.set("file", file);
+    for (const file of list) form.append("files", file);
     const response = await fetch(`/api/lab/orders/${orderId}/report`, { method: "POST", body: form });
     const data = await response.json().catch(() => ({}));
     setPending(false);
@@ -33,7 +35,7 @@ export function ExternalReportForm({
       setError(data.error ?? "Could not attach the report.");
       return;
     }
-    setFileName(data.order?.reportFileName ?? file.name);
+    setFileName(data.order?.reportFileName ?? (list.length > 1 ? "lab-report.pdf" : list[0]!.name));
     router.refresh();
   }
 
@@ -50,14 +52,18 @@ export function ExternalReportForm({
           className="sr-only"
           type="file"
           accept="application/pdf,image/jpeg,image/png,image/webp"
+          multiple
           disabled={locked || pending}
           onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void upload(file);
+            const files = event.target.files;
+            if (files?.length) void upload(files);
             event.target.value = "";
           }}
         />
       </label>
+      <p className="mt-1 text-[10px] text-text-secondary">
+        Select multiple page images or PDFs — they are combined into one report.
+      </p>
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
     </div>
   );

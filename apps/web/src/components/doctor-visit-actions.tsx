@@ -11,6 +11,7 @@ export function DoctorVisitActions({
   status,
   summaryApproved = false,
   patientPhone,
+  summaryAlreadySent = false,
   assessmentHref,
   summaryHref,
   assessmentLabel,
@@ -20,6 +21,7 @@ export function DoctorVisitActions({
   status: string;
   summaryApproved?: boolean;
   patientPhone?: string | null;
+  summaryAlreadySent?: boolean;
   assessmentHref?: string;
   summaryHref?: string;
   assessmentLabel?: string;
@@ -62,6 +64,7 @@ export function DoctorVisitActions({
       patientPhone={patientPhone}
       compact
       label="Send on WhatsApp"
+      alreadySent={summaryAlreadySent}
     />
   ) : null;
 

@@ -49,6 +49,8 @@ export function AppointmentForm({
   >([]);
   const [walkInConfigured, setWalkInConfigured] = useState(false);
   const [walkInWindowStart, setWalkInWindowStart] = useState("");
+  const [visitType, setVisitType] = useState<"NEW" | "FOLLOW_UP" | "EMERGENCY">("NEW");
+  const [carryPriorVitals, setCarryPriorVitals] = useState(true);
   const walkInDefault = defaultQueueType === "WALK_IN";
   const isWalkIn = queueType === "WALK_IN";
   const todayIso = useMemo(() => {
@@ -219,9 +221,11 @@ export function AppointmentForm({
       body: JSON.stringify({
         ...payload,
         queueType,
+        visitType,
         scheduledAt: isWalkIn ? `${todayIso}T00:00` : scheduledAt || payload.scheduledAt,
         walkInWindowStartMinute: isWalkIn && walkInWindowStart ? Number(walkInWindowStart) : undefined,
         checkInNow: payload.checkInNow === "on" || queueType === "WALK_IN",
+        carryPriorVitals: visitType === "FOLLOW_UP" && carryPriorVitals,
       }),
     });
     const data = await response.json();
@@ -438,12 +442,37 @@ export function AppointmentForm({
       )}
       <label className="text-sm font-medium text-slate-700">
         Visit type
-        <select className={fieldClass} name="visitType" defaultValue="NEW">
+        <select
+          className={fieldClass}
+          name="visitType"
+          value={visitType}
+          onChange={(event) => {
+            const next = event.target.value;
+            setVisitType(next === "FOLLOW_UP" || next === "EMERGENCY" ? next : "NEW");
+          }}
+        >
           <option value="NEW">New</option>
           <option value="FOLLOW_UP">Follow-up</option>
           <option value="EMERGENCY">Emergency</option>
         </select>
       </label>
+      {visitType === "FOLLOW_UP" ? (
+        <label className="md:col-span-2 flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-2.5 text-sm font-medium text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={carryPriorVitals}
+            onChange={(event) => setCarryPriorVitals(event.target.checked)}
+          />
+          <span>
+            Bring previous vitals and show last assessment sheet
+            <span className="mt-0.5 block text-xs font-normal text-slate-500">
+              Copies the latest recorded vitals onto this visit so the doctor can review them, and links the prior
+              assessment sheet on the visit screen.
+            </span>
+          </span>
+        </label>
+      ) : null}
       <label className="text-sm font-medium text-slate-700">
         Referral
         <select className={fieldClass} name="referralSource" defaultValue="SELF">

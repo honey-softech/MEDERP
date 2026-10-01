@@ -61,26 +61,81 @@ export function matchesBrand(manufacturer: string | null, brands: ReadonlySet<st
 
 type RankableDrug = {
   name: string;
+  salt?: string | null;
   manufacturer: string | null;
   medicineCount?: number;
 };
 
+function normalizeQuery(query: string) {
+  return query.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Strip strength / form suffixes so "Paracetamol 650mg" compares as "paracetamol". */
+export function saltBase(saltPart: string) {
+  return saltPart
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\d+([./]\d+)?\s*(mg|mcg|g|ml|%|iu|units?)?\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function isCombinationSalt(salt: string | null | undefined) {
+  if (!salt) return false;
+  return /\+|\/|,|\band\b/i.test(salt);
+}
+
+/**
+ * Lower is better.
+ * 0 = sole composition is exactly the query (Paracetamol)
+ * 1 = sole composition starts with / is the query base
+ * 2 = brand name starts with the query
+ * 3 = primary salt (before +) is the query; may still be a combo with query first
+ * 4 = name contains query as a word
+ * 5 = salt contains query but is a combo (Aceclofenac + Paracetamol) — keep at bottom
+ * 9 = weak / other match
+ */
+export function compositionMatchRank(drug: RankableDrug, query: string) {
+  const q = normalizeQuery(query);
+  if (q.length < 2) return 9;
+
+  const name = drug.name.toLowerCase().replace(/\s+/g, " ").trim();
+  const salt = (drug.salt ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const combo = isCombinationSalt(salt);
+  const soleBase = saltBase(salt);
+  const primary = saltBase(salt.split(/\s*[+/]\s*|\s*,\s*|\s+and\s+/i)[0] ?? salt);
+
+  if (salt && !combo && (salt === q || soleBase === q)) return 0;
+  if (salt && !combo && (salt.startsWith(q) || soleBase.startsWith(q) || soleBase.split(" ").includes(q))) return 1;
+  if (name.startsWith(q)) return 2;
+  if (primary === q || primary.startsWith(q)) return combo ? 3 : 1;
+
+  const nameWords = name.split(/[^a-z0-9]+/).filter(Boolean);
+  if (nameWords.some((word) => word === q || word.startsWith(q))) return 4;
+
+  if (salt.includes(q) && combo) return 5;
+  if (salt.includes(q) || name.includes(q)) return 6;
+  return 9;
+}
+
 function compareSuggestions(query: string) {
-  const q = query.trim().toLowerCase();
+  const q = normalizeQuery(query);
   return (a: RankableDrug, b: RankableDrug) => {
-    const byCount = (b.medicineCount ?? 0) - (a.medicineCount ?? 0);
-    if (byCount !== 0) return byCount;
+    const byComposition = compositionMatchRank(a, q) - compositionMatchRank(b, q);
+    if (byComposition !== 0) return byComposition;
     const aPrefix = a.name.toLowerCase().startsWith(q) ? 0 : 1;
     const bPrefix = b.name.toLowerCase().startsWith(q) ? 0 : 1;
     if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+    const byCount = (b.medicineCount ?? 0) - (a.medicineCount ?? 0);
+    if (byCount !== 0) return byCount;
     return a.name.localeCompare(b.name);
   };
 }
 
 /**
- * Admin-selected brands first. Other brands follow, largest catalogs first.
- * When both groups match, a few other-brand rows stay at the bottom of the list.
- * When the selected brands have no match, the list is filled from other brands.
+ * Admin-selected brands first. Other brands follow.
+ * Within each group: sole composition / name match first, combinations last, then popularity.
  */
 export function rankDrugSuggestions<T extends RankableDrug>(
   items: T[],

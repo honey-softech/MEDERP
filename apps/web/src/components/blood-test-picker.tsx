@@ -28,6 +28,22 @@ const TABS: { id: TabId; label: string }[] = [
 
 const USG_PARTS = ["Abdomen", "Pelvis", "KUB", "Obstetric", "Thyroid", "Breast", "Scrotum", "Soft tissue"];
 
+const FOLLOW_UP_QUICK = [
+  { label: "3d", days: 3 },
+  { label: "7d", days: 7 },
+  { label: "14d", days: 14 },
+];
+
+function addDaysIso(days: number) {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function pickKey(testId: string, siteLabel?: string | null) {
   return `${testId}::${String(siteLabel ?? "").trim()}`;
 }
@@ -46,6 +62,8 @@ export function BloodTestPicker({
   priorOrderCount = 0,
   printHref = "",
   variant = "card",
+  followUpAt = "",
+  onFollowUpAtChange,
 }: {
   selectedIds?: string[];
   selectedInvestigations?: InvestigationPick[];
@@ -59,12 +77,15 @@ export function BloodTestPicker({
   printHref?: string;
   /** toolbar = header action button before Start consult */
   variant?: "card" | "toolbar";
+  followUpAt?: string;
+  onFollowUpAtChange?: (date: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("blood");
   const [tests, setTests] = useState<LabTestOption[]>([]);
   const [search, setSearch] = useState("");
   const [customPart, setCustomPart] = useState("");
+  const [draftFollowUpAt, setDraftFollowUpAt] = useState(followUpAt);
   const initialPicks = selectedInvestigations ?? (selectedIds ?? []).map((testId) => ({ testId }));
   const [draft, setDraft] = useState<InvestigationPick[]>(initialPicks);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
@@ -74,10 +95,28 @@ export function BloodTestPicker({
   }, [selectedIds, selectedInvestigations]);
 
   useEffect(() => {
+    setDraftFollowUpAt(followUpAt);
+  }, [followUpAt]);
+
+  useEffect(() => {
     void fetch("/api/lab/tests")
       .then((response) => response.json())
       .then((data) => setTests(Array.isArray(data.tests) ? data.tests : []));
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const byCode = useMemo(() => new Map(tests.map((test) => [test.code, test])), [tests]);
   const bloodTests = useMemo(() => tests.filter((test) => test.kind !== "SCAN"), [tests]);
@@ -149,33 +188,47 @@ export function BloodTestPicker({
     return index === 0;
   }
 
+  function confirmSelection() {
+    emit(draft);
+    if (onFollowUpAtChange && draft.length > 0) {
+      const nextDate = draftFollowUpAt || followUpAt || addDaysIso(7);
+      setDraftFollowUpAt(nextDate);
+      onFollowUpAtChange(nextDate);
+    }
+    setOpen(false);
+  }
+
   const activeModality = SCAN_MODALITIES.find((row) => row.tab === tab);
   const activeScanTest = activeModality ? byCode.get(activeModality.code) : undefined;
   const usgTest = byCode.get("USG");
+  const showFollowUp = Boolean(onFollowUpAtChange);
 
   const modal = open ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-text-primary/40" onClick={() => setOpen(false)}>
-          <div className="flex min-h-full items-start justify-center p-4 sm:p-8">
-            <div
-              className="relative my-4 w-full max-w-4xl rounded-xl border border-border bg-surface p-4 shadow-card sm:p-6"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-text-primary/40 p-0 sm:items-center sm:p-4">
+          <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={() => setOpen(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tests-picker-title"
+            className="relative z-[1] flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-xl border border-border bg-surface shadow-card sm:rounded-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+              <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
                 <div>
-                  <h3 className="text-lg font-semibold text-text-primary">Select tests and scans</h3>
-                  <p className="mt-1 text-sm text-text-secondary">{draft.length} selected</p>
+                  <h3 id="tests-picker-title" className="text-lg font-semibold text-text-primary">Select tests and scans</h3>
+                  <p className="mt-0.5 text-sm text-text-secondary">{draft.length} selected</p>
                 </div>
                 <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>
                   Close
                 </button>
               </div>
 
-              <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-app-bg p-1">
+              <div className="flex shrink-0 flex-wrap gap-1 overflow-x-auto bg-app-bg px-3 py-2 sm:px-5">
                 {TABS.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                    className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
                       tab === item.id ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"
                     }`}
                     onClick={() => {
@@ -189,6 +242,7 @@ export function BloodTestPicker({
                 ))}
               </div>
 
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
               {tab === "blood" ? (
                 <>
                   <input
@@ -197,7 +251,7 @@ export function BloodTestPicker({
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search CBC, thyroid, dengue…"
                   />
-                  <div className="mt-4 max-h-[min(28rem,60dvh)] space-y-3 overflow-y-auto pr-1">
+                  <div className="mt-3 space-y-3 pr-1">
                     {groupedBlood.map(([category, items], index) => {
                       const catOpen = isCategoryOpen(category, index);
                       return (
@@ -254,7 +308,7 @@ export function BloodTestPicker({
                   </div>
                 </>
               ) : tab === "other" ? (
-                <div className="max-h-[min(28rem,60dvh)] space-y-4 overflow-y-auto pr-1">
+                <div className="space-y-4 pr-1">
                   {usgTest ? (
                     <ScanPartGrid
                       title="Ultrasound — which area?"
@@ -310,28 +364,60 @@ export function BloodTestPicker({
               ) : (
                 <p className="text-sm text-text-secondary">This scan type is not available yet.</p>
               )}
+              </div>
 
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  className={secondaryButtonClass}
-                  type="button"
-                  onClick={() => setDraft(selectedInvestigations ?? (selectedIds ?? []).map((testId) => ({ testId })))}
-                >
-                  Reset
-                </button>
-                <button
-                  className={primaryButtonClass}
-                  type="button"
-                  onClick={() => {
-                    emit(draft);
-                    setOpen(false);
-                  }}
-                >
-                  Add selected
-                </button>
+              <div className="shrink-0 space-y-3 border-t border-border bg-surface px-4 py-3 sm:px-5">
+                {showFollowUp && draft.length > 0 ? (
+                  <div className="rounded-lg border border-border bg-app-bg/70 px-3 py-2.5">
+                    <p className="text-xs font-semibold text-text-primary">Follow-up to review results</p>
+                    <p className="mt-0.5 text-[11px] text-text-secondary">
+                      When the patient returns, reception can add them to the queue with prior vitals and the last
+                      assessment sheet for the doctor.
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-end gap-2">
+                      <label className="min-w-[9rem] flex-1 text-[11px] font-medium text-text-secondary">
+                        Follow-up date
+                        <input
+                          className={`${fieldClass} mt-1`}
+                          type="date"
+                          value={draftFollowUpAt}
+                          onChange={(event) => setDraftFollowUpAt(event.target.value)}
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-1 pb-0.5">
+                        {FOLLOW_UP_QUICK.map((item) => (
+                          <button
+                            key={item.label}
+                            type="button"
+                            className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] text-text-secondary hover:bg-app-bg"
+                            onClick={() => setDraftFollowUpAt(addDaysIso(item.days))}
+                          >
+                            +{item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                <div className="flex justify-end gap-2">
+                  <button
+                    className={secondaryButtonClass}
+                    type="button"
+                    onClick={() => {
+                      emit([]);
+                      setDraftFollowUpAt(followUpAt);
+                      setSearch("");
+                      setCustomPart("");
+                    }}
+                  >
+                    Reset
+                  </button>
+                  <button className={primaryButtonClass} type="button" onClick={confirmSelection}>
+                    Add selected
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
         </div>
       ) : null;
 
@@ -423,7 +509,7 @@ function ScanPartGrid({
   onAddCustom: () => void;
 }) {
   return (
-    <div className="max-h-[min(28rem,60dvh)] space-y-3 overflow-y-auto pr-1">
+    <div className="space-y-3 pr-1">
       <div>
         <h4 className="font-semibold text-text-primary">{title}</h4>
         <p className="mt-1 text-sm text-text-secondary">

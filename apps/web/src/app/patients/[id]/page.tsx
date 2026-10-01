@@ -13,6 +13,7 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
 import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageLabel, hasFrontDeskAccess, hasRoleAccess, inr, patientName, prettyEnum } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 
 function display(value: string | null | undefined) {
@@ -96,7 +97,10 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
   const canEdit = hasFrontDeskAccess(user) && !patient.mergedIntoId;
   const canWalkIn = canAddWalkIn(user) && !patient.mergedIntoId;
-  const canAdmit = hasRoleAccess(user, WARD_ADMIT_ROLES) && !patient.mergedIntoId;
+  const canAdmit =
+    hospitalHasWardsModule(user.hospital) &&
+    hasRoleAccess(user, WARD_ADMIT_ROLES) &&
+    !patient.mergedIntoId;
   const activeStay = patient.admissions[0];
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
   const canIssueCertificate = DOCTOR_VISIT_ROLES.includes(user.role) && !patient.mergedIntoId;
@@ -107,6 +111,48 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         visit.labOrders.filter((order) => order.status === "RESULTED" && order.reportFileName),
       )
     : [];
+  const visitIds = patient.appointments.map((row) => row.id);
+  const issuedCertNos = patient.medicalCertificates
+    .filter((row) => row.status === "ISSUED")
+    .map((row) => row.certificateNo);
+  const [summarySentRows, certificateSentRows] = await Promise.all([
+    visitIds.length > 0
+      ? prisma.outboundMessage.findMany({
+          where: {
+            hospitalId: user.hospitalId,
+            appointmentId: { in: visitIds },
+            templateKey: "visit_summary",
+            status: "SENT",
+          },
+          select: { appointmentId: true },
+        })
+      : Promise.resolve([] as { appointmentId: string | null }[]),
+    issuedCertNos.length > 0
+      ? prisma.outboundMessage.findMany({
+          where: {
+            hospitalId: user.hospitalId,
+            patientId: patient.id,
+            templateKey: "medical_certificate",
+            status: "SENT",
+            OR: issuedCertNos.map((certificateNo) => ({
+              variables: { path: ["certificateNo"], equals: certificateNo },
+            })),
+          },
+          select: { variables: true },
+        })
+      : Promise.resolve([] as { variables: unknown }[]),
+  ]);
+  const summarySentIds = new Set(
+    summarySentRows.map((row) => row.appointmentId).filter((id): id is string => Boolean(id)),
+  );
+  const certificateSentNos = new Set(
+    certificateSentRows
+      .map((row) => {
+        const vars = row.variables as { certificateNo?: string } | null;
+        return vars?.certificateNo;
+      })
+      .filter((value): value is string => Boolean(value)),
+  );
 
   return (
     <AppShell title={patientName(patient)}>
@@ -228,6 +274,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         canPrintSummary={canPrintSummary}
         canViewLabReports={canViewLabReports}
         patientPhone={patient.phone}
+        summarySentIds={summarySentIds}
       />
 
       {canViewCertificates ? (
@@ -262,6 +309,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                       patientPhone={patient.phone}
                       compact
                       label="Send on WhatsApp"
+                      alreadySent={certificateSentNos.has(row.certificateNo)}
                     />
                   ) : null}
                 </li>

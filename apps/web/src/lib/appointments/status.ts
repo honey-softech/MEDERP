@@ -1,5 +1,5 @@
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { DOCTOR_VISIT_ROLES, hasFrontDeskAccess } from "@/lib/authz/hospital";
+import { canCheckoutVisit, DOCTOR_VISIT_ROLES, hasFrontDeskAccess } from "@/lib/authz/hospital";
 import { doctorName, patientName, tokenLabel } from "@/lib/display";
 import { nextToken } from "@/lib/ids";
 import { notifyNursesOfConsult } from "@/lib/notifications";
@@ -145,7 +145,8 @@ export async function closeAppointment(
   const { user, appointment } = ctx;
   const isFrontDesk = hasFrontDeskAccess(user);
   const isDoctorVisit = DOCTOR_VISIT_ROLES.includes(user.role);
-  if (action === "checkout" && !isFrontDesk && !isDoctorVisit) return noAccess();
+  const canCheckout = canCheckoutVisit(user);
+  if (action === "checkout" && !canCheckout && !isDoctorVisit) return noAccess();
   if (action === "complete" && !isDoctorVisit && !isFrontDesk) return noAccess();
   if (isDoctorVisit && user.role === "DOCTOR") {
     const owned = await doctorOwnsVisit(ctx);

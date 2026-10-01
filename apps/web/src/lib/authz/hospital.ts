@@ -51,6 +51,11 @@ export function hasFrontDeskAccess(user: { role: AppRole; hospital?: HospitalRol
   return hasRoleAccess(user, FRONT_DESK_ROLES);
 }
 
+/** Nurse or front desk can check a patient out after the doctor consult. */
+export function canCheckoutVisit(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
+  return user.role === "NURSE" || hasFrontDeskAccess(user);
+}
+
 export function hasBillingAccess(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
   return hasRoleAccess(user, BILLING_ROLES);
 }

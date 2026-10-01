@@ -30,6 +30,7 @@ export function LabOrderPanel({
   canPrint = false,
   appointmentId = "",
   patientPhone = null,
+  investigationsAlreadySent = false,
 }: {
   orders: LabOrder[];
   canCollect?: boolean;
@@ -39,6 +40,7 @@ export function LabOrderPanel({
   canPrint?: boolean;
   appointmentId?: string;
   patientPhone?: string | null;
+  investigationsAlreadySent?: boolean;
 }) {
   if (orders.length === 0) return null;
 
@@ -53,6 +55,7 @@ export function LabOrderPanel({
               patientPhone={patientPhone}
               compact
               label="Send on WhatsApp"
+              alreadySent={investigationsAlreadySent}
             />
             <Link href={`/appointments/${appointmentId}/investigations`} className={compactButtonClass}>
               Print
@@ -61,15 +64,15 @@ export function LabOrderPanel({
         ) : null}
       </div>
       <p className="mt-1 text-[11px] text-text-secondary">
-        Outside centre or hand-carried reports can be uploaded by doctor, nurse, or receptionist. After a report
-        arrives, the doctor can order more tests below.
+        Outside centre or hand-carried reports can be uploaded by doctor, nurse, or receptionist. Select multiple page
+        images or PDFs and they are combined into one file. After a report arrives, the doctor can order more tests
+        below.
       </p>
       <div className="mt-2 space-y-2">
         {orders.map((order) => {
           const external = order.fulfillment === "EXTERNAL";
           const reportReady = order.status === "RESULTED" && order.reportFileName;
-          const canUpload =
-            canAttachExternal && order.status !== "CANCELLED" && order.status !== "RESULTED";
+          const canUpload = canAttachExternal && order.status !== "CANCELLED";
           return (
             <article key={order.id} className="rounded-lg border border-border/80 px-2.5 py-2">
               <div className="flex flex-wrap items-center justify-between gap-1.5">

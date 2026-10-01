@@ -14,6 +14,7 @@ export type PastVisitItem = {
   diagnosis: string;
   chiefComplaint: string;
   summaryApproved: boolean;
+  summaryAlreadySent?: boolean;
   reports: { id: string; fileName: string }[];
 };
 
@@ -118,6 +119,7 @@ export function VisitHistorySheet({
                                 patientPhone={patientPhone}
                                 compact
                                 label="Send on WhatsApp"
+                                alreadySent={Boolean(visit.summaryAlreadySent)}
                               />
                               <Link href={`/appointments/${visit.id}/summary`} className={compactPrimaryButtonClass}>
                                 Summary

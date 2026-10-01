@@ -23,16 +23,56 @@ describe("drug catalog local search", () => {
   it("ranks name prefixes ahead of other matches, then alphabetically", () => {
     const ranked = rankDrugSuggestions(
       [
-        { name: "Calpol 500", manufacturer: null },
-        { name: "Paracip", manufacturer: null },
-        { name: "Dolo 650", manufacturer: null },
-        { name: "Para 500", manufacturer: null },
+        { name: "Calpol 500", manufacturer: null, salt: "Paracetamol" },
+        { name: "Paracip", manufacturer: null, salt: "Paracetamol" },
+        { name: "Dolo 650", manufacturer: null, salt: "Paracetamol" },
+        { name: "Para 500", manufacturer: null, salt: "Paracetamol" },
       ],
       "para",
       [],
       3,
     );
     expect(ranked.map((row) => row.name)).toEqual(["Para 500", "Paracip", "Calpol 500"]);
+  });
+
+  it("puts sole Paracetamol compositions before Aceclofenac + Paracetamol combos", () => {
+    const ranked = rankDrugSuggestions(
+      [
+        {
+          name: "Hifenac-P",
+          manufacturer: "Intas",
+          salt: "Aceclofenac + Paracetamol",
+          medicineCount: 9000,
+        },
+        {
+          name: "Crocin Advance",
+          manufacturer: "GSK",
+          salt: "Paracetamol",
+          medicineCount: 100,
+        },
+        {
+          name: "Zerodol-P",
+          manufacturer: "Ipca",
+          salt: "Aceclofenac + Paracetamol",
+          medicineCount: 8000,
+        },
+        {
+          name: "Paracetamol 500",
+          manufacturer: "Generic",
+          salt: "Paracetamol",
+          medicineCount: 50,
+        },
+      ],
+      "paracetamol",
+      [],
+      4,
+    );
+    expect(ranked.map((row) => row.name)).toEqual([
+      "Paracetamol 500",
+      "Crocin Advance",
+      "Hifenac-P",
+      "Zerodol-P",
+    ]);
   });
 
   it("puts admin brands first, then the largest other catalogs, and still shows other brands", () => {
@@ -47,7 +87,7 @@ describe("drug catalog local search", () => {
       ["Cipla"],
       3,
     );
-    expect(ranked.map((row) => row.name)).toEqual(["Azee", "Azithro", "Azibact"]);
+    expect(ranked.map((row) => row.name)).toEqual(["Azithro", "Azee", "Azibact"]);
   });
 
   it("fills the list from other brands when the selected manufacturer has no match", () => {

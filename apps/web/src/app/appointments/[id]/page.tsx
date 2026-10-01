@@ -25,6 +25,7 @@ import {
   canNurseRecordVitals,
   dayRange,
   doctorName,
+  canCheckoutVisit,
   hasBillingAccess,
   hasFrontDeskAccess,
   hasRoleAccess,
@@ -37,6 +38,7 @@ import { siteFromSnapshot } from "@/lib/lab-catalog";
 import { investigationsEditable } from "@/lib/lab";
 import { isConsultationPaid } from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
+import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { toVitalsValues } from "@/lib/vitals";
 import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
@@ -87,7 +89,7 @@ export default async function AppointmentDetailPage({
   if (!canView) notFound();
 
   const { start, end } = dayRange(appointment.scheduledAt);
-  const [activeStay, pastVisitRows, dayQueue, summarySentRow] = await Promise.all([
+  const [activeStay, pastVisitRows, dayQueue, summarySentRow, investigationsSentRow] = await Promise.all([
     prisma.admission.findFirst({
       where: {
         hospitalId: user.hospitalId,
@@ -116,6 +118,7 @@ export default async function AppointmentDetailPage({
             status: true,
           },
         },
+        vitals: true,
         labOrders: {
           where: { status: "RESULTED", reportFileName: { not: null } },
           select: { id: true, reportFileName: true },
@@ -141,8 +144,38 @@ export default async function AppointmentDetailPage({
       },
       select: { id: true },
     }),
+    prisma.outboundMessage.findFirst({
+      where: {
+        hospitalId: user.hospitalId,
+        appointmentId: appointment.id,
+        templateKey: "investigation_list",
+        status: "SENT",
+      },
+      select: { id: true },
+    }),
   ]);
   const summaryAlreadySent = Boolean(summarySentRow);
+  const investigationsAlreadySent = Boolean(investigationsSentRow);
+  const reminderAlreadySent = appointment.reminders.some(
+    (row) => row.channel === "WHATSAPP" && (row.status === "SENT" || row.status === "PENDING"),
+  );
+
+  const pastVisitIds = pastVisitRows.map((row) => row.id);
+  const pastSummarySentRows =
+    pastVisitIds.length > 0
+      ? await prisma.outboundMessage.findMany({
+          where: {
+            hospitalId: user.hospitalId,
+            appointmentId: { in: pastVisitIds },
+            templateKey: "visit_summary",
+            status: "SENT",
+          },
+          select: { appointmentId: true },
+        })
+      : [];
+  const pastSummarySentIds = new Set(
+    pastSummarySentRows.map((row) => row.appointmentId).filter((id): id is string => Boolean(id)),
+  );
 
   const pastVisits: PastVisitItem[] = pastVisitRows.map((row) => ({
     id: row.id,
@@ -152,16 +185,20 @@ export default async function AppointmentDetailPage({
     diagnosis: row.assessment?.diagnosis ?? "",
     chiefComplaint: row.assessment?.chiefComplaint ?? "",
     summaryApproved: row.assessment?.status === "APPROVED",
+    summaryAlreadySent: pastSummarySentIds.has(row.id),
     reports: row.labOrders
       .filter((order) => order.reportFileName)
       .map((order) => ({ id: order.id, fileName: order.reportFileName as string })),
   }));
   const priorVisit = pastVisitRows[0]
     ? {
+        id: pastVisitRows[0].id,
         scheduledAtLabel: pastVisits[0].when,
         diagnosis: pastVisits[0].diagnosis,
         prescription: pastVisitRows[0].assessment?.prescription ?? "",
         chiefComplaint: pastVisits[0].chiefComplaint,
+        summaryApproved: pastVisits[0].summaryApproved,
+        vitals: pastVisitRows[0].vitals ? toVitalsValues(pastVisitRows[0].vitals) : null,
       }
     : null;
 
@@ -170,6 +207,9 @@ export default async function AppointmentDetailPage({
   const nextId = queueIndex >= 0 && queueIndex < dayQueue.length - 1 ? dayQueue[queueIndex + 1]?.id ?? null : null;
 
   const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
+  const canCheckout = canCheckoutVisit(user) && !actingAsDoctor;
+  const canAdmit =
+    hospitalHasWardsModule(user.hospital) && hasRoleAccess(user, WARD_ADMIT_ROLES);
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
   const canDoctorVisit = actingAsDoctor;
   const canAssess = actingAsDoctor;
@@ -321,7 +361,7 @@ export default async function AppointmentDetailPage({
               Certificate
             </Link>
           ) : null}
-          {hasRoleAccess(user, WARD_ADMIT_ROLES) && !activeStay ? (
+          {canAdmit && !activeStay ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -333,6 +373,15 @@ export default async function AppointmentDetailPage({
             <Link href={`/wards/stays/${activeStay.id}`} className={compactButtonClass}>
               IPD {activeStay.ipNumber}
             </Link>
+          ) : null}
+          {canCheckout && !canManage ? (
+            <AppointmentActions
+              id={appointment.id}
+              status={appointment.status}
+              summaryApproved={summaryApproved}
+              compact
+              checkoutOnly
+            />
           ) : null}
         </nav>
 
@@ -420,7 +469,7 @@ export default async function AppointmentDetailPage({
               Certificate
             </Link>
           ) : null}
-          {hasRoleAccess(user, WARD_ADMIT_ROLES) && !activeStay ? (
+          {canAdmit && !activeStay ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -432,6 +481,15 @@ export default async function AppointmentDetailPage({
             <Link href={`/wards/stays/${activeStay.id}`} className={compactButtonClass}>
               IPD {activeStay.ipNumber}
             </Link>
+          ) : null}
+          {canCheckout && !canManage ? (
+            <AppointmentActions
+              id={appointment.id}
+              status={appointment.status}
+              summaryApproved={summaryApproved}
+              compact
+              checkoutOnly
+            />
           ) : null}
         </div>
       </div>
@@ -506,6 +564,17 @@ export default async function AppointmentDetailPage({
           }}
           vitals={vitals}
           canEditHistory={canAssess || canManage}
+          priorVisit={
+            appointment.visitType === "FOLLOW_UP" && priorVisit
+              ? {
+                  id: priorVisit.id,
+                  scheduledAtLabel: priorVisit.scheduledAtLabel,
+                  summaryApproved: priorVisit.summaryApproved,
+                  vitals: priorVisit.vitals,
+                  diagnosis: priorVisit.diagnosis,
+                }
+              : null
+          }
         />
         {useCockpit && canViewLab ? (
           <LabOrderPanel
@@ -517,6 +586,7 @@ export default async function AppointmentDetailPage({
             canPrint={canPrintSummary}
             appointmentId={appointment.id}
             patientPhone={appointment.patient.phone}
+            investigationsAlreadySent={investigationsAlreadySent}
           />
         ) : null}
         </div>
@@ -573,7 +643,21 @@ export default async function AppointmentDetailPage({
                     Record payment
                   </Link>
                 ) : null}
-                <AppointmentActions id={appointment.id} status={appointment.status} summaryApproved={summaryApproved} />
+                <AppointmentActions
+                  id={appointment.id}
+                  status={appointment.status}
+                  summaryApproved={summaryApproved}
+                  reminderAlreadySent={reminderAlreadySent}
+                />
+              </div>
+            ) : canCheckout ? (
+              <div className="print:hidden">
+                <AppointmentActions
+                  id={appointment.id}
+                  status={appointment.status}
+                  summaryApproved={summaryApproved}
+                  checkoutOnly
+                />
               </div>
             ) : null}
           </ConsultAssessmentForm>
@@ -604,7 +688,21 @@ export default async function AppointmentDetailPage({
                     Record payment
                   </Link>
                 ) : null}
-                <AppointmentActions id={appointment.id} status={appointment.status} summaryApproved={summaryApproved} />
+                <AppointmentActions
+                  id={appointment.id}
+                  status={appointment.status}
+                  summaryApproved={summaryApproved}
+                  reminderAlreadySent={reminderAlreadySent}
+                />
+              </div>
+            ) : canCheckout ? (
+              <div className="print:hidden">
+                <AppointmentActions
+                  id={appointment.id}
+                  status={appointment.status}
+                  summaryApproved={summaryApproved}
+                  checkoutOnly
+                />
               </div>
             ) : null}
           </div>
@@ -641,6 +739,7 @@ export default async function AppointmentDetailPage({
               canPrint={canPrintSummary}
               appointmentId={appointment.id}
               patientPhone={appointment.patient.phone}
+              investigationsAlreadySent={investigationsAlreadySent}
             />
           ) : null}
 
@@ -651,7 +750,21 @@ export default async function AppointmentDetailPage({
                   Record payment
                 </Link>
               ) : null}
-              <AppointmentActions id={appointment.id} status={appointment.status} summaryApproved={summaryApproved} />
+              <AppointmentActions
+                id={appointment.id}
+                status={appointment.status}
+                summaryApproved={summaryApproved}
+                reminderAlreadySent={reminderAlreadySent}
+              />
+            </div>
+          ) : canCheckout ? (
+            <div className="print:hidden">
+              <AppointmentActions
+                id={appointment.id}
+                status={appointment.status}
+                summaryApproved={summaryApproved}
+                checkoutOnly
+              />
             </div>
           ) : null}
         </div>

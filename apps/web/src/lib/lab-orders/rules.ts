@@ -72,7 +72,7 @@ export function canUploadLabReport(input: {
   if (input.status === "CANCELLED") {
     return { ok: false, error: "This investigation was cancelled.", status: 409 };
   }
-  if (input.status === "RESULTED" && input.role !== "SUPER_ADMIN") {
+  if (input.status === "RESULTED" && !clinicalStaff && input.role !== "SUPER_ADMIN") {
     return { ok: false, error: "This order is already marked done.", status: 409 };
   }
 

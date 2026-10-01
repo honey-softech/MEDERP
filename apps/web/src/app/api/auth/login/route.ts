@@ -9,6 +9,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { issueOtp } from "@/lib/otp";
 import { loginSchema } from "@/lib/validation/auth";
 import { parseJsonBody } from "@/lib/validation/parse";
 
@@ -40,8 +41,24 @@ export async function POST(request: Request) {
   }
 
   if (!user.isVerified) {
+    const otpResult = await issueOtp(user.id, user.mobile, "signup");
+    if (!otpResult.delivered) {
+      return NextResponse.json(
+        {
+          error: otpResult.error || "Could not send OTP on WhatsApp.",
+          needsOtp: true,
+          mobile: user.mobile,
+        },
+        { status: 502 },
+      );
+    }
     return NextResponse.json(
-      { error: "Mobile is not verified yet.", needsOtp: true, mobile: user.mobile },
+      {
+        error: "Mobile is not verified yet. Enter the OTP sent on WhatsApp.",
+        needsOtp: true,
+        mobile: user.mobile,
+        cooldownSec: 60,
+      },
       { status: 403 },
     );
   }

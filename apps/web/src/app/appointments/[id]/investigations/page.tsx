@@ -11,6 +11,7 @@ import {
   requireHospitalPage,
   tokenLabel,
 } from "@/lib/front-desk";
+import { appointmentWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
 import { ageGenderLine } from "@/lib/visit-summary";
 
@@ -45,6 +46,11 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
   const signature = signed
     ? appointment.labOrders.find((order) => order.orderedBySignature)?.orderedBySignature
     : null;
+  const investigationsAlreadySent = await appointmentWhatsAppSent({
+    hospitalId: user.hospitalId,
+    appointmentId: appointment.id,
+    templateKey: "investigation_list",
+  });
 
   const items = appointment.labOrders.flatMap((order) =>
     order.items.map((item) => ({
@@ -74,6 +80,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
             endpoint={`/api/appointments/${appointment.id}/investigations/send`}
             patientPhone={appointment.patient.phone}
             label="Send on WhatsApp"
+            alreadySent={investigationsAlreadySent}
           />
           <PrintButton label="Print list" variant="primary" />
         </div>

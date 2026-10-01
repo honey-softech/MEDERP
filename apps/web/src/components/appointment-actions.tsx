@@ -1,23 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { secondaryButtonClass } from "@/components/auth-shell";
+
+const SENT_FLASH_MS = 1500;
 
 export function AppointmentActions({
   id,
   status,
   summaryApproved = false,
   compact = false,
+  reminderAlreadySent = false,
+  checkoutOnly = false,
 }: {
   id: string;
   status: string;
   summaryApproved?: boolean;
   compact?: boolean;
+  /** True when a WhatsApp reminder was already queued or delivered for this visit. */
+  reminderAlreadySent?: boolean;
+  /** Nurse checkout after consult — only the Check out control. */
+  checkoutOnly?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
+  const [reminderSentOnce, setReminderSentOnce] = useState(reminderAlreadySent);
+  const [reminderJustSent, setReminderJustSent] = useState(false);
+  const sentFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setReminderSentOnce(reminderAlreadySent);
+  }, [reminderAlreadySent]);
+
+  useEffect(() => {
+    return () => {
+      if (sentFlashTimer.current) clearTimeout(sentFlashTimer.current);
+    };
+  }, []);
 
   async function run(action: string, extra?: Record<string, unknown>) {
     setError("");
@@ -33,10 +54,45 @@ export function AppointmentActions({
       setError(data.error ?? "Action failed.");
       return;
     }
+    if (action === "remind") {
+      setReminderSentOnce(true);
+      setReminderJustSent(true);
+      if (sentFlashTimer.current) clearTimeout(sentFlashTimer.current);
+      sentFlashTimer.current = setTimeout(() => {
+        setReminderJustSent(false);
+        router.refresh();
+      }, SENT_FLASH_MS);
+      return;
+    }
     router.refresh();
   }
 
   const done = ["CANCELLED", "COMPLETED"].includes(status);
+  const canCheckout = (status === "CHECKED_IN" || status === "IN_PROGRESS") && !done;
+  const reminderLabel = pending === "remind"
+    ? "Sending…"
+    : reminderJustSent
+      ? "Sent"
+      : reminderSentOnce
+        ? "Resend"
+        : "Send reminder";
+
+  if (checkoutOnly) {
+    if (!canCheckout || !summaryApproved) return null;
+    return (
+      <div className={compact ? "flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2"}>
+        <button
+          className={secondaryButtonClass}
+          type="button"
+          disabled={Boolean(pending)}
+          onClick={() => void run("checkout")}
+        >
+          {pending === "checkout" ? "…" : "Check out"}
+        </button>
+        {error ? <p className="w-full text-xs text-red-600">{error}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className={compact ? "flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2"}>
@@ -45,7 +101,7 @@ export function AppointmentActions({
           {pending === "checkin" ? "…" : "Check in"}
         </button>
       ) : null}
-      {(status === "CHECKED_IN" || status === "IN_PROGRESS") && !summaryApproved ? (
+      {canCheckout ? (
         <button className={secondaryButtonClass} type="button" disabled={Boolean(pending)} onClick={() => void run("checkout")}>
           {pending === "checkout" ? "…" : "Check out"}
         </button>
@@ -63,10 +119,10 @@ export function AppointmentActions({
       <button
         className={secondaryButtonClass}
         type="button"
-        disabled={Boolean(pending)}
+        disabled={Boolean(pending) || reminderJustSent}
         onClick={() => void run("remind", { channels: ["WHATSAPP"] })}
       >
-        {pending === "remind" ? "…" : "Send reminder"}
+        {reminderLabel}
       </button>
       {!done ? (
         <button

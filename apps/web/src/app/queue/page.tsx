@@ -14,6 +14,7 @@ import {
   NURSE_VITALS_ROLES,
   PRINT_SUMMARY_ROLES,
   canAddWalkIn,
+  canCheckoutVisit,
   hasFrontDeskAccess,
   dayRange,
   doctorName,
@@ -85,6 +86,22 @@ export default async function QueuePage({
     listBookableDoctors(user.hospitalId),
   ]);
 
+  const summarySentRows =
+    queue.length > 0
+      ? await prisma.outboundMessage.findMany({
+          where: {
+            hospitalId: user.hospitalId,
+            appointmentId: { in: queue.map((row) => row.id) },
+            templateKey: "visit_summary",
+            status: "SENT",
+          },
+          select: { appointmentId: true },
+        })
+      : [];
+  const summarySentIds = new Set(
+    summarySentRows.map((row) => row.appointmentId).filter((id): id is string => Boolean(id)),
+  );
+
   const grouped = groupByDoctor(queue);
   const seen = new Set(grouped.map((group) => group.doctorId));
   const emptyDoctors =
@@ -102,6 +119,7 @@ export default async function QueuePage({
           }));
   const doctorQueues = isToday ? [...grouped, ...emptyDoctors] : grouped;
   const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
+  const canCheckout = canCheckoutVisit(user) && !actingAsDoctor;
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
   const canDoctorVisit = actingAsDoctor;
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
@@ -247,6 +265,7 @@ export default async function QueuePage({
                             status={row.status}
                             summaryApproved={row.assessment?.status === "APPROVED"}
                             patientPhone={row.patient.phone}
+                            summaryAlreadySent={summarySentIds.has(row.id)}
                             assessmentHref={`/appointments/${row.id}`}
                             assessmentLabel={
                               row.assessment?.status === "APPROVED" || row.status === "COMPLETED"
@@ -272,6 +291,7 @@ export default async function QueuePage({
                             patientPhone={row.patient.phone}
                             compact
                             label="Send on WhatsApp"
+                            alreadySent={summarySentIds.has(row.id)}
                           />
                           <Link href={`/appointments/${row.id}/summary`} className={compactButtonClass}>
                             Print record
@@ -290,6 +310,22 @@ export default async function QueuePage({
                             id={row.id}
                             status={row.status}
                             summaryApproved={row.assessment?.status === "APPROVED"}
+                          />
+                        </div>
+                      ) : null}
+
+                      {!canManage &&
+                      canCheckout &&
+                      isToday &&
+                      row.assessment?.status === "APPROVED" &&
+                      (row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") ? (
+                        <div className="mt-2.5">
+                          <AppointmentActions
+                            id={row.id}
+                            status={row.status}
+                            summaryApproved={row.assessment?.status === "APPROVED"}
+                            compact
+                            checkoutOnly
                           />
                         </div>
                       ) : null}

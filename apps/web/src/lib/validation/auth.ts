@@ -80,6 +80,9 @@ export const forgotPasswordSchema = z
     return { mobile };
   });
 
+/** Resend signup / login verification OTP (unverified accounts only). */
+export const resendOtpSchema = forgotPasswordSchema;
+
 export const verifyOtpSchema = z
   .object({
     mobile: z.unknown().optional(),

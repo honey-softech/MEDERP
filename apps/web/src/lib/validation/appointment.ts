@@ -37,6 +37,7 @@ export const createAppointmentSchema = z
     notes: z.unknown().optional(),
     photoData: z.unknown().optional(),
     checkInNow: z.unknown().optional(),
+    carryPriorVitals: z.unknown().optional(),
     scheduledAt: z.unknown().optional(),
     walkInWindowStartMinute: z.unknown().optional(),
   })
@@ -91,6 +92,7 @@ export const createAppointmentSchema = z
       notes: optionalText(data.notes),
       photoData: data.photoData,
       checkInNow: Boolean(data.checkInNow),
+      carryPriorVitals: Boolean(data.carryPriorVitals),
       scheduledAt,
       walkInWindowStartMinute,
     };

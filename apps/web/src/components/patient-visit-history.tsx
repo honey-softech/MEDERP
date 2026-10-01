@@ -52,12 +52,15 @@ export function PatientVisitHistory({
   canPrintSummary,
   canViewLabReports = false,
   patientPhone,
+  summarySentIds,
 }: {
   visits: VisitRow[];
   canPrintSummary: boolean;
   canViewLabReports?: boolean;
   patientPhone?: string | null;
+  summarySentIds?: ReadonlySet<string> | string[];
 }) {
+  const sent = summarySentIds instanceof Set ? summarySentIds : new Set(summarySentIds ?? []);
   const last = visits[0];
 
   return (
@@ -117,6 +120,7 @@ export function PatientVisitHistory({
                     patientPhone={patientPhone}
                     compact
                     label="Send on WhatsApp"
+                    alreadySent={sent.has(last.id)}
                   />
                   <Link href={`/appointments/${last.id}/summary`} className="text-teal-700 hover:underline">
                     View / print summary
@@ -226,6 +230,7 @@ export function PatientVisitHistory({
                       patientPhone={patientPhone}
                       compact
                       label="Send on WhatsApp"
+                      alreadySent={sent.has(row.id)}
                     />
                     <Link href={`/appointments/${row.id}/summary`} className="text-teal-700 hover:underline">
                       Print visit summary

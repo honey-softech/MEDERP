@@ -15,6 +15,7 @@ export {
   WALK_IN_BASE_ROLES,
   WALK_IN_ROLES,
   canAddWalkIn,
+  canCheckoutVisit,
   canRegisterPatient,
   forbidUnless,
   hasBillingAccess,

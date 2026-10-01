@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { compactButtonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { VitalsPanel } from "@/components/vitals-panel";
 import type { VitalsValues } from "@/lib/vitals";
@@ -34,10 +35,18 @@ export function PatientContextPanel({
   patient,
   vitals = null,
   canEditHistory,
+  priorVisit = null,
 }: {
   patient: PatientContextData;
   vitals?: VitalsValues | null;
   canEditHistory: boolean;
+  priorVisit?: {
+    id: string;
+    scheduledAtLabel: string;
+    summaryApproved: boolean;
+    vitals: VitalsValues | null;
+    diagnosis?: string;
+  } | null;
 }) {
   const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(true);
@@ -108,6 +117,43 @@ export function PatientContextPanel({
       </section>
 
       <VitalsPanel vitals={vitals} compact />
+
+      {priorVisit ? (
+        <section className="rounded-xl border border-primary/30 bg-primary-light/40 p-2.5 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-text-primary">Prior visit</h3>
+              <p className="text-[11px] text-text-secondary">{priorVisit.scheduledAtLabel}</p>
+              {priorVisit.diagnosis?.trim() ? (
+                <p className="mt-1 line-clamp-2 text-[11px] text-text-primary">
+                  Dx: {priorVisit.diagnosis.trim()}
+                </p>
+              ) : null}
+            </div>
+            {priorVisit.summaryApproved ? (
+              <Link href={`/appointments/${priorVisit.id}/summary`} className={compactButtonClass}>
+                Assessment sheet
+              </Link>
+            ) : (
+              <Link href={`/appointments/${priorVisit.id}`} className={compactButtonClass}>
+                Open visit
+              </Link>
+            )}
+          </div>
+          {priorVisit.vitals && !vitals ? (
+            <div className="mt-2">
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-text-secondary">
+                Previous vitals
+              </p>
+              <VitalsPanel vitals={priorVisit.vitals} compact />
+            </div>
+          ) : priorVisit.vitals && vitals?.notes?.includes("Carried from prior visit") ? (
+            <p className="mt-1.5 text-[10px] text-text-secondary">
+              Today&apos;s vitals were carried from this prior visit. Nurse can re-measure if needed.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="rounded-xl border border-border bg-surface px-2.5 py-2 shadow-card">
         <div className="flex items-center justify-between gap-2">

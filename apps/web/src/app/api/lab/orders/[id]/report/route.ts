@@ -3,12 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { patientName, requireHospitalActor } from "@/lib/front-desk";
 import { notifyLabResults } from "@/lib/lab";
-import {
-  isAllowedLabReport,
-  readLabReportFile,
-  sanitizeReportFileName,
-  saveLabReportFile,
-} from "@/lib/lab-report-store";
+import { assertLabReportSources, combineLabReportFiles } from "@/lib/lab-report-combine";
+import { readLabReportFile, saveLabReportFile } from "@/lib/lab-report-store";
 import { canUploadLabReport, canViewLabReport } from "@/lib/lab-orders/rules";
 import { hospitalScope } from "@/lib/tenancy";
 
@@ -47,6 +43,23 @@ export async function GET(_request: Request, context: Ctx) {
   });
 }
 
+async function collectUploadFiles(form: FormData) {
+  const entries = [
+    ...form.getAll("files"),
+    ...form.getAll("file"),
+  ].filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+  const unique: File[] = [];
+  const seen = new Set<string>();
+  for (const file of entries) {
+    const key = `${file.name}:${file.size}:${file.type}:${file.lastModified}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(file);
+  }
+  return unique;
+}
+
 export async function POST(request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
@@ -76,25 +89,42 @@ export async function POST(request: Request, context: Ctx) {
   const markResulted = external || handCarriedByClinical;
 
   const form = await request.formData().catch(() => null);
-  const file = form?.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!form) {
     return NextResponse.json({ error: "Choose a PDF or image to upload." }, { status: 400 });
   }
-  if (!isAllowedLabReport(file.type, file.size)) {
-    return NextResponse.json({ error: "Upload a PDF, JPG, or PNG up to 8 MB." }, { status: 400 });
+  const uploads = await collectUploadFiles(form);
+  const sources = await Promise.all(
+    uploads.map(async (file) => ({
+      name: file.name,
+      mimeType: file.type || "application/octet-stream",
+      bytes: Buffer.from(await file.arrayBuffer()),
+    })),
+  );
+  const sourceError = assertLabReportSources(sources);
+  if (sourceError) {
+    return NextResponse.json({ error: sourceError }, { status: 400 });
   }
 
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await saveLabReportFile(order.hospitalId, order.id, bytes);
-  const fileName = sanitizeReportFileName(file.name);
+  let combined;
+  try {
+    combined = await combineLabReportFiles(sources);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not combine the report files." },
+      { status: 400 },
+    );
+  }
+
+  await saveLabReportFile(order.hospitalId, order.id, combined.bytes);
+  const fileName = combined.fileName;
   const now = new Date();
 
   const updated = await prisma.labOrder.update({
     where: { id: order.id },
     data: {
       reportFileName: fileName,
-      reportMimeType: file.type,
-      reportSize: file.size,
+      reportMimeType: combined.mimeType,
+      reportSize: combined.bytes.length,
       reportUploadedAt: now,
       reportUploadedByUsername: scoped.user.username,
       sampleCollectedAt: order.sampleCollectedAt ?? now,
@@ -125,13 +155,14 @@ export async function POST(request: Request, context: Ctx) {
     action: external || handCarriedByClinical ? "EXTERNAL_REPORT_UPLOADED" : "LAB_REPORT_UPLOADED",
     entity: "LabOrder",
     entityId: order.id,
-    summary: `${scoped.user.username} uploaded ${external || handCarriedByClinical ? "hand-carried/outside" : "lab"} report ${fileName} for ${patientName(order.patient)}.`,
+    summary: `${scoped.user.username} uploaded ${external || handCarriedByClinical ? "hand-carried/outside" : "lab"} report ${fileName} (${sources.length} file${sources.length === 1 ? "" : "s"}) for ${patientName(order.patient)}.`,
     metadata: {
       changes: diffAuditFields(
         { reportFileName: order.reportFileName, status: order.status },
         { reportFileName: updated.reportFileName, status: updated.status },
         { fields: ["reportFileName", "status"] },
       ),
+      pageCount: sources.length,
     },
   });
 

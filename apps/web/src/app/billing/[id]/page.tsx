@@ -17,6 +17,7 @@ import {
   prettyEnum,
   requireHospitalPage,
 } from "@/lib/front-desk";
+import { invoiceWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
 import { resolveReceiptCollector } from "@/lib/billing/receipt-collector";
 import { redirect } from "next/navigation";
@@ -45,6 +46,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const due = Math.max(0, Number(invoice.netTotal) - Number(invoice.paidAmount));
   const collector = await resolveReceiptCollector(invoice.payments);
+  const billAlreadySent = await invoiceWhatsAppSent({
+    hospitalId: user.hospitalId,
+    invoiceNo: invoice.invoiceNo,
+    appointmentId: invoice.appointmentId,
+  });
 
   return (
     <AppShell title={invoice.invoiceNo}>
@@ -57,6 +63,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             endpoint={`/api/invoices/${invoice.id}/send`}
             patientPhone={invoice.patient.phone}
             label="Send on WhatsApp"
+            alreadySent={billAlreadySent}
           />
         ) : null}
         <PrintButton />

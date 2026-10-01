@@ -39,11 +39,13 @@ export function LabWorkForm({
     router.refresh();
   }
 
-  async function upload(file: File) {
+  async function upload(files: FileList | File[]) {
+    const list = Array.from(files).filter((file) => file.size > 0);
+    if (list.length === 0) return;
     setError("");
     setPending("upload");
     const form = new FormData();
-    form.set("file", file);
+    for (const file of list) form.append("files", file);
     const response = await fetch(`/api/lab/orders/${orderId}/report`, { method: "POST", body: form });
     const data = await response.json().catch(() => ({}));
     setPending("");
@@ -51,7 +53,7 @@ export function LabWorkForm({
       setError(data.error ?? "Could not upload the report.");
       return;
     }
-    setFileName(data.order?.reportFileName ?? file.name);
+    setFileName(data.order?.reportFileName ?? (list.length > 1 ? "lab-report.pdf" : list[0]!.name));
     router.refresh();
   }
 
@@ -98,18 +100,20 @@ export function LabWorkForm({
             locked || pending ? "pointer-events-none opacity-60" : "hover:border-teal-600 hover:bg-teal-50"
           }`}
         >
-          <span className={secondaryButtonClass}>{pending === "upload" ? "Uploading…" : fileName ? "Replace file" : "Choose file"}</span>
+          <span className={secondaryButtonClass}>{pending === "upload" ? "Uploading…" : fileName ? "Replace file" : "Choose files"}</span>
           <span className="text-sm text-slate-600">
-            {fileName ?? "PDF, JPG, or PNG up to 8 MB. The doctor and nurse will see it on the patient record after you mark this done."}
+            {fileName ??
+              "PDF or page images (JPG/PNG). Select multiple pages — they are combined into one report (up to 8 MB each). The doctor and nurse will see it after you mark this done."}
           </span>
           <input
             className="sr-only"
             type="file"
             accept="application/pdf,image/jpeg,image/png,image/webp"
+            multiple
             disabled={locked || Boolean(pending)}
             onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void upload(file);
+              const files = event.target.files;
+              if (files?.length) void upload(files);
               event.target.value = "";
             }}
           />

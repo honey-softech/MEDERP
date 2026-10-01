@@ -97,6 +97,7 @@ export async function POST(request: Request) {
     reason,
     notes,
     checkInNow,
+    carryPriorVitals,
     walkInWindowStartMinute,
   } = parsed.data;
   let scheduledAt = parsed.data.scheduledAt;
@@ -218,6 +219,50 @@ export async function POST(request: Request) {
 
   if (photoData && !patient.photoData) {
     await prisma.patient.update({ where: { id: patient.id }, data: { photoData } });
+  }
+
+  if (visitType === "FOLLOW_UP" && carryPriorVitals) {
+    const priorWithVitals = await prisma.appointment.findFirst({
+      where: {
+        hospitalId: scoped.user.hospitalId,
+        patientId: patient.id,
+        id: { not: appointment.id },
+        status: { notIn: ["CANCELLED", "NO_SHOW"] },
+        vitals: { isNot: null },
+      },
+      orderBy: { scheduledAt: "desc" },
+      include: { vitals: true },
+    });
+    const prior = priorWithVitals?.vitals;
+    if (prior) {
+      const carriedNote = [
+        prior.notes?.trim() || "",
+        `Carried from prior visit ${priorWithVitals.scheduledAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}.`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      await prisma.visitVitals.create({
+        data: {
+          hospitalId: scoped.user.hospitalId,
+          appointmentId: appointment.id,
+          patientId: patient.id,
+          recordedByUserId: scoped.user.id,
+          recordedByUsername: scoped.user.username,
+          heightCm: prior.heightCm,
+          weightKg: prior.weightKg,
+          bmi: prior.bmi,
+          temperatureC: prior.temperatureC,
+          hasFever: prior.hasFever,
+          spo2Percent: prior.spo2Percent,
+          pulseBpm: prior.pulseBpm,
+          respiratoryRate: prior.respiratoryRate,
+          bpSystolic: prior.bpSystolic,
+          bpDiastolic: prior.bpDiastolic,
+          bloodSugarMgDl: prior.bloodSugarMgDl,
+          notes: carriedNote || null,
+        },
+      });
+    }
   }
 
   await writeAuditLog({

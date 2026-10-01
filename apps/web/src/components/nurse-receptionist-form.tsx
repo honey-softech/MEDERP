@@ -41,7 +41,7 @@ export function NurseReceptionistForm({
         <h3 className="font-semibold">Nurses as receptionists</h3>
         <p className="mt-1 text-sm text-slate-500">
           Off by default. Turn this on if nurses also cover the front desk. Every nurse then gets reception work:
-          register patients, manage the queue, collect bills, and admit. This does not add seats — each nurse still
+          register patients, manage the queue, collect bills, and check patients out. This does not add seats — each nurse still
           counts as one login on your plan. You can still add a dedicated Receptionist if seats remain.
         </p>
       </div>

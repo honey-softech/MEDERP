@@ -3,6 +3,7 @@ import {
   BILLING_ROLES,
   FRONT_DESK_ROLES,
   canAddWalkIn,
+  canCheckoutVisit,
   canRegisterPatient,
   forbidUnless,
   hasBillingAccess,
@@ -50,5 +51,12 @@ describe("authz", () => {
     expect(forbidUnless({ role: "NURSE", hospital }, BILLING_ROLES)).toBeNull();
     expect(hasRoleAccess({ role: "NURSE", hospital }, ["SUPER_ADMIN", "RECEPTIONIST"])).toBe(true);
     expect(withNurseReceptionist(["SUPER_ADMIN", "DOCTOR"], hospital)).toEqual(["SUPER_ADMIN", "DOCTOR"]);
+  });
+
+  it("lets nurses and reception check patients out after consult", () => {
+    expect(canCheckoutVisit({ role: "NURSE" })).toBe(true);
+    expect(canCheckoutVisit({ role: "RECEPTIONIST" })).toBe(true);
+    expect(canCheckoutVisit({ role: "DOCTOR" })).toBe(false);
+    expect(canCheckoutVisit({ role: "LAB_TECH" })).toBe(false);
   });
 });

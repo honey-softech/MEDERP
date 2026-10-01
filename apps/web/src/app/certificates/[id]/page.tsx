@@ -12,6 +12,7 @@ import {
   patientName,
   requireHospitalPage,
 } from "@/lib/front-desk";
+import { certificateWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
 import { ageGenderLine } from "@/lib/visit-summary";
 
@@ -38,6 +39,13 @@ export default async function CertificatePrintPage({ params }: { params: Promise
 
   const canVoid =
     issued && canIssue && (user.role === "SUPER_ADMIN" || certificate.issuedByUserId === user.id);
+  const certificateAlreadySent = issued
+    ? await certificateWhatsAppSent({
+        hospitalId: user.hospitalId,
+        patientId: certificate.patientId,
+        certificateNo: certificate.certificateNo,
+      })
+    : false;
 
   const printedAt = new Date().toLocaleString("en-IN", {
     day: "2-digit",
@@ -76,6 +84,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
               endpoint={`/api/certificates/${certificate.id}/send`}
               patientPhone={certificate.patient.phone}
               label="Send on WhatsApp"
+              alreadySent={certificateAlreadySent}
             />
           ) : null}
           {issued && canPrint ? <PrintButton label="Print certificate" variant="primary" /> : null}

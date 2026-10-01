@@ -54,6 +54,7 @@ export async function POST(request: Request, context: Ctx) {
     doctor: certificate.issuedByDisplayName || certificate.issuedByUsername,
     when: formatCertDate(certificate.issuedAt),
     type: certificateTitle(certificate.type),
+    certificateNo: certificate.certificateNo,
   };
   const body = renderTemplate("medical_certificate", variables);
   const filename = `medical-certificate-${certificate.certificateNo}.pdf`;

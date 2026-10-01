@@ -17,6 +17,7 @@ import {
   requireHospitalPage,
   tokenLabel,
 } from "@/lib/front-desk";
+import { invoiceWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
 
 export default async function CollectVisitPaymentPage({
@@ -55,6 +56,14 @@ export default async function CollectVisitPaymentPage({
   const due = Math.max(0, fee - paid);
   const doctorLabel = doctorName(appointment.doctor);
   const amountLocked = Boolean(invoice);
+  const billAlreadySent =
+    invoice && canSendIssuedInvoice(invoice.status)
+      ? await invoiceWhatsAppSent({
+          hospitalId: user.hospitalId,
+          invoiceNo: invoice.invoiceNo,
+          appointmentId: appointment.id,
+        })
+      : false;
 
   if (due <= 0) {
     redirect(invoice ? `/billing/${invoice.id}` : `/appointments/${appointment.id}`);
@@ -78,6 +87,7 @@ export default async function CollectVisitPaymentPage({
               endpoint={`/api/invoices/${invoice.id}/send`}
               patientPhone={appointment.patient.phone}
               label="Send on WhatsApp"
+              alreadySent={billAlreadySent}
             />
             <Link href={`/billing/${invoice.id}`} className={secondaryButtonClass}>
               View / print receipt

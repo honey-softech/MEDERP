@@ -173,14 +173,14 @@ export function ConsultAssessmentForm({
       setTestsMountEl(null);
       return;
     }
+    const mq = window.matchMedia("(min-width: 640px)");
     function resolve() {
-      setTestsMountEl(
-        document.getElementById("visit-tests-mount") ??
-          document.getElementById("visit-tests-mount-mobile"),
-      );
+      const desktop = document.getElementById("visit-tests-mount");
+      const mobile = document.getElementById("visit-tests-mount-mobile");
+      // Prefer the visible mount — desktop node exists but is hidden below sm.
+      setTestsMountEl(mq.matches ? desktop ?? mobile : mobile ?? desktop);
     }
     resolve();
-    const mq = window.matchMedia("(min-width: 640px)");
     mq.addEventListener("change", resolve);
     return () => mq.removeEventListener("change", resolve);
   }, [testsMountId]);
@@ -528,6 +528,14 @@ export function ConsultAssessmentForm({
                 );
               }
             }}
+            followUpAt={values.followUpAt}
+            onFollowUpAtChange={(date) => {
+              setValues((current) => ({
+                ...current,
+                followUpAt: date,
+                visitOutcome: "FOLLOW_UP",
+              }));
+            }}
             locked={testsLocked}
             labEnabled={labEnabled}
             patientPhone={patientPhone}
@@ -753,6 +761,10 @@ export function ConsultAssessmentForm({
                   </button>
                 ))}
               </div>
+              <p className="rounded-lg border border-border bg-app-bg/70 px-2.5 py-2 text-[11px] text-text-secondary">
+                On revisit, reception can add the patient to the queue as a follow-up and bring prior vitals plus the
+                last assessment sheet so you can review them again.
+              </p>
               {followUpReminderNote ? (
                 <p className="text-[11px] text-text-secondary">{followUpReminderNote}</p>
               ) : null}
@@ -871,6 +883,14 @@ export function ConsultAssessmentForm({
                   current.visitOutcome ? current : { ...current, visitOutcome: "FOLLOW_UP" },
                 );
               }
+            }}
+            followUpAt={values.followUpAt}
+            onFollowUpAtChange={(date) => {
+              setValues((current) => ({
+                ...current,
+                followUpAt: date,
+                visitOutcome: "FOLLOW_UP",
+              }));
             }}
             locked={testsLocked}
             labEnabled={labEnabled}

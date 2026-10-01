@@ -29,21 +29,31 @@ export async function POST(request: Request) {
     const existingMobile = await prisma.appUser.findFirst({
       where: { mobile },
     });
-    if (existingMobile) {
+    if (existingMobile?.isVerified) {
       return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
 
-    const username = await uniqueUsername(suggestedUsername("user", mobile.slice(-4), requestedRole));
-
-    const user = await prisma.appUser.create({
-      data: {
-        username,
-        mobile,
-        passwordHash: await hashPassword(password),
-        isVerified: false,
-        role: requestedRole,
-      },
-    });
+    // Unverified rows are pending OTP only — allow retry (new password/role + fresh OTP)
+    // instead of locking the mobile after a failed/skipped verification.
+    const passwordHash = await hashPassword(password);
+    const user = existingMobile
+      ? await prisma.appUser.update({
+          where: { id: existingMobile.id },
+          data: {
+            passwordHash,
+            role: requestedRole,
+            isVerified: false,
+          },
+        })
+      : await prisma.appUser.create({
+          data: {
+            username: await uniqueUsername(suggestedUsername("user", mobile.slice(-4), requestedRole)),
+            mobile,
+            passwordHash,
+            isVerified: false,
+            role: requestedRole,
+          },
+        });
 
     await issueOtp(user.id, user.mobile, "signup");
 
@@ -52,17 +62,19 @@ export async function POST(request: Request) {
       actorUserId: user.id,
       actorUsername: user.username,
       actorRole: user.role,
-      action: "USER_REGISTERED",
+      action: existingMobile ? "USER_SIGNUP_OTP_RESENT" : "USER_REGISTERED",
       entity: "AppUser",
       entityId: user.id,
-      summary: `Mobile ${user.mobile} registered as ${user.role.replace(/_/g, " ")} and must request to join a listed hospital.`,
-      metadata: { mobile: user.mobile },
+      summary: existingMobile
+        ? `Mobile ${user.mobile} restarted signup OTP as ${user.role.replace(/_/g, " ")}.`
+        : `Mobile ${user.mobile} started signup as ${user.role.replace(/_/g, " ")} and must verify OTP before login.`,
+      metadata: { mobile: user.mobile, resumed: Boolean(existingMobile) },
     });
 
     return NextResponse.json({
       ok: true,
       mobile: user.mobile,
-      message: "Account created. Enter the OTP sent to your mobile to verify, then request to join a listed hospital.",
+      message: "Enter the OTP sent to your mobile to finish signup, then request to join a listed hospital.",
     });
   } catch (error) {
     console.error("Signup failed", error);

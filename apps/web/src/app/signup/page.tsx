@@ -70,7 +70,7 @@ export default function SignupPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Sign up first, then request to join a hospital that is already listed. We’ll send a one-time code to verify your mobile."
+      subtitle="Sign up with your mobile. Your account is only active after you enter the OTP we send. Then request to join a listed hospital."
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">

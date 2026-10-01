@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { FilterableTable } from "@/components/filterable-table";
-import { PlatformRemoveUserButton } from "@/components/platform-remove-user-button";
+import { PlatformUsersTable } from "@/components/platform-users-table";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -65,8 +64,8 @@ export default async function HospitalUsersForSaasPage({
           Add user
         </Link>
       </div>
-      <FilterableTable
-        minWidthClass="min-w-[900px]"
+      <PlatformUsersTable
+        showEdit
         empty="No users in this hospital yet."
         rows={hospital.users.map((row) => ({
           id: row.id,
@@ -80,28 +79,7 @@ export default async function HospitalUsersForSaasPage({
           lastLogin: row.sessions[0] ? formatDate(row.sessions[0].createdAt) : "Never",
           edit: "Edit",
           editHref: `/platform/users/${hospital.id}/${row.id}`,
-          remove: row.username,
         }))}
-        columns={[
-          { key: "username", header: "Username", className: "font-medium" },
-          { key: "mobile", header: "Mobile" },
-          { key: "email", header: "Email" },
-          { key: "role", header: "Role" },
-          { key: "access", header: "Access" },
-          { key: "verified", header: "Verified" },
-          { key: "joined", header: "Joined" },
-          { key: "lastLogin", header: "Last login" },
-          { key: "edit", header: "", hrefKey: "editHref" },
-          {
-            key: "remove",
-            header: "",
-            filter: false,
-            render: (row) =>
-              row.role === "SOFTWARE ADMIN" || row.role === "HELPDESK" ? null : (
-                <PlatformRemoveUserButton userId={row.id} label={`${row.username} / ${row.mobile}`} />
-              ),
-          },
-        ]}
       />
     </AppShell>
   );

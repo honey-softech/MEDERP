@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { FilterableTable } from "@/components/filterable-table";
-import { PlatformRemoveUserButton } from "@/components/platform-remove-user-button";
+import { PlatformUsersTable } from "@/components/platform-users-table";
 import { getCurrentUser } from "@/lib/auth";
 import { isRemovedAccountMobile } from "@/lib/platform-user-remove";
 import { prisma } from "@/lib/prisma";
@@ -55,8 +54,7 @@ export default async function UnassignedUsersPage() {
         Registered users who are not linked to a hospital yet (pending OTP or waiting to join).
         You can remove an account so the mobile number can sign up again.
       </p>
-      <FilterableTable
-        minWidthClass="min-w-[900px]"
+      <PlatformUsersTable
         empty="No unassigned accounts right now."
         rows={users.map((row) => {
           const pendingJoin = row.joinRequests[0];
@@ -75,26 +73,8 @@ export default async function UnassignedUsersPage() {
                   : "Verified · no hospital",
             joined: formatDate(row.createdAt),
             lastLogin: row.sessions[0] ? formatDate(row.sessions[0].createdAt) : "Never",
-            remove: row.username,
           };
         })}
-        columns={[
-          { key: "username", header: "Username", className: "font-medium" },
-          { key: "mobile", header: "Mobile" },
-          { key: "email", header: "Email" },
-          { key: "role", header: "Role" },
-          { key: "status", header: "Status" },
-          { key: "joined", header: "Signed up" },
-          { key: "lastLogin", header: "Last login" },
-          {
-            key: "remove",
-            header: "",
-            filter: false,
-            render: (row) => (
-              <PlatformRemoveUserButton userId={row.id} label={`${row.username} / ${row.mobile}`} />
-            ),
-          },
-        ]}
       />
     </AppShell>
   );

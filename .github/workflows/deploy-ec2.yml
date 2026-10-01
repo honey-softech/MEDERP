@@ -22,26 +22,31 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           command_timeout: 40m
-          script_stop: true
+          # Do NOT set script_stop: true — drone-ssh injects exit checks after every
+          # line and breaks if/functions, causing silent failures after git reset.
           script: |
             set -euo pipefail
             cd ~/mederp
 
+            echo "==> Checking git repo"
             if [ ! -d .git ]; then
               echo "ERROR: ~/mederp is not a git repo yet. Run the one-time EC2 git setup first."
               exit 1
             fi
 
+            echo "==> Pulling origin/main"
             git fetch origin main
             git reset --hard origin/main
+            echo "==> Now at $(git rev-parse --short HEAD)"
 
+            echo "==> Checking apps/web/.env"
             if [ ! -f apps/web/.env ]; then
               echo "ERROR: apps/web/.env missing on server. Copy it once and keep it only on EC2."
               exit 1
             fi
 
             if ! grep -qE '^(ASKEVA_API_TOKEN|WHATSAPP_ACCESS_TOKEN)=' apps/web/.env; then
-              echo "ERROR: apps/web/.env is missing ASKEVA_API_TOKEN. Add the same AskEva API key used on local, then redeploy."
+              echo "ERROR: apps/web/.env is missing ASKEVA_API_TOKEN. Add the AskEva API key, then redeploy."
               exit 1
             fi
 
@@ -67,6 +72,7 @@ jobs:
               fi
             }
 
+            echo "==> Syncing env defaults"
             # Razorpay Test Mode plans (amount = MedERP fee + 18% GST)
             set_env RAZORPAY_PLAN_ID_CLINIC "plan_TeJsdSN6PAwtAJ"
             set_env RAZORPAY_PLAN_ID_STARTER "plan_TeJtDouBjTwD2x"
@@ -75,12 +81,13 @@ jobs:
             PUBLIC_API_URL="$(grep -E '^NEXT_PUBLIC_API_URL=' apps/web/.env | head -n1 | cut -d= -f2- | tr -d '"' || true)"
             ensure_env ASKEVA_API_URL "https://backend.askeva.io/v1"
             ensure_env WHATSAPP_TEMPLATE_LANG "en,en_IN"
-            ensure_env WHATSAPP_OTP_TEMPLATE "as"
+            ensure_env WHATSAPP_OTP_TEMPLATE "reminder"
             ensure_env WHATSAPP_REMINDER_PARAMS "named"
             ensure_env WHATSAPP_REMINDER_TEMPLATE "appointment_reminder1"
             ensure_env WHATSAPP_INVESTIGATION_TEMPLATE "investigation_list"
             ensure_env WHATSAPP_VISIT_SUMMARY_TEMPLATE "visit_summary_"
             ensure_env WHATSAPP_BILL_RECEIPT_TEMPLATE "billpreceipt"
+            ensure_env WHATSAPP_MEDICAL_CERTIFICATE_TEMPLATE "medical_certificate"
             ensure_env WHATSAPP_SUBSCRIPTION_BILL_TEMPLATE "subscription_bill"
             if [ -n "$PUBLIC_API_URL" ]; then
               ensure_env WHATSAPP_MEDIA_BASE_URL "$PUBLIC_API_URL"
@@ -88,10 +95,11 @@ jobs:
             ensure_env SITE_ADDRESS "mederp.co.in,www.mederp.co.in"
             ensure_env ACME_EMAIL "admin@mederp.co.in"
 
+            echo "==> Building and starting containers"
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml up -d --build
             sudo docker compose --env-file apps/web/.env -f docker-compose.prod.yml ps
 
-            echo "Waiting for /api/health (app needs a few seconds after container start)..."
+            echo "==> Waiting for /api/health"
             ok=0
             for i in $(seq 1 30); do
               if curl -fsS -m 5 http://127.0.0.1:3000/api/health; then

@@ -198,7 +198,7 @@ export function AppointmentForm({
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (selectedOnLeave) {
+    if (selectedOnLeave && !isWalkIn) {
       setError("This doctor is on leave that day. Choose another doctor or another date.");
       return;
     }
@@ -267,7 +267,11 @@ export function AppointmentForm({
           <input type="hidden" name="doctorId" value={defaultDoctorId} />
           <input className={`${fieldClass} bg-slate-50`} value={lockedDoctor?.label ?? "You"} readOnly />
           {selectedOnLeave ? (
-            <span className="mt-1 block text-xs font-normal text-amber-700">You are on leave this day.</span>
+            <span className="mt-1 block text-xs font-normal text-amber-700">
+              {isWalkIn
+                ? "You are marked on leave today — walk-in is still allowed if you are consulting."
+                : "You are on leave this day."}
+            </span>
           ) : null}
         </label>
       ) : (
@@ -282,7 +286,7 @@ export function AppointmentForm({
           >
             <option value="">Select doctor</option>
             {doctors.map((item) => (
-              <option key={item.id} value={item.id} disabled={onLeaveIds.includes(item.id)}>
+              <option key={item.id} value={item.id} disabled={!isWalkIn && onLeaveIds.includes(item.id)}>
                 {item.label}
                 {onLeaveIds.includes(item.id) ? " (on leave)" : ""}
               </option>
@@ -291,6 +295,10 @@ export function AppointmentForm({
           {doctors.length === 0 ? (
             <span className="mt-1 block text-xs font-normal text-amber-700">
               No doctor users in this hospital yet. Add one under Hospital users with the Doctor role.
+            </span>
+          ) : selectedOnLeave && isWalkIn ? (
+            <span className="mt-1 block text-xs font-normal text-amber-700">
+              This doctor is on leave today — walk-in is still allowed if they are consulting.
             </span>
           ) : (
             <span className="mt-1 block text-xs font-normal text-slate-500">
@@ -458,7 +466,7 @@ export function AppointmentForm({
       </label>
       {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
       <div className="md:col-span-2">
-        <button className={buttonClass} type="submit" disabled={pending || selectedOnLeave || walkInNoWindowToday}>
+        <button className={buttonClass} type="submit" disabled={pending || (!isWalkIn && selectedOnLeave) || walkInNoWindowToday}>
           {pending ? "Saving…" : isWalkIn ? "Add walk-in" : "Book appointment"}
         </button>
       </div>

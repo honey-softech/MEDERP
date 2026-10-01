@@ -96,7 +96,7 @@ ASKEVA_API_URL="https://backend.askeva.io/v1"
 ASKEVA_API_TOKEN="...."
 WHATSAPP_ACCESS_TOKEN="...."
 WHATSAPP_TEMPLATE_LANG="en,en_IN"
-WHATSAPP_OTP_TEMPLATE="as"
+WHATSAPP_OTP_TEMPLATE="reminder"
 
 # Android FCM (optional until push is enabled — paste service-account JSON as one line)
 # FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}

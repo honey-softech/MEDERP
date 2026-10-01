@@ -23,8 +23,8 @@ export default async function MyLeavePage() {
   return (
     <AppShell title="Leave">
       <p className="mb-6 text-sm text-slate-500">
-        Apply for leave. Booking is blocked for those days as soon as you apply. If the hospital super admin rejects
-        the request, appointments can be booked again.
+        Apply for leave. New appointment bookings are blocked for those days as soon as you apply. Walk-ins and
+        already-booked visits can still go ahead. If the hospital super admin rejects the request, booking opens again.
       </p>
       <LeaveApplyForm />
       <section className="mt-8">

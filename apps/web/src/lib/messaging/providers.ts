@@ -5,10 +5,10 @@ import {
   investigationListComponents,
   META_PATIENT_TEMPLATES,
   namedBody,
+  otpReminderComponents,
   parseOtpDigits,
   reminderComponents,
   subscriptionBillComponents,
-  utilityAccessCodeComponents,
   type WhatsAppComponent,
 } from "@/lib/messaging/whatsapp-meta-templates";
 
@@ -104,10 +104,23 @@ function reminderParamFormat(): "named" | "positional" {
   return env("WHATSAPP_REMINDER_PARAMS", "named").toLowerCase() === "positional" ? "positional" : "named";
 }
 
-function accessCodeLabel(vars: Record<string, string>) {
-  return env(
-    "WHATSAPP_OTP_CODE_LABEL",
-    vars.patientname || vars.label || vars.code || META_PATIENT_TEMPLATES.otp.defaultCodeLabel,
+function otpStatusLabel(vars: Record<string, string>) {
+  const purpose = (vars.purpose || vars.status || "").trim().toLowerCase();
+  if (purpose === "signup") return "Sign up";
+  if (purpose === "password-reset") return "Password reset";
+  if (purpose === "public-help") return "Support request";
+  if (purpose === "public-help-status") return "Support status";
+  if (vars.status?.trim()) return vars.status.trim();
+  return "Access code";
+}
+
+function otpGreetingName(vars: Record<string, string>) {
+  return (
+    vars.name?.trim() ||
+    vars.patient?.trim() ||
+    vars.patientname?.trim() ||
+    vars.label?.trim() ||
+    "User"
   );
 }
 
@@ -116,7 +129,11 @@ export function templateComponents(payload: ProviderPayload, _includeOtpButton =
   if (payload.templateKey === "otp") {
     const parsed = parseOtpDigits(payload.otp || vars.otp || vars.birthyear || vars.value || vars.number);
     if (parsed.error) return { error: parsed.error };
-    return utilityAccessCodeComponents(accessCodeLabel(vars), parsed.otp);
+    return otpReminderComponents({
+      name: otpGreetingName(vars),
+      status: otpStatusLabel(vars),
+      otp: parsed.otp,
+    });
   }
   if (payload.templateKey === "appointment_reminder") {
     return reminderComponents(vars, reminderParamFormat());

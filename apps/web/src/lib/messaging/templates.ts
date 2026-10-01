@@ -22,8 +22,9 @@ export function renderTemplate(
 ): string {
   if (key === "otp") {
     const number = variables.birthyear || variables.value || variables.number || variables.otp || "";
-    const label = variables.patientname || variables.label || variables.code || "Code";
-    return `Hello, ${label} is ${number}.\nThanks for choosing mederp.`;
+    const name = variables.name || variables.patient || "User";
+    const status = variables.status || variables.purpose || "Access code";
+    return `Hello ${name},\n\nService Update\n\nStatus: ${status}\nActivity: ${number}\n\nThis update relates to your hospital service request.\n\nMederp`;
   }
   if (key === "investigation_list") {
     return `Hi ${variables.patient ?? "patient"}, ${variables.hospital ?? "the clinic"} has listed tests/scans for you: ${variables.items ?? ""}. The investigation request is attached as a PDF. Please follow the doctor's advice.`;

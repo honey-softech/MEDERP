@@ -148,14 +148,17 @@ export async function POST(request: Request) {
   if (!patient || !doctor || !department) {
     return NextResponse.json({ error: "Patient, doctor, and department must belong to this hospital." }, { status: 400 });
   }
-  if (await doctorIsOnLeave(scoped.user.hospitalId, doctor.id, scheduledAt)) {
+
+  const walkIn = queueType === "WALK_IN";
+  // Leave blocks new scheduled bookings only. Walk-ins stay allowed, and existing
+  // appointments can still be checked in / consulted / summarised.
+  if (!walkIn && (await doctorIsOnLeave(scoped.user.hospitalId, doctor.id, scheduledAt))) {
     return NextResponse.json(
       { error: `${doctorName(doctor)} is on leave that day. Choose another doctor or another date.` },
       { status: 409 },
     );
   }
 
-  const walkIn = queueType === "WALK_IN";
   const {
     listDoctorAvailability,
     resolveWalkInScheduledAt,

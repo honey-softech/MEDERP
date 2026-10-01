@@ -212,16 +212,20 @@ export async function assertDoctorBookableAt(params: {
   hospitalId: string;
   doctorId: string;
   at: Date;
-  /** Walk-ins may skip window checks when no windows are configured; still block leave. */
+  /**
+   * Walk-ins may skip window checks when no windows are configured.
+   * Leave blocks new scheduled bookings only — not walk-ins, and not work on
+   * appointments that were already booked.
+   */
   queueType?: string;
 }) {
-  if (await doctorIsOnLeave(params.hospitalId, params.doctorId, params.at)) {
+  const isWalkIn = params.queueType === "WALK_IN";
+  if (!isWalkIn && (await doctorIsOnLeave(params.hospitalId, params.doctorId, params.at))) {
     return { ok: false as const, error: "Doctor is on leave that day.", status: 409 as const };
   }
 
   const windows = await listDoctorAvailability(params.doctorId);
-  if (windows.length === 0 || params.queueType === "WALK_IN") {
-    // No structured hours, or a walk-in after hours — still block leave above.
+  if (windows.length === 0 || isWalkIn) {
     return { ok: true as const };
   }
 

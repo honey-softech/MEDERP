@@ -90,7 +90,7 @@ describe("WhatsApp template builder", () => {
     ]);
   });
 
-  it("builds utility access-number template without OTP wording", () => {
+  it("builds reminder OTP template with positional name, status, and code", () => {
     expect(
       templateComponents({ toPhone: "9876543210", channel: "WHATSAPP", body: "unused", templateKey: "otp" }),
     ).toEqual({ error: "OTP value missing for WhatsApp send." });
@@ -101,13 +101,15 @@ describe("WhatsApp template builder", () => {
       body: "unused",
       templateKey: "otp",
       otp: "123456",
+      variables: { purpose: "signup" },
     });
     expect(otp).toEqual([
       {
         type: "body",
         parameters: [
-          { type: "text", parameter_name: "patientname", text: "Code" },
-          { type: "text", parameter_name: "birthyear", text: "123456" },
+          { type: "text", text: "User" },
+          { type: "text", text: "Sign up" },
+          { type: "text", text: "123456" },
         ],
       },
     ]);

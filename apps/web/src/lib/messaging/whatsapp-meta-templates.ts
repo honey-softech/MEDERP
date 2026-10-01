@@ -26,7 +26,29 @@ export function parseOtpDigits(raw: string | undefined) {
   return { otp };
 }
 
-/** Tier 0: Meta body uses {{patientname}} / {{birthyear}}. Sent values are "Code" and the digits. */
+/**
+ * OTP uses Utility template `reminder` (positional):
+ * Hello {{1}},
+ * Service Update
+ * Status: {{2}}
+ * Activity: {{3}}
+ * …
+ */
+export function otpReminderComponents(params: {
+  name?: string;
+  status?: string;
+  otp: string;
+}): WhatsAppComponent[] {
+  return [
+    positionalBody([
+      params.name?.trim() || "User",
+      params.status?.trim() || "Access code",
+      params.otp,
+    ]),
+  ];
+}
+
+/** @deprecated Prefer otpReminderComponents — kept for older named `as` templates. */
 export function utilityAccessCodeComponents(label: string, number: string): WhatsAppComponent[] {
   return [
     namedBody([
@@ -151,7 +173,8 @@ export function subscriptionBillComponents(params: {
 export const META_PATIENT_TEMPLATES = {
   otp: {
     category: "UTILITY" as const,
-    defaultName: "as",
+    /** AskEva / Meta template name for login OTP (positional {{1}} {{2}} {{3}}). */
+    defaultName: "reminder",
     defaultCodeLabel: "Code",
   },
   appointment_reminder: {

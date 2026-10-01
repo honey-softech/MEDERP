@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import HospitalUserForm from "@/components/hospital-user-form";
+import { PlatformRemoveUserButton } from "@/components/platform-remove-user-button";
 import { StaffMergePanel } from "@/components/staff-merge-panel";
 import { UserSignatureManager } from "@/components/user-signature-manager";
 import { getCurrentUser } from "@/lib/auth";
@@ -44,13 +45,21 @@ export default async function PlatformEditHospitalUserPage({
 
   return (
     <AppShell title={`Edit ${user.firstName ?? user.username}`}>
-      <p className="mb-6 text-sm text-slate-500">
-        <Link className="text-teal-700 hover:underline" href={`/platform/users/${hospital.id}`}>
-          Back to users
-        </Link>
-        {" · "}
-        {hospital.code} · {user.userCode ?? "User ID pending"} · {user.role.replace(/_/g, " ")}
-      </p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          <Link className="text-teal-700 hover:underline" href={`/platform/users/${hospital.id}`}>
+            Back to users
+          </Link>
+          {" · "}
+          {hospital.code} · {user.userCode ?? "User ID pending"} · {user.role.replace(/_/g, " ")}
+        </p>
+        <PlatformRemoveUserButton
+          userId={user.id}
+          label={`${user.username} / ${user.mobile}`}
+          redirectTo={`/platform/users/${hospital.id}`}
+          className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+        />
+      </div>
       <HospitalUserForm
         initial={userFormInitial(user)}
         hospitalId={hospital.id}

@@ -57,9 +57,13 @@ export async function POST(request: Request) {
 
     const otpResult = await issueOtp(user.id, user.mobile, "signup");
     if (!otpResult.delivered) {
+      const detail = otpResult.error || "WhatsApp delivery failed.";
+      const hint = /AskEva could not decrypt|API token/i.test(detail)
+        ? " Fix ASKEVA_API_TOKEN on the server (full key, one line), recreate web, then try again."
+        : " Check WHATSAPP_OTP_TEMPLATE=reminder is approved, then try again.";
       return NextResponse.json(
         {
-          error: `Could not send OTP on WhatsApp. ${otpResult.error} Check WHATSAPP_OTP_TEMPLATE=reminder is approved, then try again.`,
+          error: `Could not send OTP on WhatsApp. ${detail}${hint}`,
           mobile: user.mobile,
         },
         { status: 502 },

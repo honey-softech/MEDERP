@@ -240,4 +240,13 @@ describe("AskEva API token", () => {
     process.env.WHATSAPP_ACCESS_TOKEN = `"${"c".repeat(128)}"`;
     expect(askEvaTokenCandidates()).toEqual(["c".repeat(128)]);
   });
+
+  it("ignores an odd-length truncated hex fragment (length 17)", () => {
+    const truncated = "1491d992c306b2d1b";
+    const full = "a".repeat(128);
+    expect(truncated).toHaveLength(17);
+    process.env.ASKEVA_API_TOKEN = truncated;
+    process.env.WHATSAPP_ACCESS_TOKEN = full;
+    expect(askEvaTokenCandidates()).toEqual([full]);
+  });
 });

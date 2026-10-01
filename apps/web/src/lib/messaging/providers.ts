@@ -233,8 +233,18 @@ function parseWhatsAppResult(text: string, httpStatus: number): SendResult {
   return { ok: false, error: text.slice(0, 300) || "WhatsApp send failed." };
 }
 
+/** AskEva decrypts the Consumer API key server-side. Truncated/odd-length hex keys surface as Node Buffer/OpenSSL errors. */
 function isAskEvaTokenDecryptError(error: string) {
-  return /wrong final block length|bad decrypt/i.test(error);
+  return (
+    /wrong final block length|bad decrypt|encoding['"]? is invalid for data of length|Received ['"]hex['"]/i.test(
+      error,
+    )
+  );
+}
+
+function askEvaTokenConfigError(tokenLengths: number[]) {
+  const lengths = tokenLengths.join(", ");
+  return `AskEva could not decrypt the API token (length ${lengths}). Set ASKEVA_API_TOKEN in apps/web/.env to the full AskEva Consumer API key on one line (128 hex chars, no spaces/wrap), copy the same value to WHATSAPP_ACCESS_TOKEN, then recreate the web container.`;
 }
 
 async function postWhatsAppTemplate(params: {
@@ -254,13 +264,12 @@ async function postWhatsAppTemplate(params: {
     last = await postAskEvaTemplate(token, params);
     if (last.ok || !isAskEvaTokenDecryptError(last.error)) return last;
     console.error(
-      `[whatsapp] AskEva rejected API token length=${token.length} (${index + 1}/${tokens.length}).`,
+      `[whatsapp] AskEva rejected API token length=${token.length} usable=${isUsableAskEvaToken(token)} (${index + 1}/${tokens.length}): ${last.error}`,
     );
   }
   return {
     ok: false,
-    error:
-      "AskEva could not read the API token. On the live server, set ASKEVA_API_TOKEN in apps/web/.env to the full key on a single line, then recreate the web container.",
+    error: askEvaTokenConfigError(tokens.map((token) => token.length)),
   };
 }
 

@@ -110,39 +110,55 @@ export function VisitSummaryDocument({
 
         <h1 className="vs-title">Visit summary</h1>
 
-        <section className="vs-identity">
-          <div className="vs-identity-main">
-            <p className="vs-patient-name">{patientName}</p>
-            <p className="vs-patient-age">{ageGender}</p>
-          </div>
-          <div className="vs-identity-ids">
-            <p className="vs-field">
-              <span className="vs-label">Encounter no.</span>
-              <span className="vs-mono">{encounterNo}</span>
-            </p>
-            <p className="vs-field">
-              <span className="vs-label">UHID</span>
-              <span className="vs-mono">{mrn}</span>
-            </p>
-          </div>
-          <div className="vs-identity-meta">
-            <p className="vs-field">
-              <span className="vs-label">Appointment type</span>
-              <span>{appointmentType}</span>
-            </p>
-            <p className="vs-field">
-              <span className="vs-label">Date</span>
-              <span>{visitDate}</span>
-            </p>
-            <p className="vs-field vs-wide">
-              <span className="vs-label">Consulting physician</span>
-              <span>{physician}</span>
-            </p>
-            <p className="vs-field vs-wide">
-              <span className="vs-label">Department</span>
-              <span>{departmentName}</span>
-            </p>
-          </div>
+        <section className="vs-top-stack">
+          <section className="vs-identity">
+            <div className="vs-identity-main">
+              <p className="vs-patient-name">{patientName}</p>
+              <p className="vs-patient-age">{ageGender}</p>
+            </div>
+            <div className="vs-identity-ids">
+              <p className="vs-field">
+                <span className="vs-label">Encounter no.</span>
+                <span className="vs-mono">{encounterNo}</span>
+              </p>
+              <p className="vs-field">
+                <span className="vs-label">UHID</span>
+                <span className="vs-mono">{mrn}</span>
+              </p>
+            </div>
+            <div className="vs-identity-meta">
+              <p className="vs-field">
+                <span className="vs-label">Appointment type</span>
+                <span>{appointmentType}</span>
+              </p>
+              <p className="vs-field">
+                <span className="vs-label">Date</span>
+                <span>{visitDate}</span>
+              </p>
+              <p className="vs-field vs-wide">
+                <span className="vs-label">Consulting physician</span>
+                <span>{physician}</span>
+              </p>
+              <p className="vs-field vs-wide">
+                <span className="vs-label">Department</span>
+                <span>{departmentName}</span>
+              </p>
+            </div>
+          </section>
+
+          <section className="vs-exam-panel">
+            <p className="vs-exam-title">General examination</p>
+            <ul className="vs-vitals-list vs-vitals-compact">
+              {vitals.map((row) => (
+                <li key={row.label || row.value}>
+                  {row.label ? <span className="vs-vital-label">{row.label}</span> : null}
+                  <span className={row.value === "—" ? "vs-vital-empty" : "vs-vital-value"}>
+                    {row.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         </section>
 
         <div className="vs-clinical">
@@ -158,19 +174,6 @@ export function VisitSummaryDocument({
 
           <ClinicalRow label="History of present illness">
             <p className="vs-body">{historyText || "—"}</p>
-          </ClinicalRow>
-
-          <ClinicalRow label="General examination">
-            <ul className="vs-vitals-list">
-              {vitals.map((row) => (
-                <li key={row.label || row.value}>
-                  {row.label ? <span className="vs-vital-label">{row.label}</span> : null}
-                  <span className={row.value === "—" ? "vs-vital-empty" : "vs-vital-value"}>
-                    {row.value}
-                  </span>
-                </li>
-              ))}
-            </ul>
           </ClinicalRow>
 
           <ClinicalRow label="Systemic examination">

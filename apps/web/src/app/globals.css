@@ -291,16 +291,42 @@ html {
   word-break: break-word;
 }
 
+.vs-top-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
 .vs-identity {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: 8px 20px;
-  margin-top: 4px;
+  margin-top: 0;
   padding: 12px 14px;
   border: 1px solid #c8c8c8;
   border-radius: 6px;
   background: #f7f7f7;
   min-width: 0;
+}
+
+.vs-exam-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  background: #f7f7f7;
+}
+
+.vs-exam-title {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .vs-identity-main {
@@ -429,11 +455,23 @@ html {
   gap: 2px;
 }
 
+.vs-vitals-compact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 14px;
+}
+
 .vs-vitals-list li {
   display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 8px;
+  grid-template-columns: minmax(72px, 0.95fr) 1fr;
+  gap: 6px;
   min-width: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.vs-vitals-compact li {
+  grid-template-columns: minmax(70px, 0.9fr) 1fr;
 }
 
 .vs-vital-label {
@@ -586,6 +624,10 @@ html {
     gap: 2px;
   }
 
+  .vs-vitals-compact {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .vs-vitals-list li {
     grid-template-columns: 1fr 1fr;
   }
@@ -626,14 +668,17 @@ html {
   }
 
   .vs-sign-img,
-  .vs-identity {
+  .vs-identity,
+  .vs-exam-panel {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .vs-signoff,
   .vs-meds,
+  .vs-top-stack,
   .vs-identity,
+  .vs-exam-panel,
   .vs-footer {
     break-inside: avoid;
     page-break-inside: avoid;

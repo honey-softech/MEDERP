@@ -109,8 +109,15 @@ export function drawIdentity(
     ageGender: string;
     ids: { label: string; value: string }[];
     meta: { label: string; value: string }[];
+    /** When set, draws general examination in a compact grid below patient details. */
+    vitals?: { label: string; value: string }[];
   },
 ) {
+  if (params.vitals && params.vitals.length > 0) {
+    drawIdentityWithVitals(doc, params.patientName, params.ageGender, params.ids, params.meta, params.vitals);
+    return;
+  }
+
   const left = doc.page.margins.left;
   const width = pageWidth(doc);
   const startY = doc.y;
@@ -154,6 +161,55 @@ export function drawIdentity(
     doc.font("Helvetica").fontSize(9).fillColor(PRINT_INK).text(field.value, x, y + 10, { width: col - 8 });
   });
   doc.y = startY + boxH + 14;
+  doc.x = left;
+}
+
+function drawIdentityWithVitals(
+  doc: PDFKit.PDFDocument,
+  patientName: string,
+  ageGender: string,
+  ids: { label: string; value: string }[],
+  meta: { label: string; value: string }[],
+  vitals: { label: string; value: string }[],
+) {
+  // Patient block first (full width), then general examination underneath in a compact grid.
+  drawIdentity(doc, { patientName, ageGender, ids, meta });
+
+  const left = doc.page.margins.left;
+  const width = pageWidth(doc);
+  const pad = 8;
+  const startY = doc.y;
+  const cols = 3;
+  const vitalRows = Math.ceil(vitals.length / cols);
+  const boxH = pad + 14 + vitalRows * 13 + pad;
+
+  doc.save();
+  doc.roundedRect(left, startY, width, boxH, 6).fillAndStroke(PRINT_BOX, PRINT_LINE);
+  doc.restore();
+
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(PRINT_INK).text("General examination", left + pad, startY + pad, {
+    width: width - pad * 2,
+  });
+
+  const colW = (width - pad * 2 - 12) / cols;
+  const vitalStart = startY + pad + 16;
+  vitals.forEach((row, index) => {
+    const col = index % cols;
+    const rowIndex = Math.floor(index / cols);
+    const x = left + pad + col * (colW + 6);
+    const fieldY = vitalStart + rowIndex * 13;
+    const labelW = Math.min(72, colW * 0.48);
+    if (row.label) {
+      doc.font("Helvetica").fontSize(8).fillColor(PRINT_MUTED).text(row.label, x, fieldY, { width: labelW });
+    }
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .fillColor(PRINT_INK)
+      .text(row.value, x + labelW, fieldY, { width: colW - labelW });
+  });
+
+  doc.y = startY + boxH + 12;
   doc.x = left;
 }
 

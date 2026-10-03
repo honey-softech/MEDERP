@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
-import { ensureDrugCatalogCache, searchDrugCatalogCache } from "@/lib/drug-catalog-cache";
+import { ensureDrugCatalogCache } from "@/lib/drug-catalog-cache";
+import { DRUG_FORM_FILTERS } from "@/lib/drug-catalog-cache/search";
 import { parseMedications } from "@/lib/prescription-text";
 
 type DrugSuggest = {
@@ -11,6 +12,14 @@ type DrugSuggest = {
   salt: string | null;
   pack: string | null;
   manufacturer: string | null;
+};
+
+type SuggestResponse = {
+  items?: DrugSuggest[];
+  preferred?: DrugSuggest[];
+  other?: DrugSuggest[];
+  preferredManufacturers?: string[];
+  canManagePreferred?: boolean;
 };
 
 type RxRow = {
@@ -29,8 +38,11 @@ const RECENT_KEY = "mederp_recent_drugs";
 const MAX_RECENT = 12;
 const rxInputClass =
   "h-8 min-w-0 rounded-lg border border-border px-2.5 text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light sm:h-9";
+const filterClass =
+  "h-7 max-w-[9.5rem] rounded-md border border-border bg-surface px-1.5 text-[11px] text-text-primary outline-none focus:border-primary";
 
 type Timing = { m: boolean; a: boolean; n: boolean };
+type ManufacturerFilter = "boost" | "preferred" | "all" | string;
 
 function timingLabel(t: Timing) {
   return `${t.m ? "1" : "0"}-${t.a ? "1" : "0"}-${t.n ? "1" : "0"}`;
@@ -77,6 +89,55 @@ function pushRecent(name: string) {
   localStorage.setItem(RECENT_KEY, JSON.stringify(next));
 }
 
+function SuggestRow({
+  item,
+  preferred,
+  canStar,
+  starring,
+  onSelect,
+  onStar,
+}: {
+  item: DrugSuggest;
+  preferred?: boolean;
+  canStar: boolean;
+  starring: boolean;
+  onSelect: () => void;
+  onStar: () => void;
+}) {
+  return (
+    <li className="flex items-stretch">
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 flex-col items-start px-3 py-1.5 text-left hover:bg-primary-light"
+        onClick={onSelect}
+      >
+        <span className="flex items-center gap-1.5 text-sm font-medium text-text-primary">
+          {preferred ? <span className="text-[11px] text-amber-600" aria-hidden>★</span> : null}
+          {item.name}
+        </span>
+        <span className="text-[11px] text-text-secondary">
+          {[item.salt, item.pack, item.manufacturer].filter(Boolean).join(" · ")}
+        </span>
+      </button>
+      {canStar && item.manufacturer && !preferred ? (
+        <button
+          type="button"
+          className="shrink-0 px-2 text-[11px] text-text-secondary hover:bg-primary-light hover:text-primary"
+          title={`Add ${item.manufacturer} to preferred`}
+          aria-label={`Add ${item.manufacturer} to preferred manufacturers`}
+          disabled={starring}
+          onClick={(event) => {
+            event.stopPropagation();
+            onStar();
+          }}
+        >
+          ☆
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
 export function PrescriptionBuilder({
   value,
   onChange,
@@ -87,9 +148,19 @@ export function PrescriptionBuilder({
   const listId = useId();
   const [rows, setRows] = useState<RxRow[]>(() => rowsFromText(value));
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<DrugSuggest[]>([]);
+  const [preferredHits, setPreferredHits] = useState<DrugSuggest[]>([]);
+  const [otherHits, setOtherHits] = useState<DrugSuggest[]>([]);
+  const [preferredManufacturers, setPreferredManufacturers] = useState<string[]>([]);
+  const [canManagePreferred, setCanManagePreferred] = useState(false);
+  const [manufacturerFilter, setManufacturerFilter] = useState<ManufacturerFilter>("boost");
+  const [formFilter, setFormFilter] = useState("");
+  const [strengthFilter, setStrengthFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [starringManufacturer, setStarringManufacturer] = useState<string | null>(null);
+  const [starMessage, setStarMessage] = useState("");
+  const [searchError, setSearchError] = useState("");
+  const [searchNonce, setSearchNonce] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
   const [draftNotes, setDraftNotes] = useState("");
   const [timing, setTiming] = useState<Timing>({ m: false, a: false, n: false });
@@ -100,6 +171,8 @@ export function PrescriptionBuilder({
   const abortRef = useRef<AbortController | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const suppressSearchRef = useRef(false);
+
+  const suggestions = useMemo(() => [...preferredHits, ...otherHits], [preferredHits, otherHits]);
 
   useEffect(() => {
     setRecent(loadRecent());
@@ -115,14 +188,18 @@ export function PrescriptionBuilder({
   useEffect(() => {
     if (suppressSearchRef.current) {
       suppressSearchRef.current = false;
-      setSuggestions([]);
+      setPreferredHits([]);
+      setOtherHits([]);
+      setSearchError("");
       setLoading(false);
       return;
     }
 
     const q = query.trim();
     if (q.length < 2) {
-      setSuggestions([]);
+      setPreferredHits([]);
+      setOtherHits([]);
+      setSearchError("");
       setLoading(false);
       return;
     }
@@ -132,26 +209,48 @@ export function PrescriptionBuilder({
       const controller = new AbortController();
       abortRef.current = controller;
       setLoading(true);
+      setSearchError("");
       void (async () => {
         try {
-          const local = await searchDrugCatalogCache(q, 12);
+          // Always hit the API on web; local IndexedDB cache is mobile-only.
+          const params = new URLSearchParams({ q, limit: "12" });
+          if (manufacturerFilter) params.set("manufacturer", manufacturerFilter);
+          if (formFilter) params.set("form", formFilter);
+          if (strengthFilter.trim()) params.set("strength", strengthFilter.trim());
+
+          const response = await fetch(`/api/medicines/suggest?${params}`, {
+            signal: controller.signal,
+          });
+          const data = (await response.json().catch(() => ({}))) as SuggestResponse & { error?: string };
           if (controller.signal.aborted) return;
-          if (local && local.length > 0) {
-            setSuggestions(local);
+
+          if (!response.ok) {
+            setPreferredHits([]);
+            setOtherHits([]);
+            setSearchError(data.error ?? "Medicine search failed. Try again.");
             setOpen(true);
             return;
           }
 
-          const response = await fetch(`/api/medicines/suggest?q=${encodeURIComponent(q)}&limit=12`, {
-            signal: controller.signal,
-          });
-          const data = (await response.json()) as { items?: DrugSuggest[] };
-          if (!controller.signal.aborted) {
-            setSuggestions(Array.isArray(data.items) ? data.items : []);
-            setOpen(true);
+          setPreferredHits(Array.isArray(data.preferred) ? data.preferred : []);
+          setOtherHits(Array.isArray(data.other) ? data.other : Array.isArray(data.items) ? data.items : []);
+          if (Array.isArray(data.preferredManufacturers)) {
+            setPreferredManufacturers(data.preferredManufacturers);
           }
-        } catch {
-          if (!controller.signal.aborted) setSuggestions([]);
+          if (typeof data.canManagePreferred === "boolean") {
+            setCanManagePreferred(data.canManagePreferred);
+          }
+          setOpen(true);
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            setPreferredHits([]);
+            setOtherHits([]);
+            // Aborts throw; ignore those. Network/parse errors should surface.
+            if (!(error instanceof DOMException && error.name === "AbortError")) {
+              setSearchError("Medicine search failed. Try again.");
+              setOpen(true);
+            }
+          }
         } finally {
           if (!controller.signal.aborted) setLoading(false);
         }
@@ -162,7 +261,9 @@ export function PrescriptionBuilder({
       clearTimeout(timer);
       abortRef.current?.abort();
     };
-  }, [query]);
+    // preferredManufacturers only used for local cache sectioning; API returns sections.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchNonce forces refresh after starring a brand
+  }, [query, manufacturerFilter, formFilter, strengthFilter, searchNonce]);
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -189,14 +290,18 @@ export function PrescriptionBuilder({
     if (!trimmed) return;
     suppressSearchRef.current = true;
     setQuery(trimmed);
-    setSuggestions([]);
+    setPreferredHits([]);
+    setOtherHits([]);
+    setSearchError("");
     setOpen(false);
   }
 
   function resetDraft() {
     suppressSearchRef.current = true;
     setQuery("");
-    setSuggestions([]);
+    setPreferredHits([]);
+    setOtherHits([]);
+    setSearchError("");
     setOpen(false);
     setDraftNotes("");
     setTiming({ m: false, a: false, n: false });
@@ -204,6 +309,7 @@ export function PrescriptionBuilder({
     setFood("");
     setDuration("");
     setEditingKey(null);
+    setStarMessage("");
   }
 
   function addMedicine() {
@@ -230,7 +336,8 @@ export function PrescriptionBuilder({
     setSos(false);
     setFood("");
     setDuration("");
-    setSuggestions([]);
+    setPreferredHits([]);
+    setOtherHits([]);
     setOpen(false);
   }
 
@@ -255,31 +362,74 @@ export function PrescriptionBuilder({
     setRows((current) => current.filter((row) => row.key !== key));
   }
 
+  async function starManufacturer(name: string) {
+    setStarringManufacturer(name);
+    setStarMessage("");
+    try {
+      const response = await fetch("/api/hospital/drug-brands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manufacturerName: name }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        alreadyPreferred?: boolean;
+        manufacturer?: { name: string };
+      };
+      if (!response.ok) {
+        setStarMessage(data.error ?? "Could not add preferred brand.");
+        return;
+      }
+      const addedName = data.manufacturer?.name ?? name;
+      setPreferredManufacturers((current) =>
+        current.some((item) => item.toLowerCase() === addedName.toLowerCase())
+          ? current
+          : [...current, addedName],
+      );
+      setStarMessage(data.alreadyPreferred ? `${addedName} is already preferred.` : `Added ${addedName} to preferred.`);
+      setSearchNonce((value) => value + 1);
+    } finally {
+      setStarringManufacturer(null);
+    }
+  }
+
+  const showDropdown =
+    open &&
+    (suggestions.length > 0 ||
+      loading ||
+      Boolean(searchError) ||
+      (query.trim().length < 2 && recent.length > 0) ||
+      starMessage ||
+      (query.trim().length >= 2 && !loading));
+
   return (
     <div className="space-y-2">
       <div ref={boxRef} className="relative space-y-2">
-        <input
-          className={`${rxInputClass} w-full`}
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder="Search medicine…"
-          autoComplete="off"
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-label="Search medicine"
-        />
+        <div className="relative">
+          <input
+            className={`${rxInputClass} w-full`}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+              setStarMessage("");
+              setSearchError("");
+            }}
+            onFocus={() => setOpen(true)}
+            placeholder="Search medicine… e.g. Paracetamol 500 tablet"
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-label="Search medicine"
+          />
 
-        {open && (suggestions.length > 0 || loading || (query.trim().length < 2 && recent.length > 0)) ? (
-          <ul
-            id={listId}
-            role="listbox"
-            className="absolute left-0 right-0 z-20 max-h-44 overflow-y-auto rounded-lg border border-border bg-surface shadow-card"
-          >
+          {showDropdown ? (
+            <ul
+              id={listId}
+              role="listbox"
+              className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-surface shadow-card"
+            >
             {query.trim().length < 2
               ? recent.map((name) => (
                   <li key={name}>
@@ -294,26 +444,107 @@ export function PrescriptionBuilder({
                   </li>
                 ))
               : null}
-            {loading ? <li className="px-3 py-1.5 text-xs text-text-secondary">Searching…</li> : null}
-            {!loading && query.trim().length >= 2 && suggestions.length === 0 ? (
-              <li className="px-3 py-1.5 text-xs text-text-secondary">No match — add as free text.</li>
-            ) : null}
-            {suggestions.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-primary-light"
-                  onClick={() => selectMedicine(item.name)}
-                >
-                  <span className="text-sm font-medium text-text-primary">{item.name}</span>
-                  <span className="text-[11px] text-text-secondary">
-                    {[item.salt, item.pack, item.manufacturer].filter(Boolean).join(" · ")}
-                  </span>
-                </button>
-              </li>
+              {loading ? <li className="px-3 py-1.5 text-xs text-text-secondary">Searching…</li> : null}
+              {searchError ? <li className="px-3 py-1.5 text-xs text-critical">{searchError}</li> : null}
+              {!loading && !searchError && query.trim().length >= 2 && suggestions.length === 0 ? (
+                <li className="px-3 py-1.5 text-xs text-text-secondary">No match — add as free text.</li>
+              ) : null}
+              {starMessage ? (
+                <li className="border-b border-border px-3 py-1.5 text-[11px] text-success">{starMessage}</li>
+              ) : null}
+              {preferredHits.length > 0 ? (
+                <li className="sticky top-0 bg-app-bg px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                  Preferred
+                </li>
+              ) : null}
+              {preferredHits.map((item) => (
+                <SuggestRow
+                  key={`p-${item.id}`}
+                  item={item}
+                  preferred
+                  canStar={false}
+                  starring={false}
+                  onSelect={() => selectMedicine(item.name)}
+                  onStar={() => undefined}
+                />
+              ))}
+              {otherHits.length > 0 ? (
+                <li className="sticky top-0 bg-app-bg px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                  {preferredHits.length > 0 ? `Other results (${otherHits.length})` : "Results"}
+                </li>
+              ) : null}
+              {otherHits.map((item) => (
+                <SuggestRow
+                  key={`o-${item.id}`}
+                  item={item}
+                  canStar={canManagePreferred}
+                  starring={starringManufacturer === item.manufacturer}
+                  onSelect={() => selectMedicine(item.name)}
+                  onStar={() => {
+                    if (item.manufacturer) void starManufacturer(item.manufacturer);
+                  }}
+                />
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <label className="sr-only" htmlFor={`${listId}-mfr`}>
+            Manufacturer filter
+          </label>
+          <select
+            id={`${listId}-mfr`}
+            className={filterClass}
+            value={manufacturerFilter}
+            onChange={(event) => setManufacturerFilter(event.target.value)}
+          >
+            <option value="boost">★ Preferred first</option>
+            <option value="preferred">Preferred only</option>
+            <option value="all">All manufacturers</option>
+            {preferredManufacturers.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
             ))}
-          </ul>
-        ) : null}
+          </select>
+
+          <label className="sr-only" htmlFor={`${listId}-form`}>
+            Dosage form
+          </label>
+          <select
+            id={`${listId}-form`}
+            className={filterClass}
+            value={formFilter}
+            onChange={(event) => setFormFilter(event.target.value)}
+          >
+            <option value="">Any form</option>
+            {DRUG_FORM_FILTERS.map((form) => (
+              <option key={form} value={form}>
+                {form.charAt(0).toUpperCase() + form.slice(1)}
+              </option>
+            ))}
+          </select>
+
+          <label className="sr-only" htmlFor={`${listId}-strength`}>
+            Strength
+          </label>
+          <input
+            id={`${listId}-strength`}
+            className={filterClass}
+            value={strengthFilter}
+            onChange={(event) => setStrengthFilter(event.target.value)}
+            placeholder="Strength e.g. 500mg"
+            list={`${listId}-strengths`}
+          />
+          <datalist id={`${listId}-strengths`}>
+            <option value="250mg" />
+            <option value="500mg" />
+            <option value="650mg" />
+            <option value="40mg" />
+            <option value="10mg" />
+          </datalist>
+        </div>
 
         <div className="flex flex-wrap items-center gap-1">
           {(

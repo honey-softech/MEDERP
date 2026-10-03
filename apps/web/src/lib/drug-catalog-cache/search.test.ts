@@ -3,9 +3,13 @@ import { isMedErpMobileUserAgent } from "@/lib/drug-catalog-cache/platform";
 import { catalogRowInSnapshot, catalogSyncNeedsSnapshot } from "@/lib/drug-catalog-sync";
 import {
   catalogTokens,
+  drugMatchesForm,
+  drugMatchesStrength,
   matchesBrand,
   parseCatalogLine,
+  parseDrugQuery,
   rankDrugSuggestions,
+  sectionDrugSuggestions,
   toCachedDrug,
 } from "@/lib/drug-catalog-cache/search";
 
@@ -18,6 +22,23 @@ describe("drug catalog local search", () => {
       "micro",
       "labs",
     ]);
+  });
+
+  it("parses strength and dosage form out of a free-text query", () => {
+    expect(parseDrugQuery("Paracetamol 500 tablet")).toEqual({
+      text: "paracetamol",
+      raw: "paracetamol 500 tablet",
+      strength: "500mg",
+      form: "tablet",
+    });
+  });
+
+  it("matches pack/name against form and strength filters", () => {
+    const dolo = { name: "Dolo 650", salt: "Paracetamol", pack: "15 tablets", manufacturer: "Micro Labs" };
+    expect(drugMatchesForm(dolo, "tablet")).toBe(true);
+    expect(drugMatchesForm(dolo, "syrup")).toBe(false);
+    expect(drugMatchesStrength(dolo, "650mg")).toBe(true);
+    expect(drugMatchesStrength(dolo, "500mg")).toBe(false);
   });
 
   it("ranks name prefixes ahead of other matches, then alphabetically", () => {
@@ -102,6 +123,48 @@ describe("drug catalog local search", () => {
       2,
     );
     expect(ranked.map((row) => row.name)).toEqual(["Dolo 650", "Dolopar"]);
+  });
+
+  it("sections preferred manufacturers ahead of others", () => {
+    const sectioned = sectionDrugSuggestions(
+      [
+        { name: "Azibact", manufacturer: "Ipca", medicineCount: 8000 },
+        { name: "Azee", manufacturer: "Cipla", medicineCount: 200 },
+        { name: "Azithro", manufacturer: "Cipla", medicineCount: 100 },
+      ],
+      "azi",
+      ["Cipla"],
+      3,
+    );
+    expect(sectioned.preferred.map((row) => row.name)).toEqual(["Azithro", "Azee"]);
+    expect(sectioned.other.map((row) => row.name)).toEqual(["Azibact"]);
+  });
+
+  it("prefers exact strength matches when the query includes strength", () => {
+    const ranked = rankDrugSuggestions(
+      [
+        { name: "Dolo 650", manufacturer: "Micro Labs", salt: "Paracetamol", pack: "15 tablets" },
+        { name: "Dolo 500", manufacturer: "Micro Labs", salt: "Paracetamol", pack: "15 tablets" },
+        { name: "Calpol 500", manufacturer: "GSK", salt: "Paracetamol", pack: "15 tablets" },
+      ],
+      "paracetamol 500 tablet",
+      ["Micro Labs"],
+      3,
+    );
+    expect(ranked[0]?.name).toBe("Dolo 500");
+  });
+
+  it("orders preferred manufacturers by admin priority list order", () => {
+    const ranked = rankDrugSuggestions(
+      [
+        { name: "Crocin 500", manufacturer: "Abbott", salt: "Paracetamol", pack: "15 tablets" },
+        { name: "Dolo 500", manufacturer: "Micro Labs", salt: "Paracetamol", pack: "15 tablets" },
+      ],
+      "paracetamol 500",
+      ["Micro Labs", "Abbott"],
+      2,
+    );
+    expect(ranked.map((row) => row.name)).toEqual(["Dolo 500", "Crocin 500"]);
   });
 
   it("builds a cache record from a snapshot line", () => {

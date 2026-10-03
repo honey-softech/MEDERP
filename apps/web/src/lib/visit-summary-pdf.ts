@@ -8,7 +8,6 @@ import {
   drawSignoff,
   drawTitle,
   drawTwoColTable,
-  drawVitalsList,
   printClock,
 } from "@/lib/print-document-pdf";
 import {
@@ -101,30 +100,28 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
         { label: "Consulting physician", value: physician },
         { label: "Department", value: input.departmentName },
       ],
+      vitals:
+        input.vitalsRows && input.vitalsRows.length > 0
+          ? input.vitalsRows
+          : [
+              "Temperature",
+              "Height",
+              "Weight",
+              "BMI",
+              "BSA",
+              "SpO2",
+              "Pulse",
+              "Respiratory rate",
+              "BP",
+              "Blood sugar",
+              "Fever",
+              "Vital remarks",
+            ].map((label) => ({ label, value: "—" })),
     });
 
     drawClinicalRow(doc, "Diagnosis", `Final Diagnosis: ${readableClinicalText(input.assessment.diagnosis) || "—"}`);
     drawClinicalRow(doc, "Presenting complaints", readableClinicalText(input.assessment.chiefComplaint) || "—");
     drawClinicalRow(doc, "History of present illness", readableClinicalText(input.assessment.summary) || "—");
-    drawVitalsList(
-      doc,
-      input.vitalsRows && input.vitalsRows.length > 0
-        ? input.vitalsRows
-        : [
-            "Temperature",
-            "Height",
-            "Weight",
-            "BMI",
-            "BSA",
-            "SpO2",
-            "Pulse",
-            "Respiratory rate",
-            "BP",
-            "Blood sugar",
-            "Fever",
-            "Vital remarks",
-          ].map((label) => ({ label, value: "—" })),
-    );
     drawClinicalRow(doc, "Systemic examination", readableClinicalText(input.assessment.examination) || "—");
     drawClinicalRow(doc, "Advice", readableClinicalText(input.assessment.advice) || "—");
     drawClinicalRow(doc, followUp ? "Follow-up" : "Outcome", outcome);

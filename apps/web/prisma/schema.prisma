@@ -1322,10 +1322,13 @@ model HospitalDrugManufacturer {
   hospital       Hospital         @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
   manufacturerId String
   manufacturer   DrugManufacturer @relation(fields: [manufacturerId], references: [id], onDelete: Cascade)
+  /// Lower sorts first in preferred suggestions (0 = top).
+  priority       Int              @default(0)
   createdAt      DateTime         @default(now())
 
   @@id([hospitalId, manufacturerId])
   @@index([manufacturerId])
+  @@index([hospitalId, priority])
 }
 
 /// Hospital pharmacy item (what this hospital stocks — not national catalog).

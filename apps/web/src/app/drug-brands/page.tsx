@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { DrugBrandForm } from "@/components/drug-brand-form";
-import { listManufacturersForPicker } from "@/lib/drug-brands";
+import { listManufacturersForPicker, listPreferredManufacturers } from "@/lib/drug-brands";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -28,20 +28,17 @@ export default async function DrugBrandsPage() {
     `;
   }
 
-  const selected = await prisma.hospitalDrugManufacturer.findMany({
-    where: { hospitalId: user.hospitalId },
-    include: { manufacturer: { select: { id: true, name: true, medicineCount: true } } },
-    orderBy: { manufacturer: { name: "asc" } },
-  });
-
-  const suggestions = await listManufacturersForPicker("", 40);
+  const [selected, suggestions] = await Promise.all([
+    listPreferredManufacturers(user.hospitalId),
+    listManufacturersForPicker("", 40),
+  ]);
 
   return (
     <AppShell title="Medicine brands">
       <p className="mb-6 max-w-3xl text-sm text-text-secondary">
-        Choose which manufacturers appear in the doctor’s prescription autosuggest for this hospital. Only the hospital
-        super admin can change this list. Leave empty to allow the full catalog. Loading new medicines onto the server
-        is done by MedERP software admin, not from here.
+        Choose preferred manufacturers for prescription search. Preferred brands appear first when doctors type a
+        medicine name. Doctors can also star a manufacturer from the prescription search. Leave empty to rank the full
+        catalog by match quality. Loading new medicines onto the server is done by MedERP software admin, not from here.
       </p>
       {catalogSize === 0 ? (
         <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
@@ -55,7 +52,11 @@ export default async function DrugBrandsPage() {
         </p>
       )}
       <DrugBrandForm
-        initialSelected={selected.map((row) => row.manufacturer)}
+        initialSelected={selected.map((row) => ({
+          id: row.id,
+          name: row.name,
+          medicineCount: row.medicineCount,
+        }))}
         initialSuggestions={suggestions}
       />
     </AppShell>

@@ -158,11 +158,11 @@ export function DrugBrandForm({
       <div className="rounded-lg border border-border bg-surface p-4 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="font-semibold text-text-primary">Preferred brands</h3>
+            <h3 className="font-semibold text-text-primary">Preferred manufacturers</h3>
             <p className="mt-1 text-sm text-text-secondary">
               {selected.length === 0
-                ? "None selected — doctors see the full Indian catalog."
-                : `${selected.length} brand${selected.length === 1 ? "" : "s"} active for prescription search.`}
+                ? "None selected — prescription search ranks the full catalog with no brand boost."
+                : `${selected.length} manufacturer${selected.length === 1 ? "" : "s"} boosted to the top of prescription search.`}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -242,7 +242,9 @@ export function DrugBrandForm({
             </>
           ) : (
             <p className="mt-3 text-sm text-text-secondary">
-              {editing ? "Pick brands from the list below." : "Tap the pencil to choose brands for this hospital."}
+              {editing
+                ? "Add manufacturers your pharmacy stocks. They will appear first when doctors search medicines."
+                : "Tap the pencil to choose preferred manufacturers for this hospital."}
             </p>
           )
         ) : null}
@@ -251,7 +253,7 @@ export function DrugBrandForm({
       {editing ? (
         <div className="rounded-lg border border-border bg-surface p-4 shadow-card">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-text-primary">Manufacturer catalog</h3>
+            <h3 className="text-sm font-semibold text-text-primary">Add from manufacturer catalog</h3>
             <ExpandToggle open={catalogOpen} onToggle={() => setCatalogOpen((v) => !v)} count={listRows.length} />
           </div>
 
@@ -271,10 +273,10 @@ export function DrugBrandForm({
               </label>
               <p className="mt-1 text-xs text-text-secondary">
                 {query.trim().length < 2
-                  ? "Top brands by catalog size. Type 2+ letters to search all manufacturers."
+                  ? "Showing largest catalogs first. Type 2+ letters to find a manufacturer (e.g. Cipla, Micro Labs)."
                   : searching
                     ? "Searching…"
-                    : `${listRows.length} matches`}
+                    : `${listRows.length} matches — tap + to prefer, trash to remove`}
               </p>
 
               <ul className="mt-3 max-h-[28rem] divide-y divide-border overflow-y-auto rounded-lg border border-border">
@@ -335,7 +337,11 @@ export function DrugBrandForm({
       ) : null}
 
       {error ? <p className="text-sm text-critical">{error}</p> : null}
-      {saved ? <p className="text-sm text-success">Brands saved. Doctor search will use this list.</p> : null}
+      {saved ? (
+        <p className="text-sm text-success">
+          Preferred manufacturers saved. Prescription search will show these brands first.
+        </p>
+      ) : null}
     </div>
   );
 }

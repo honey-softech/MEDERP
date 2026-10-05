@@ -377,6 +377,8 @@ model Hospital {
   code          String                 @unique
   address       String?
   phone         String?
+  /** Extra clinic numbers (landline, mobile) as JSON, printed on bills and records. */
+  altPhones     String?                @db.Text
   logoData      String?                @db.Text
   sealData      String?                @db.Text
   opdFee        Decimal                @default(500) @db.Decimal(12, 2)

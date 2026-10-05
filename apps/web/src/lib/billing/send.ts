@@ -1,48 +1,26 @@
 import type { Prisma } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit";
 import type { HospitalActor } from "@/lib/authz/hospital";
-import { buildBillReceiptPdf } from "@/lib/bill-receipt-pdf";
-import { resolveReceiptCollector } from "@/lib/billing/receipt-collector";
+import { findInvoiceForReceipt, renderInvoiceReceiptPdf } from "@/lib/billing/receipt-pdf";
 import {
-  billPdfFilename,
   canSendIssuedInvoice,
   hasSendableMobile,
   invoiceDue,
   patientMobileDigits,
 } from "@/lib/billing/rules";
 import type { BillingActionResult } from "@/lib/billing/types";
-import { doctorName, inr, patientName } from "@/lib/display";
+import { inr, patientName } from "@/lib/display";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { renderTemplate } from "@/lib/messaging/templates";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { prisma } from "@/lib/prisma";
-import { hospitalScope } from "@/lib/tenancy";
 
 export async function sendInvoiceWhatsApp(params: {
   request: Request;
   user: HospitalActor;
   invoiceId: string;
 }): Promise<BillingActionResult> {
-  const invoice = await prisma.invoice.findFirst({
-    where: { id: params.invoiceId, ...hospitalScope(params.user.hospitalId) },
-    include: {
-      patient: true,
-      hospital: { select: { name: true, address: true, phone: true } },
-      items: true,
-      payments: {
-        orderBy: { receivedAt: "desc" },
-        include: {
-          receivedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
-        },
-      },
-      appointment: {
-        include: {
-          doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
-          department: { select: { name: true } },
-        },
-      },
-    },
-  });
+  const invoice = await findInvoiceForReceipt(params.user.hospitalId, params.invoiceId);
   if (!invoice) {
     return { ok: false, error: "Invoice not found.", status: 404 };
   }
@@ -64,29 +42,7 @@ export async function sendInvoiceWhatsApp(params: {
     due: inr(due),
   };
   const body = renderTemplate("bill_receipt", variables);
-  const filename = billPdfFilename(invoice.invoiceNo);
-  const visitLine = invoice.appointment
-    ? `${doctorName(invoice.appointment.doctor)} · ${invoice.appointment.department.name}`
-    : null;
-
-  const pdf = await buildBillReceiptPdf({
-    hospitalName: invoice.issuedHospitalName || invoice.hospital.name,
-    issuedAt: invoice.issuedAt,
-    status: invoice.status,
-    patientName: invoice.issuedPatientName || patientName(invoice.patient),
-    patientMrn: invoice.issuedPatientMrn || invoice.patient.mrn,
-    visitLine,
-    items: invoice.items,
-    subtotal: invoice.subtotal,
-    discountAmount: invoice.discountAmount,
-    waiverAmount: invoice.waiverAmount,
-    waiverReason: invoice.waiverReason,
-    showWaiver: invoice.waiverStatus === "APPROVED",
-    netTotal: invoice.netTotal,
-    paidAmount: invoice.paidAmount,
-    payments: invoice.payments,
-    collector: await resolveReceiptCollector(invoice.payments),
-  });
+  const { pdf, filename } = await renderInvoiceReceiptPdf(invoice);
 
   let documentMediaId: string | undefined;
   if (messagingProvider() === "whatsapp") {

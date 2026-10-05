@@ -29,7 +29,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
       vitals: true,
       assessment: { include: { approvedBySignature: { select: { imageData: true } } } },
       hospital: {
-        select: { name: true, address: true, phone: true, logoData: true, sealData: true, code: true },
+        select: { name: true, address: true, phone: true, altPhones: true, logoData: true, sealData: true, code: true },
       },
     },
   });

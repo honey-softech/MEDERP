@@ -3,6 +3,7 @@ import { MissingRecord } from "@/components/missing-record";
 import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { InvoiceActions } from "@/components/billing-forms";
+import { DownloadBillButton } from "@/components/download-bill-button";
 import { PrintButton } from "@/components/print-button";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { SignatureBlock } from "@/components/signature-block";
@@ -20,6 +21,8 @@ import {
 import { invoiceWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
 import { resolveReceiptCollector } from "@/lib/billing/receipt-collector";
+import { letterheadPhoneText } from "@/lib/hospital-letterhead";
+import { billPdfFilename } from "@/lib/billing/rules";
 import { redirect } from "next/navigation";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +40,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           receivedBySignature: { select: { imageData: true, displayName: true, credentials: true } },
         },
       },
+      hospital: { select: { name: true, address: true, phone: true, altPhones: true } },
       appointment: { include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true } },
     },
   });
@@ -45,6 +49,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   }
 
   const due = Math.max(0, Number(invoice.netTotal) - Number(invoice.paidAmount));
+  const clinicName = invoice.issuedHospitalName || invoice.hospital.name;
+  const clinicAddress = invoice.issuedHospitalAddress || invoice.hospital.address;
+  const clinicPhone = letterheadPhoneText(
+    invoice.issuedHospitalPhone || invoice.hospital.phone,
+    invoice.hospital.altPhones,
+  );
   const collector = await resolveReceiptCollector(invoice.payments);
   const billAlreadySent = await invoiceWhatsAppSent({
     hospitalId: user.hospitalId,
@@ -66,14 +76,18 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             alreadySent={billAlreadySent}
           />
         ) : null}
+        <DownloadBillButton invoiceId={invoice.id} filename={billPdfFilename(invoice.invoiceNo)} />
         <PrintButton />
       </div>
 
       <article className="max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700">
-          {invoice.issuedHospitalName || user.hospital?.name || "Hospital"}
-        </p>
-        <h2 className="mt-1 text-xl font-semibold">Receipt / invoice</h2>
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700">{clinicName}</p>
+          {clinicAddress ? <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{clinicAddress}</p> : null}
+          {clinicPhone ? <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{clinicPhone}</p> : null}
+        </header>
+        <h2 className="mt-3 text-xl font-semibold">Receipt / invoice</h2>
+        <p className="mt-1 font-mono text-sm font-semibold text-slate-800">Invoice {invoice.invoiceNo}</p>
         <p className="mt-1 text-sm text-slate-500">
           {invoice.issuedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} · {prettyEnum(invoice.status)}
         </p>

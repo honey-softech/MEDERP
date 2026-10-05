@@ -287,6 +287,8 @@ html {
   margin: 2px 0 0;
   color: #616161;
   font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
 }

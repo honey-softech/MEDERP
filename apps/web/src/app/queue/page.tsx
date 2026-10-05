@@ -15,6 +15,7 @@ import {
   PRINT_SUMMARY_ROLES,
   canAddWalkIn,
   canCheckoutVisit,
+  canCollectOpdFee,
   hasFrontDeskAccess,
   dayRange,
   doctorName,
@@ -119,6 +120,8 @@ export default async function QueuePage({
           }));
   const doctorQueues = isToday ? [...grouped, ...emptyDoctors] : grouped;
   const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
+  // Doctors/nurses can collect even in clinical view; only hide when Super Admin is in doctor mode.
+  const canCollectFee = canCollectOpdFee(user) && !(actingAsDoctor && user.role === "SUPER_ADMIN");
   const canCheckout = canCheckoutVisit(user) && !actingAsDoctor;
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
   const canDoctorVisit = actingAsDoctor;
@@ -136,7 +139,7 @@ export default async function QueuePage({
               ? myDoctorId
                 ? "Your tokens start at T-001 each day."
                 : "Each doctor has a separate queue. Tokens restart at T-001 per doctor, per day."
-              : `Past OPD for ${dayLabel}. Doctors can review completed visits from previous days.`}{" "}
+              : `Past OPD for ${dayLabel}. Unpaid visits still show Record payment for admin, nurse, doctor, and receptionist.`}{" "}
             {isToday
               ? `Waiting ${waiting} · With doctor ${checkedIn}`
               : `Completed ${completed} · Visits ${queue.length}`}
@@ -299,13 +302,16 @@ export default async function QueuePage({
                         </div>
                       ) : null}
 
+                      {canCollectFee && !isConsultationPaid(row.invoices[0]) ? (
+                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                          <Link href={`/billing/collect/${row.id}`} className={compactPrimaryButtonClass}>
+                            Record payment
+                          </Link>
+                        </div>
+                      ) : null}
+
                       {canManage && isToday ? (
                         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                          {!isConsultationPaid(row.invoices[0]) ? (
-                            <Link href={`/billing/collect/${row.id}`} className={compactPrimaryButtonClass}>
-                              Record payment
-                            </Link>
-                          ) : null}
                           <AppointmentActions
                             id={row.id}
                             status={row.status}

@@ -31,6 +31,7 @@ export function LabOrderPanel({
   appointmentId = "",
   patientPhone = null,
   investigationsAlreadySent = false,
+  embedded = false,
 }: {
   orders: LabOrder[];
   canCollect?: boolean;
@@ -41,11 +42,13 @@ export function LabOrderPanel({
   appointmentId?: string;
   patientPhone?: string | null;
   investigationsAlreadySent?: boolean;
+  /** Inside the tests / scans popup — no extra card chrome. */
+  embedded?: boolean;
 }) {
   if (orders.length === 0) return null;
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-2.5">
+    <section className={embedded ? "rounded-lg border border-border bg-app-bg/50 p-3" : "rounded-lg border border-border bg-surface p-2.5"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-text-primary">Investigations</h4>
         {canPrint && appointmentId ? (
@@ -83,11 +86,15 @@ export function LabOrderPanel({
                   {external ? "Outside / hand-carried" : inr(order.totalAmount)}
                 </span>
               </div>
-              <ul className="mt-1.5 flex flex-wrap gap-1">
+              <ul className={embedded ? "mt-2 space-y-1" : "mt-1.5 flex flex-wrap gap-1"}>
                 {order.items.map((item) => (
                   <li
                     key={item.id}
-                    className="rounded-full bg-app-bg px-2 py-0.5 text-[11px] font-medium text-text-primary"
+                    className={
+                      embedded
+                        ? "text-sm leading-5 text-text-primary"
+                        : "rounded-full bg-app-bg px-2 py-0.5 text-[11px] font-medium text-text-primary"
+                    }
                     title={item.categorySnapshot}
                   >
                     {item.nameSnapshot}

@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mederp_mobile/bill_download.dart';
 import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -53,7 +54,13 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       ..addJavaScriptChannel(
         'MedErpNative',
         onMessageReceived: (message) {
-          SystemNotifications.showFromBridge(message.message);
+          final raw = message.message;
+          if (isNativeDownloadMessage(raw)) {
+            final download = parseNativeBillDownload(raw);
+            if (download != null) saveNativeBill(download);
+            return;
+          }
+          SystemNotifications.showFromBridge(raw);
         },
       )
       ..setNavigationDelegate(

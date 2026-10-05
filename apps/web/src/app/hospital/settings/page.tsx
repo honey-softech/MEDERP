@@ -7,6 +7,7 @@ import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
 import { NurseReceptionistForm } from "@/components/nurse-receptionist-form";
 import { FollowUpReminderPolicyForm } from "@/components/follow-up-reminder-policy-form";
 import { requireHospitalPage } from "@/lib/front-desk";
+import { parseExtraPhones } from "@/lib/hospital-letterhead";
 import { countStaffWithoutSignature } from "@/lib/signatures";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -33,6 +34,7 @@ export default async function HospitalSettingsPage() {
         code: true,
         address: true,
         phone: true,
+        altPhones: true,
         logoData: true,
         sealData: true,
         opdFee: true,
@@ -84,6 +86,7 @@ export default async function HospitalSettingsPage() {
           code: hospital.code,
           address: hospital.address ?? "",
           phone: hospital.phone ?? "",
+          extraPhones: parseExtraPhones(hospital.altPhones),
           logoData: hospital.logoData ?? "",
           sealData: hospital.sealData ?? "",
           opdFee: String(Number(hospital.opdFee ?? 500)),

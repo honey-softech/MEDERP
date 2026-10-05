@@ -114,6 +114,7 @@ export function ConsultAssessmentForm({
   cockpit = false,
   followUpReminderNote = null,
   testsMountId = null,
+  ordersPanel = null,
   children,
 }: {
   appointmentId: string;
@@ -134,6 +135,8 @@ export function ConsultAssessmentForm({
   followUpReminderNote?: string | null;
   /** When set (cockpit), Tests / scans render under the history column instead of Findings. */
   testsMountId?: string | null;
+  /** Existing orders, shown inside the Tests / scans popup. */
+  ordersPanel?: ReactNode;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -541,6 +544,7 @@ export function ConsultAssessmentForm({
             patientPhone={patientPhone}
             priorOrderCount={priorOrderCount}
             printHref={`/appointments/${appointmentId}/investigations`}
+            ordersPanel={ordersPanel}
           />
           {investigations.length > 0 ? (
             <p className="mt-1.5 text-[11px] text-text-secondary">
@@ -897,6 +901,7 @@ export function ConsultAssessmentForm({
             patientPhone={patientPhone}
             priorOrderCount={priorOrderCount}
             printHref={`/appointments/${appointmentId}/investigations`}
+            ordersPanel={ordersPanel}
           />,
           testsMountEl,
         )

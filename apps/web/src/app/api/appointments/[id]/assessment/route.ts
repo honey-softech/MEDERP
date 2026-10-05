@@ -108,6 +108,7 @@ export async function POST(request: Request, context: Ctx) {
             code: true,
             address: true,
             phone: true,
+            altPhones: true,
             logoData: true,
             sealData: true,
           },

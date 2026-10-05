@@ -12,7 +12,9 @@ export const CLINICAL_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "D
 export const NURSE_VITALS_ROLES: AppRole[] = ["NURSE"];
 export const DOCTOR_VISIT_ROLES: AppRole[] = ["SUPER_ADMIN", "DOCTOR"];
 export const PRINT_SUMMARY_ROLES: AppRole[] = ["SUPER_ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"];
-export const BILLING_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "ACCOUNTANT", "DOCTOR"];
+export const BILLING_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "ACCOUNTANT", "DOCTOR", "NURSE"];
+/** OPD consultation fee collect — admin, nurse, doctor, receptionist (accountant included via billing). */
+export const OPD_FEE_COLLECT_ROLES: AppRole[] = ["SUPER_ADMIN", "RECEPTIONIST", "DOCTOR", "NURSE", "ACCOUNTANT"];
 export const WAIVER_APPROVER_ROLES: AppRole[] = ["SUPER_ADMIN", "ACCOUNTANT"];
 export const LAB_WORK_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH"];
 export const LAB_VIEW_ROLES: AppRole[] = ["SUPER_ADMIN", "LAB_TECH", "DOCTOR", "NURSE", "RECEPTIONIST"];
@@ -58,6 +60,10 @@ export function canCheckoutVisit(user: { role: AppRole; hospital?: HospitalRoleP
 
 export function hasBillingAccess(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
   return hasRoleAccess(user, BILLING_ROLES);
+}
+
+export function canCollectOpdFee(user: { role: AppRole; hospital?: HospitalRolePolicy | null }) {
+  return hasRoleAccess(user, OPD_FEE_COLLECT_ROLES);
 }
 
 export function walkInRolesFor(hospital?: HospitalRolePolicy | null): AppRole[] {

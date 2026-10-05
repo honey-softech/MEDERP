@@ -13,6 +13,7 @@ import {
 } from "@/lib/front-desk";
 import { appointmentWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
+import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { ageGenderLine } from "@/lib/visit-summary";
 
 export default async function InvestigationSlipPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
       patient: true,
       doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: true,
-      hospital: { select: { name: true, address: true, phone: true, logoData: true } },
+      hospital: { select: { name: true, address: true, phone: true, altPhones: true, logoData: true } },
       assessment: { select: { status: true } },
       labOrders: {
         where: { status: { not: "CANCELLED" } },
@@ -89,7 +90,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
         <InvestigationSlip
           hospitalName={appointment.hospital.name}
           hospitalAddress={appointment.hospital.address}
-          hospitalPhone={appointment.hospital.phone}
+          hospitalPhone={letterheadPhoneText(appointment.hospital.phone, appointment.hospital.altPhones)}
           logoData={appointment.hospital.logoData}
           patientName={`${appointment.patient.firstName} ${appointment.patient.lastName}`.trim().toUpperCase()}
           mrn={appointment.patient.mrn}

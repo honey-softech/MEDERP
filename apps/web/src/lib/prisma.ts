@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 /** Bump when the schema gains models so a long-running dev server drops a stale client. */
-const PRISMA_CLIENT_STAMP = "20260928-demo-bookings";
+const PRISMA_CLIENT_STAMP = "20261005-letterhead-phones";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient; prismaStamp?: string };
 

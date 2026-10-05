@@ -6,6 +6,7 @@ import { clipWhatsAppVar, renderTemplate } from "@/lib/messaging/templates";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { patientName, PRINT_SUMMARY_ROLES, requireHospitalActor } from "@/lib/front-desk";
+import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,7 +30,7 @@ export async function POST(request: Request, context: Ctx) {
     where: { id, hospitalId: scoped.user.hospitalId },
     include: {
       patient: true,
-      hospital: { select: { name: true, address: true, phone: true, logoData: true } },
+      hospital: { select: { name: true, address: true, phone: true, altPhones: true, logoData: true } },
       doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: { select: { name: true } },
       assessment: { select: { status: true } },
@@ -76,7 +77,10 @@ export async function POST(request: Request, context: Ctx) {
   const filename = `investigation-list-${appointment.patient.mrn}.pdf`;
 
   const pdf = await buildInvestigationListPdf({
-    hospital: appointment.hospital,
+    hospital: {
+      ...appointment.hospital,
+      phone: letterheadPhoneText(appointment.hospital.phone, appointment.hospital.altPhones),
+    },
     patient: appointment.patient,
     doctor: appointment.doctor,
     departmentName: appointment.department.name,

@@ -10,6 +10,9 @@ const MUTED = "#475569";
 
 export type BillReceiptPdfInput = {
   hospitalName: string;
+  hospitalAddress?: string | null;
+  hospitalPhone?: string | null;
+  invoiceNo: string;
   issuedAt: Date;
   status: string;
   patientName: string;
@@ -78,9 +81,18 @@ export async function buildBillReceiptPdf(input: BillReceiptPdfInput): Promise<B
     const startY = doc.y;
 
     doc.font("Helvetica-Bold").fontSize(9).fillColor(TEAL);
-    doc.text(input.hospitalName.toUpperCase(), left, startY, { characterSpacing: 1.4 });
+    doc.text(input.hospitalName.toUpperCase(), left, startY, { characterSpacing: 1.4, width });
+    if (input.hospitalAddress) {
+      doc.font("Helvetica").fontSize(9).fillColor(SLATE);
+      doc.text(input.hospitalAddress, left, doc.y + 2, { width });
+    }
+    if (input.hospitalPhone) {
+      doc.font("Helvetica").fontSize(9).fillColor(SLATE);
+      doc.text(input.hospitalPhone, left, doc.y + 1, { width });
+    }
     doc.moveDown(0.35);
     doc.font("Helvetica-Bold").fontSize(18).fillColor(INK).text("Receipt / invoice", left);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(INK).text(`Invoice ${input.invoiceNo}`, left);
     doc.font("Helvetica").fontSize(10).fillColor(SLATE);
     doc.text(`${when(input.issuedAt)} · ${prettyEnum(input.status)}`, left);
     doc.moveDown(0.8);

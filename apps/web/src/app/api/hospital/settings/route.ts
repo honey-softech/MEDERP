@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { parseFollowUpReminderDaysBefore } from "@/lib/appointments/follow-up-reminder";
+import { extraPhonesForStorage } from "@/lib/hospital-letterhead";
 import { requireHospitalActor, sanitizeLogoData } from "@/lib/front-desk";
 
 export async function PATCH(request: Request) {
@@ -16,7 +17,7 @@ export async function PATCH(request: Request) {
 
   // Branding and document policy post to this route separately, so only touch what was sent.
   const data: Prisma.HospitalUpdateInput = {};
-  const brandingSent = ["address", "phone", "opdFee", "logoData", "sealData"].some((key) => key in (body ?? {}));
+  const brandingSent = ["address", "phone", "altPhones", "opdFee", "logoData", "sealData"].some((key) => key in (body ?? {}));
 
   if (brandingSent) {
     const opdFee = Number(body?.opdFee ?? 500);
@@ -31,8 +32,13 @@ export async function PATCH(request: Request) {
     if (body?.sealData && !sealData) {
       return NextResponse.json({ error: "Seal icon must be a smaller image file." }, { status: 400 });
     }
+    const altPhones = extraPhonesForStorage(body?.altPhones);
+    if (!altPhones.ok) {
+      return NextResponse.json({ error: altPhones.error }, { status: 400 });
+    }
     data.address = String(body?.address ?? "").trim() || null;
     data.phone = String(body?.phone ?? "").trim() || null;
+    data.altPhones = altPhones.value;
     data.opdFee = opdFee;
     data.logoData = logoData;
     data.sealData = sealData;
@@ -93,6 +99,7 @@ export async function PATCH(request: Request) {
       fields: [
         "address",
         "phone",
+        "altPhones",
         "opdFee",
         "logoData",
         "sealData",

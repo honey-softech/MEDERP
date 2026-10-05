@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { BloodTestPicker } from "@/components/blood-test-picker";
 import { compactPrimaryButtonClass } from "@/components/auth-shell";
@@ -15,6 +15,7 @@ export function VisitLabTestsForm({
   patientPhone = null,
   priorOrderCount = 0,
   variant = "card",
+  ordersPanel = null,
 }: {
   appointmentId: string;
   initialTestIds?: string[];
@@ -24,6 +25,7 @@ export function VisitLabTestsForm({
   patientPhone?: string | null;
   priorOrderCount?: number;
   variant?: "card" | "toolbar";
+  ordersPanel?: ReactNode;
 }) {
   const router = useRouter();
   const [investigations, setInvestigations] = useState<InvestigationPick[]>(
@@ -64,6 +66,7 @@ export function VisitLabTestsForm({
           patientPhone={patientPhone}
           priorOrderCount={priorOrderCount}
           printHref={`/appointments/${appointmentId}/investigations`}
+          ordersPanel={ordersPanel}
         />
         {!locked && hasPicks ? (
           <button
@@ -90,6 +93,7 @@ export function VisitLabTestsForm({
         patientPhone={patientPhone}
         priorOrderCount={priorOrderCount}
         printHref={`/appointments/${appointmentId}/investigations`}
+        ordersPanel={ordersPanel}
       />
       {!hasPicks ? (
         <p className="text-[11px] text-text-secondary">

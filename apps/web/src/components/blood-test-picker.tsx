@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { primaryButtonClass, secondaryButtonClass, fieldClass, compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
@@ -64,6 +64,7 @@ export function BloodTestPicker({
   variant = "card",
   followUpAt = "",
   onFollowUpAtChange,
+  ordersPanel = null,
 }: {
   selectedIds?: string[];
   selectedInvestigations?: InvestigationPick[];
@@ -79,6 +80,8 @@ export function BloodTestPicker({
   variant?: "card" | "toolbar";
   followUpAt?: string;
   onFollowUpAtChange?: (date: string) => void;
+  /** Ordered investigations (status, WhatsApp, report upload) shown inside this popup. */
+  ordersPanel?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("blood");
@@ -243,6 +246,7 @@ export function BloodTestPicker({
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+              {ordersPanel ? <div className="mb-4">{ordersPanel}</div> : null}
               {tab === "blood" ? (
                 <>
                   <input

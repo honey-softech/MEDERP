@@ -5,6 +5,7 @@ describe("bill receipt PDF", () => {
   it("builds a PDF that matches the print receipt fields", async () => {
     const pdf = await buildBillReceiptPdf({
       hospitalName: "NALAM",
+      invoiceNo: "INV-VELNALAM-00001",
       issuedAt: new Date("2026-09-13T08:46:00+05:30"),
       status: "PAID",
       patientName: "PATIENT1",

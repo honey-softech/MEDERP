@@ -26,6 +26,7 @@ import {
   dayRange,
   doctorName,
   canCheckoutVisit,
+  canCollectOpdFee,
   hasBillingAccess,
   hasFrontDeskAccess,
   hasRoleAccess,
@@ -207,6 +208,7 @@ export default async function AppointmentDetailPage({
   const nextId = queueIndex >= 0 && queueIndex < dayQueue.length - 1 ? dayQueue[queueIndex + 1]?.id ?? null : null;
 
   const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
+  const canCollectFee = canCollectOpdFee(user) && !actingAsDoctor;
   const canCheckout = canCheckoutVisit(user) && !actingAsDoctor;
   const canAdmit =
     hospitalHasWardsModule(user.hospital) && hasRoleAccess(user, WARD_ADMIT_ROLES);
@@ -247,6 +249,24 @@ export default async function AppointmentDetailPage({
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
   const photo = appointment.patient.photoData || "";
+  const testsLiveInPopup = canAssess && (showEditableAssessment || summaryApproved);
+  function labOrdersPanel() {
+    if (!canViewLab || appointment.labOrders.length === 0) return null;
+    return (
+      <LabOrderPanel
+        embedded
+        orders={appointment.labOrders}
+        canCollect={canCollectLab && labEnabled}
+        canWork={canWorkLab && labEnabled}
+        canViewReport={canViewLabReport}
+        canAttachExternal={canAttachExternal}
+        canPrint={canPrintSummary}
+        appointmentId={appointment.id}
+        patientPhone={appointment.patient.phone}
+        investigationsAlreadySent={investigationsAlreadySent}
+      />
+    );
+  }
 
   return (
     <AppShell title="Visit details" dense={useCockpit}>
@@ -268,10 +288,10 @@ export default async function AppointmentDetailPage({
               </span>
               {canDoctorVisit ? (
                 <div className="flex flex-wrap items-center gap-1.5 sm:hidden">
-                  {canAssess && showEditableAssessment && !summaryApproved ? (
+                  {canAssess && showEditableAssessment ? (
                     <div id="visit-tests-mount-mobile" />
                   ) : null}
-                  {canAssess && summaryApproved ? (
+                  {canAssess && summaryApproved && !showEditableAssessment ? (
                     <VisitLabTestsForm
                       variant="toolbar"
                       appointmentId={appointment.id}
@@ -280,6 +300,7 @@ export default async function AppointmentDetailPage({
                       patientPhone={appointment.patient.phone}
                       priorOrderCount={lockedLabOrders.length}
                       initialInvestigations={draftInvestigations}
+                      ordersPanel={labOrdersPanel()}
                     />
                   ) : null}
                   <DoctorVisitActions
@@ -386,10 +407,10 @@ export default async function AppointmentDetailPage({
         </nav>
 
         <div className="hidden items-center gap-1.5 sm:flex sm:flex-wrap">
-          {canAssess && showEditableAssessment && !summaryApproved ? (
+          {canAssess && showEditableAssessment ? (
             <div id="visit-tests-mount" />
           ) : null}
-          {canAssess && summaryApproved ? (
+          {canAssess && summaryApproved && !showEditableAssessment ? (
             <VisitLabTestsForm
               variant="toolbar"
               appointmentId={appointment.id}
@@ -398,6 +419,7 @@ export default async function AppointmentDetailPage({
               patientPhone={appointment.patient.phone}
               priorOrderCount={lockedLabOrders.length}
               initialInvestigations={draftInvestigations}
+              ordersPanel={labOrdersPanel()}
             />
           ) : null}
           {canDoctorVisit && !summaryApproved ? (
@@ -576,7 +598,7 @@ export default async function AppointmentDetailPage({
               : null
           }
         />
-        {useCockpit && canViewLab ? (
+        {useCockpit && canViewLab && !testsLiveInPopup ? (
           <LabOrderPanel
             orders={appointment.labOrders}
             canCollect={canCollectLab && labEnabled}
@@ -615,7 +637,8 @@ export default async function AppointmentDetailPage({
                 : null
             }
             cockpit
-            testsMountId={useCockpit && !summaryApproved ? "visit-tests-mount" : null}
+            testsMountId={useCockpit && showEditableAssessment ? "visit-tests-mount" : null}
+            ordersPanel={labOrdersPanel()}
             followUpReminderNote={followUpReminderHint(user.hospital)}
             initial={{
               chiefComplaint: assessment?.chiefComplaint ?? "",
@@ -636,13 +659,15 @@ export default async function AppointmentDetailPage({
                 <VitalsForm appointmentId={appointment.id} initial={vitals} />
               </div>
             ) : null}
+            {canCollectFee && !visitPaid ? (
+              <div className="print:hidden">
+                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                  Record payment
+                </Link>
+              </div>
+            ) : null}
             {canManage ? (
               <div className="print:hidden">
-                {!visitPaid ? (
-                  <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                    Record payment
-                  </Link>
-                ) : null}
                 <AppointmentActions
                   id={appointment.id}
                   status={appointment.status}
@@ -681,13 +706,15 @@ export default async function AppointmentDetailPage({
               visitOutcome={assessment?.visitOutcome}
               followUpAt={assessment?.followUpAt}
             />
+            {canCollectFee && !visitPaid ? (
+              <div className="print:hidden">
+                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                  Record payment
+                </Link>
+              </div>
+            ) : null}
             {canManage ? (
               <div className="print:hidden">
-                {!visitPaid ? (
-                  <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                    Record payment
-                  </Link>
-                ) : null}
                 <AppointmentActions
                   id={appointment.id}
                   status={appointment.status}
@@ -743,13 +770,15 @@ export default async function AppointmentDetailPage({
             />
           ) : null}
 
+          {canCollectFee && !visitPaid ? (
+            <div className="print:hidden">
+              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
+                Record payment
+              </Link>
+            </div>
+          ) : null}
           {canManage ? (
             <div className="print:hidden">
-              {!visitPaid ? (
-                <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                  Record payment
-                </Link>
-              ) : null}
               <AppointmentActions
                 id={appointment.id}
                 status={appointment.status}

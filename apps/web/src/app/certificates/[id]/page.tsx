@@ -14,6 +14,7 @@ import {
 } from "@/lib/front-desk";
 import { certificateWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
+import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { ageGenderLine } from "@/lib/visit-summary";
 
 export default async function CertificatePrintPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +25,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
     include: {
       patient: true,
       hospital: {
-        select: { name: true, address: true, phone: true, logoData: true, sealData: true, code: true },
+        select: { name: true, address: true, phone: true, altPhones: true, logoData: true, sealData: true, code: true },
       },
       issuedBySignature: { select: { imageData: true } },
     },
@@ -95,7 +96,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
         <MedicalCertificateDocument
           hospitalName={certificate.hospital.name}
           hospitalAddress={certificate.hospital.address}
-          hospitalPhone={certificate.hospital.phone}
+          hospitalPhone={letterheadPhoneText(certificate.hospital.phone, certificate.hospital.altPhones)}
           logoData={certificate.hospital.logoData}
           sealData={certificate.hospital.sealData}
           patientName={patientName(certificate.patient)}

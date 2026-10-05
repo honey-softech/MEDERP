@@ -82,6 +82,14 @@ const nurseNav: NavSection[] = [
     ],
   },
   {
+    title: "Billing",
+    items: [
+      { href: "/billing", label: "Billing" },
+      { href: "/billing/collections", label: "Collections" },
+      { href: "/billing/reports", label: "Reports" },
+    ],
+  },
+  {
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },

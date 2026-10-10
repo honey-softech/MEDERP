@@ -59,12 +59,13 @@ export async function POST(request: Request) {
 
   try {
     if (phase === "create") {
-      const quote = await monthlyAmountForSelection({ tierId });
+      const quote = await monthlyAmountForSelection({ tierId, extraUsers: hospital.extraStaffSlots });
       const plan = await resolveOrCreatePlan({
         hospitalCode: hospital.code,
         amountInr: quote.total,
-        description: `MedERP monthly · ${hospital.code} · ${quote.tier.name}`,
+        description: `MedERP ${quote.tier.name} · ${quote.tier.patientLimit} patients`,
         tierId,
+        extraUsers: hospital.extraStaffSlots,
       });
       const subscription = await createRazorpaySubscription({
         planId: plan.id,

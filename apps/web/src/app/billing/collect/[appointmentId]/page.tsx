@@ -4,6 +4,7 @@ import { MissingRecord } from "@/components/missing-record";
 import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { VisitPaymentForm } from "@/components/visit-payment-form";
+import { InvoiceAdjustments, OfferVisitWaiver } from "@/components/billing-forms";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import { canSendIssuedInvoice } from "@/lib/billing/rules";
@@ -16,6 +17,7 @@ import {
   prettyEnum,
   requireHospitalPage,
   tokenLabel,
+  WAIVER_APPROVER_ROLES,
 } from "@/lib/front-desk";
 import { invoiceWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
@@ -121,6 +123,25 @@ export default async function CollectVisitPaymentPage({
           </div>
         </dl>
       </article>
+
+      {invoice ? (
+        <div className="mb-6 max-w-3xl">
+          <InvoiceAdjustments
+            invoiceId={invoice.id}
+            due={due}
+            paid={paid}
+            canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
+            canRequestWaiver
+            waiverStatus={invoice.waiverStatus}
+          />
+        </div>
+      ) : (
+        <OfferVisitWaiver
+          appointmentId={appointment.id}
+          patientId={appointment.patientId}
+          canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
+        />
+      )}
 
       <VisitPaymentForm
         appointmentId={appointment.id}

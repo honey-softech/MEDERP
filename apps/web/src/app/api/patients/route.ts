@@ -16,6 +16,7 @@ import {
 import { babyOfName, parentNameFromPatient } from "@/lib/patients/infant";
 import { createPatientSchema } from "@/lib/validation/patient";
 import { parseJsonBody } from "@/lib/validation/parse";
+import { assertPatientCapacity } from "@/lib/platform-billing";
 
 const PATIENT_VIEW_ROLES: AppRole[] = [...CLINICAL_VIEW_ROLES, "ACCOUNTANT"];
 
@@ -178,6 +179,13 @@ export async function POST(request: Request) {
   const hospital = scoped.user.hospital ?? (await prisma.hospital.findUnique({ where: { id: scoped.user.hospitalId } }));
   if (!hospital) {
     return NextResponse.json({ error: "Hospital not found." }, { status: 400 });
+  }
+
+  try {
+    await assertPatientCapacity(scoped.user.hospitalId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Patient limit reached.";
+    return NextResponse.json({ error: message }, { status: 409 });
   }
 
   let familyGroupId: string | null = null;

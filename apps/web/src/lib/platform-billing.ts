@@ -7,8 +7,8 @@ import {
   type SubscriptionSelection,
 } from "@/lib/platform-pricing";
 import {
+  getSubscriptionTier,
   isSubscriptionTierId,
-  normalizeSubscriptionTierId,
   type SubscriptionTierId,
 } from "@/lib/subscription-tiers";
 
@@ -123,58 +123,24 @@ export async function createPlatformInvoice(params: {
   });
 }
 
-/**
- * Active hospital logins that use a plan seat.
- * Plan 1: a hospital admin who is not an active doctor does not use a seat.
- * If that admin also practices as a doctor, the same login uses one seat.
- * Plan 2 and Plan 3: hospital admin always uses one seat.
- */
+/** Active hospital logins. Each plan's seat limit includes the hospital admin. */
 export async function countHospitalStaffSeats(hospitalId: string) {
-  const hospital = await prisma.hospital.findUnique({
-    where: { id: hospitalId },
-    select: { subscriptionTier: true },
-  });
-  const basePlan = normalizeSubscriptionTierId(hospital?.subscriptionTier) === "CLINIC";
-  if (!basePlan) {
-    return prisma.appUser.count({
-      where: {
-        hospitalId,
-        isActive: true,
-        role: { notIn: ["SOFTWARE_ADMIN", "HELPDESK"] },
-      },
-    });
-  }
-
   return prisma.appUser.count({
     where: {
       hospitalId,
       isActive: true,
-      OR: [
-        { role: { notIn: ["SOFTWARE_ADMIN", "HELPDESK", "SUPER_ADMIN"] } },
-        {
-          role: "SUPER_ADMIN",
-          staffProfile: { is: { role: "DOCTOR", isActive: true } },
-        },
-      ],
+      role: { notIn: ["SOFTWARE_ADMIN", "HELPDESK"] },
     },
   });
 }
 
-/**
- * Plan 1 only: enabling admin-as-doctor makes that login use a staff seat.
- * Skip when the admin already counts, or when linking replaces another active doctor login.
- */
+/** Admin-as-doctor uses the same login, so it does not take another seat. */
 export async function assertSeatIfAdminBecomesDoctor(
   hospitalId: string,
   options: { adminAlreadyActiveDoctor: boolean; freesAnotherActiveLogin: boolean },
 ) {
-  if (options.adminAlreadyActiveDoctor || options.freesAnotherActiveLogin) return;
-  const hospital = await prisma.hospital.findUnique({
-    where: { id: hospitalId },
-    select: { subscriptionTier: true },
-  });
-  if (normalizeSubscriptionTierId(hospital?.subscriptionTier) !== "CLINIC") return;
-  await assertStaffSeatAvailable(hospitalId);
+  void hospitalId;
+  void options;
 }
 
 export async function assertStaffSeatAvailable(hospitalId: string) {
@@ -201,6 +167,25 @@ export async function assertStaffSeatAvailable(hospitalId: string) {
     );
   }
   return { used, limit };
+}
+
+export async function assertPatientCapacity(hospitalId: string) {
+  const hospital = await prisma.hospital.findUnique({
+    where: { id: hospitalId },
+    select: { subscriptionTier: true },
+  });
+  if (!hospital) throw new Error("Hospital not found.");
+  const tier = getSubscriptionTier(hospital.subscriptionTier);
+  if (!tier) return { used: 0, limit: null as number | null };
+  const used = await prisma.patient.count({
+    where: { hospitalId, mergedIntoId: null },
+  });
+  if (used >= tier.patientLimit) {
+    throw new Error(
+      `Patient limit reached (${used}/${tier.patientLimit}). Upgrade your subscription plan to register more patients.`,
+    );
+  }
+  return { used, limit: tier.patientLimit };
 }
 
 export async function applyHospitalTier(hospitalId: string, tierId: SubscriptionTierId | string) {

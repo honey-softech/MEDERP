@@ -57,6 +57,19 @@ export async function POST(request: Request) {
     });
   }
 
+  if (event === "subscription.activated" || event === "subscription.authenticated") {
+    await writeAuditLog({
+      hospitalId: local.hospitalId,
+      actorUsername: "razorpay-webhook",
+      actorRole: "SOFTWARE_ADMIN",
+      action: "SUBSCRIPTION_LINKED",
+      entity: "HospitalSubscription",
+      entityId: local.id,
+      summary: `Razorpay ${event} for ${local.hospital.code}. Subscription ${subscriptionId} is linked.`,
+      metadata: { subscriptionId, event },
+    });
+  }
+
   if (event === "subscription.charged" && paymentEntity) {
     const paymentId = String(paymentEntity.id ?? "");
     const amountInr = fromPaise(Number(paymentEntity.amount ?? 0));

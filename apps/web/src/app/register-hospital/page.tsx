@@ -19,14 +19,11 @@ import {
 import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
 import { PasswordStrength } from "@/components/password-strength";
 import { passwordValidationError, stripSuperAdminName, superAdminNameError } from "@/lib/password-policy";
-// Payment gateway temporarily disabled. Restore Razorpay Checkout by uncommenting:
-// import {
-//   attachRazorpayFailureHandler,
-//   isOrderCheckoutSuccess,
-//   loadRazorpayCheckoutScript,
-//   RAZORPAY_SUBSCRIPTION_CHECKOUT_CONFIG,
-//   type RazorpayCheckoutSuccess,
-// } from "@/lib/razorpay-checkout";
+import {
+  isOrderCheckoutSuccess,
+  loadRazorpayCheckoutScript,
+  type RazorpayCheckoutSuccess,
+} from "@/lib/razorpay-checkout";
 type TierInfo = {
   id: string;
   name: string;
@@ -259,58 +256,40 @@ export default function RegisterHospitalPage() {
     ],
   );
 
-  async function completeRegistration() {
-    const response = await fetch("/api/public/register-hospital/trial", {
+  async function completeRegistrationWithPayment(
+    payment: RazorpayCheckoutSuccess,
+    meta: { mode: "subscription" | "order"; planId?: string },
+  ) {
+    const response = await fetch("/api/public/register-hospital", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(registrationPayload),
+      body: JSON.stringify({
+        ...registrationPayload,
+        mode: meta.mode,
+        planId: meta.planId,
+        ...(isOrderCheckoutSuccess(payment)
+          ? {
+              razorpay_order_id: payment.razorpay_order_id,
+              razorpay_payment_id: payment.razorpay_payment_id,
+              razorpay_signature: payment.razorpay_signature,
+            }
+          : {
+              razorpay_subscription_id: payment.razorpay_subscription_id,
+              razorpay_payment_id: payment.razorpay_payment_id,
+              razorpay_signature: payment.razorpay_signature,
+            }),
+      }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       setPending(false);
-      setError(data.error ?? "Could not register the hospital. Check the form and try again.");
+      setError(data.error ?? "Payment succeeded but hospital registration failed. Contact support with your payment ID.");
       return;
     }
     clearRegisterHospitalDraft();
     router.push(data.redirectTo || "/");
     router.refresh();
   }
-
-  // Payment gateway (Razorpay) — restore this after completeRegistration when card setup is required again:
-  // async function completeRegistrationWithPayment(
-  //   payment: RazorpayCheckoutSuccess,
-  //   meta: { mode: "subscription" | "order"; planId?: string },
-  // ) {
-  //   const response = await fetch("/api/public/register-hospital", {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify({
-  //       ...registrationPayload,
-  //       mode: meta.mode,
-  //       planId: meta.planId,
-  //       ...(isOrderCheckoutSuccess(payment)
-  //         ? {
-  //             razorpay_order_id: payment.razorpay_order_id,
-  //             razorpay_payment_id: payment.razorpay_payment_id,
-  //             razorpay_signature: payment.razorpay_signature,
-  //           }
-  //         : {
-  //             razorpay_subscription_id: payment.razorpay_subscription_id,
-  //             razorpay_payment_id: payment.razorpay_payment_id,
-  //             razorpay_signature: payment.razorpay_signature,
-  //           }),
-  //     }),
-  //   });
-  //   const data = await response.json().catch(() => ({}));
-  //   if (!response.ok) {
-  //     setPending(false);
-  //     setError(data.error ?? "Payment succeeded but hospital registration failed. Contact support with your payment ID.");
-  //     return;
-  //   }
-  //   clearRegisterHospitalDraft();
-  //   router.push(data.redirectTo || "/");
-  //   router.refresh();
-  // }
 
   function validateForm() {
     if (!name.trim()) {
@@ -381,108 +360,92 @@ export default function RegisterHospitalPage() {
     setNotice("");
     if (!validateForm()) return;
     setPending(true);
-
     try {
-      await completeRegistration();
+      if (pkg != null && !pkg.razorpayEnabled) {
+        setError(
+          "Online payment is not configured on the server. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and NEXT_PUBLIC_RAZORPAY_KEY_ID to apps/web/.env, then restart the server.",
+        );
+        setPending(false);
+        return;
+      }
+      if (pkg == null) {
+        setError("Could not load billing package. Refresh the page and try again.");
+        setPending(false);
+        return;
+      }
+      const orderResponse = await fetch("/api/public/register-hospital/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registrationPayload),
+      });
+      const raw = await orderResponse.text();
+      let orderData: Record<string, unknown> = {};
+      try {
+        orderData = raw ? JSON.parse(raw) : {};
+      } catch {
+        orderData = {};
+      }
+      if (!orderResponse.ok) {
+        setError(String(orderData.error ?? `Could not start payment (${orderResponse.status}).`));
+        setPending(false);
+        return;
+      }
+      const mode: "subscription" | "order" = orderData.mode === "order" ? "order" : "subscription";
+      if (orderData.notice) {
+        setNotice(String(orderData.notice));
+      }
+      const scriptReady = await loadRazorpayCheckoutScript();
+      if (!scriptReady || !window.Razorpay) {
+        setError("Could not load Razorpay Checkout. Check your network and try again.");
+        setPending(false);
+        return;
+      }
+      const checkout = new window.Razorpay({
+        key: String(orderData.keyId ?? ""),
+        ...(mode === "subscription"
+          ? { subscription_id: String(orderData.subscriptionId ?? "") }
+          : {
+              order_id: String(orderData.orderId ?? ""),
+              amount: Number(orderData.amount),
+              currency: String(orderData.currency || "INR"),
+            }),
+        name: "MedERP",
+        description:
+          mode === "subscription"
+            ? `Card setup · first charge after 1-month trial — ${String(orderData.hospitalName || name)}`
+            : `Hospital registration — ${String(orderData.hospitalName || name)}`,
+        prefill: {
+          name: String((orderData.prefill as { name?: string } | undefined)?.name || adminUsername),
+          contact: String((orderData.prefill as { contact?: string } | undefined)?.contact || adminMobile),
+          email: String((orderData.prefill as { email?: string } | undefined)?.email || adminEmail),
+        },
+        theme: { color: "#1976d2" },
+        handler: (response) => {
+          void completeRegistrationWithPayment(response, {
+            mode,
+            planId: orderData.planId ? String(orderData.planId) : undefined,
+          });
+        },
+        modal: {
+          ondismiss: () => {
+            setPending(false);
+            if (mode === "subscription" && orderData.shortUrl) {
+              setNotice(
+                "Checkout was closed. You can complete the same monthly subscription on Razorpay’s hosted page if card lookup fails.",
+              );
+              setError("");
+              return;
+            }
+            setError("Payment was cancelled. You can try again when ready.");
+          },
+        },
+      });
+      checkout.open();
     } catch (err) {
       setPending(false);
-      setError(err instanceof Error ? err.message : "Could not register the hospital. Please try again.");
+      setError(err instanceof Error ? err.message : "Could not start payment. Please try again.");
     }
   }
-
-  // Payment gateway onSubmit — restore in place of the trial submit above:
-  // async function onSubmitWithPayment(event: React.FormEvent) {
-  //   event.preventDefault();
-  //   setError("");
-  //   setNotice("");
-  //   if (!validateForm()) return;
-  //   setPending(true);
-  //   try {
-  //     if (pkg != null && !pkg.razorpayEnabled) {
-  //       setError(
-  //         "Online payment is not configured on the server. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and NEXT_PUBLIC_RAZORPAY_KEY_ID to apps/web/.env, then restart/redeploy.",
-  //       );
-  //       setPending(false);
-  //       return;
-  //     }
-  //     if (pkg == null) {
-  //       setError("Could not load billing package. Refresh the page and try Pay again.");
-  //       setPending(false);
-  //       return;
-  //     }
-  //     const orderResponse = await fetch("/api/public/register-hospital/order", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(registrationPayload),
-  //     });
-  //     const raw = await orderResponse.text();
-  //     let orderData: Record<string, unknown> = {};
-  //     try {
-  //       orderData = raw ? JSON.parse(raw) : {};
-  //     } catch {
-  //       orderData = {};
-  //     }
-  //     if (!orderResponse.ok) {
-  //       setError(String(orderData.error ?? `Could not start payment (${orderResponse.status}).`));
-  //       setPending(false);
-  //       return;
-  //     }
-  //     const mode: "subscription" | "order" = orderData.mode === "order" ? "order" : "subscription";
-  //     if (orderData.notice) {
-  //       setNotice(String(orderData.notice));
-  //     }
-  //     const scriptReady = await loadRazorpayCheckoutScript();
-  //     if (!scriptReady || !window.Razorpay) {
-  //       setError("Could not load Razorpay Checkout. Check your network and try again.");
-  //       setPending(false);
-  //       return;
-  //     }
-  //     const checkout = new window.Razorpay({
-  //       key: String(orderData.keyId ?? ""),
-  //       ...(mode === "subscription"
-  //         ? { subscription_id: String(orderData.subscriptionId ?? "") }
-  //         : {
-  //             order_id: String(orderData.orderId ?? ""),
-  //             amount: Number(orderData.amount),
-  //             currency: String(orderData.currency || "INR"),
-  //           }),
-  //       name: "MedERP",
-  //       description:
-  //         mode === "subscription"
-  //           ? `Card setup · first charge after 1-month trial — ${String(orderData.hospitalName || name)}`
-  //           : `Hospital registration — ${String(orderData.hospitalName || name)}`,
-  //       prefill: {
-  //         name: String((orderData.prefill as { name?: string } | undefined)?.name || adminUsername),
-  //         contact: String((orderData.prefill as { contact?: string } | undefined)?.contact || adminMobile),
-  //         email: String((orderData.prefill as { email?: string } | undefined)?.email || adminEmail),
-  //       },
-  //       theme: { color: "#1976d2" },
-  //       handler: (response) => {
-  //         void completeRegistrationWithPayment(response, {
-  //           mode,
-  //           planId: orderData.planId ? String(orderData.planId) : undefined,
-  //         });
-  //       },
-  //       modal: {
-  //         ondismiss: () => {
-  //           setPending(false);
-  //           if (mode === "subscription" && orderData.shortUrl) {
-  //             setNotice(
-  //               "Checkout was closed. You can complete the same monthly subscription on Razorpay’s hosted page if card lookup fails.",
-  //             );
-  //             setError("");
-  //             return;
-  //           }
-  //           setError("Payment was cancelled. You can try again when ready.");
-  //         },
-  //       },
-  //     });
-  //     checkout.open();
-  //   } catch (err) {
-  //     setPending(false);
-  //     setError(err instanceof Error ? err.message : "Could not start payment. Please try again.");
-  //   }
-  // }
 
   return (
     <AuthShell
@@ -671,9 +634,7 @@ export default function RegisterHospitalPage() {
           <aside className="rounded-xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6">
             <h2 className="font-semibold text-slate-800">Monthly subscription plan</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Choose a plan. You get 1 month free; card setup is paused for now. On Plan 1 the hospital admin
-              login is extra unless that admin is also a doctor. On Plan 2 and Plan 3 the admin login uses one
-              seat. Nurse-as-receptionist does not add a second login.
+              Choose a plan. The first month is free. Add a card now; Razorpay charges the plan plus GST from the next month. Each extra user is ₹300/month before GST.
             </p>
             <div className="mt-3 grid gap-2">
               {(pkg?.tiers ?? []).map((tier) => {
@@ -731,7 +692,7 @@ export default function RegisterHospitalPage() {
               </ul>
             ) : null}
             <p className="mt-3 text-xs text-slate-600">
-              You can change plan later from Subscription. Online payment for auto-debit is paused for now.
+              You can change plan later from Subscription. The card is saved for monthly auto-debit after the free month.
             </p>
           </aside>
         </div>
@@ -749,7 +710,7 @@ export default function RegisterHospitalPage() {
             <Link href="/terms" target="_blank" className="font-medium text-teal-700 underline">
               Terms &amp; Conditions
             </Link>
-            . Registration starts a 1-month trial on the selected plan.
+            . Registration starts a 1-month trial. The selected plan is charged monthly after that.
           </span>
         </label>
 
@@ -757,11 +718,11 @@ export default function RegisterHospitalPage() {
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button className={`${buttonClass} sm:w-auto sm:min-w-56`} type="submit" disabled={pending || !termsAccepted}>
-            {pending ? "Registering…" : "Register hospital"}
+            {pending ? "Opening payment…" : "Continue to payment"}
           </button>
         </div>
         <p className="text-xs text-slate-500">
-          Payment gateway is paused. Completing this form creates the hospital and starts a 1-month trial. Listed
+          Add a card to start the 1-month trial. Nothing is billed today except a small bank check, if any. Listed
           monthly totals include {SUBSCRIPTION_GST_PERCENT}% GST.
         </p>
       </form>

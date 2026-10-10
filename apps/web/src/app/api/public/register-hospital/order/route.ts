@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       const plan = await resolveOrCreatePlan({
         hospitalCode: prepared.code,
         amountInr: prepared.quote.total,
-        description: `MedERP monthly · ${prepared.code}`,
+        description: `MedERP ${prepared.tierId} · ${prepared.quote.tier.patientLimit} patients`,
         tierId: prepared.tierId,
       });
       const subscription = await createRazorpaySubscription({

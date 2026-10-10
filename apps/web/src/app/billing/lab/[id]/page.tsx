@@ -7,7 +7,6 @@ import { secondaryButtonClass } from "@/components/auth-shell";
 import {
   WAIVER_APPROVER_ROLES,
   hasBillingAccess,
-  hasFrontDeskAccess,
   inr,
   patientName,
   requireHospitalPage,
@@ -86,9 +85,10 @@ export default async function CollectLabPage({ params }: { params: Promise<{ id:
       <div className="mb-6 max-w-3xl">
         <InvoiceAdjustments
           invoiceId={invoice.id}
+          due={due}
           paid={Number(invoice.paidAmount)}
           canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-          canRequestWaiver={hasFrontDeskAccess(user)}
+          canRequestWaiver={hasBillingAccess(user)}
           waiverStatus={invoice.waiverStatus}
         />
       </div>

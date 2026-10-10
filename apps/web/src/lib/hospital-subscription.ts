@@ -10,7 +10,6 @@ import {
   hospitalFieldsFromTier,
   isSubscriptionTierId,
   normalizeSubscriptionTierId,
-  type SubscriptionTierId,
 } from "@/lib/subscription-tiers";
 
 const SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles; cancel anytime
@@ -39,8 +38,8 @@ export function mapRazorpaySubscriptionStatus(status: string): HospitalSubscript
   return allowed.includes(upper) ? upper : "PENDING";
 }
 
-export async function monthlyAmountForSelection(selection: { tierId: string }) {
-  return pricingFromTier(selection.tierId);
+export async function monthlyAmountForSelection(selection: { tierId: string; extraUsers?: number }) {
+  return pricingFromTier(selection.tierId, selection.extraUsers ?? 0);
 }
 
 export async function monthlyAmountForHospital(
@@ -49,11 +48,11 @@ export async function monthlyAmountForHospital(
     "subscriptionTier" | "includedStaffSlots" | "extraStaffSlots" | "pharmacyEnabled" | "labEnabled"
   >,
 ) {
-  if (hospital.subscriptionTier && isSubscriptionTierId(hospital.subscriptionTier)) {
-    return pricingFromTier(hospital.subscriptionTier);
-  }
-  // Legacy PROFESSIONAL/ENTERPRISE (or missing) → nearest current OPD plan
-  return pricingFromTier(normalizeSubscriptionTierId(hospital.subscriptionTier));
+  const tierId =
+    hospital.subscriptionTier && isSubscriptionTierId(hospital.subscriptionTier)
+      ? hospital.subscriptionTier
+      : normalizeSubscriptionTierId(hospital.subscriptionTier);
+  return pricingFromTier(tierId, hospital.extraStaffSlots);
 }
 
 export function configuredRazorpayPlanId(tierId?: string) {
@@ -64,6 +63,7 @@ export function configuredRazorpayPlanId(tierId?: string) {
     CLINIC: process.env.RAZORPAY_PLAN_ID_CLINIC,
     STARTER: process.env.RAZORPAY_PLAN_ID_STARTER,
     GROWTH: process.env.RAZORPAY_PLAN_ID_GROWTH,
+    PLUS: process.env.RAZORPAY_PLAN_ID_PLUS,
   };
   const fromTier = normalized ? byTier[normalized]?.trim() : "";
   if (fromTier) return fromTier;
@@ -75,56 +75,106 @@ export async function resolveOrCreatePlan(params: {
   amountInr: number;
   description: string;
   tierId?: string;
+  extraUsers?: number;
 }) {
   const configuredId = configuredRazorpayPlanId(params.tierId);
   const amountPaise = toPaise(params.amountInr);
+  const extraUsers = Math.max(0, Math.trunc(params.extraUsers ?? 0));
   if (amountPaise < 100) {
     throw new Error("Monthly amount is too small for Razorpay.");
   }
 
-  if (configuredId) {
+  const razorpay = getRazorpayClient();
+  if (configuredId && extraUsers === 0) {
     try {
-      const razorpay = getRazorpayClient();
       const plan = await razorpay.plans.fetch(configuredId);
       if (Number(plan.item.amount) === amountPaise) {
         return plan;
       }
       console.warn(
-        `Razorpay plan ${configuredId} amount ${plan.item.amount} paise does not match quote ${amountPaise} paise; creating a matching plan.`,
+        `Razorpay plan ${configuredId} amount ${plan.item.amount} paise does not match quote ${amountPaise} paise; looking up or creating a matching plan.`,
       );
     } catch {
-      // Configured plan missing or amount differs — create a matching plan.
+      // Configured plan missing — create or reuse a matching plan.
     }
   }
 
-  return createSubscriptionPlan(params);
+  return findOrCreateTierPlan({
+    tierId: params.tierId || "CLINIC",
+    amountInr: params.amountInr,
+    description: params.description,
+    extraUsers,
+    hospitalCode: params.hospitalCode,
+  });
 }
 
-export async function createSubscriptionPlan(params: {
-  hospitalCode: string;
+type RazorpayPlanItem = {
+  id: string;
+  item: { amount: number | string };
+  notes?: Record<string, string>;
+};
+
+export async function findOrCreateTierPlan(params: {
+  tierId: string;
   amountInr: number;
   description: string;
+  extraUsers: number;
+  hospitalCode?: string;
 }) {
   const razorpay = getRazorpayClient();
   const amountPaise = toPaise(params.amountInr);
   if (amountPaise < 100) {
     throw new Error("Monthly amount is too small for Razorpay.");
   }
-  const plan = await razorpay.plans.create({
+
+  const listed = (await razorpay.plans.all({ count: 100 })) as { items?: RazorpayPlanItem[] };
+  const match = (listed.items ?? []).find((plan) => {
+    const notes = plan.notes ?? {};
+    return (
+      notes.purpose === "mederp_tier" &&
+      notes.tierId === params.tierId &&
+      String(notes.extraUsers ?? "0") === String(params.extraUsers) &&
+      Number(plan.item.amount) === amountPaise
+    );
+  });
+  if (match) return match;
+
+  const name =
+    params.extraUsers > 0
+      ? `MedERP ${params.tierId} +${params.extraUsers} users`
+      : `MedERP ${params.tierId}`;
+  return razorpay.plans.create({
     period: "monthly",
     interval: 1,
     item: {
-      name: `MedERP ${params.hospitalCode}`.slice(0, 255),
+      name: name.slice(0, 255),
       amount: amountPaise,
       currency: "INR",
       description: params.description.slice(0, 255),
     },
     notes: {
-      hospitalCode: params.hospitalCode,
-      purpose: "mederp_monthly",
+      purpose: "mederp_tier",
+      tierId: params.tierId,
+      extraUsers: String(params.extraUsers),
+      ...(params.hospitalCode ? { hospitalCode: params.hospitalCode } : {}),
     },
   });
-  return plan;
+}
+
+export async function createSubscriptionPlan(params: {
+  hospitalCode: string;
+  amountInr: number;
+  description: string;
+  tierId?: string;
+  extraUsers?: number;
+}) {
+  return findOrCreateTierPlan({
+    tierId: params.tierId || "CLINIC",
+    amountInr: params.amountInr,
+    description: params.description,
+    extraUsers: params.extraUsers ?? 0,
+    hospitalCode: params.hospitalCode,
+  });
 }
 
 export async function createRazorpayCustomer(params: {
@@ -306,13 +356,18 @@ export async function scheduleNextCyclePackageChange(params: {
     throw new Error("That plan is already active (or already scheduled).");
   }
 
-  const quote = await monthlyAmountForSelection({ tierId: params.tierId });
+  const quote = await monthlyAmountForSelection({
+    tierId: params.tierId,
+    extraUsers: hospital.extraStaffSlots,
+  });
   const tier = quote.tier;
 
   const plan = await createSubscriptionPlan({
     hospitalCode: hospital.code,
     amountInr: quote.total,
-    description: `MedERP monthly · ${hospital.code} · ${tier.name}`,
+    description: `MedERP monthly · ${tier.name} · ${tier.patientLimit} patients`,
+    tierId: tier.id,
+    extraUsers: hospital.extraStaffSlots,
   });
 
   const razorpay = getRazorpayClient();

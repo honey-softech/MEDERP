@@ -12,7 +12,6 @@ import {
   WAIVER_APPROVER_ROLES,
   doctorName,
   hasBillingAccess,
-  hasFrontDeskAccess,
   inr,
   patientName,
   prettyEnum,
@@ -190,7 +189,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           due={due}
           paid={Number(invoice.paidAmount)}
           canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-          canRequestWaiver={hasFrontDeskAccess(user)}
+          canRequestWaiver={hasBillingAccess(user)}
           waiverStatus={invoice.waiverStatus}
           fullPaymentRequired={Boolean(invoice.appointmentId)}
         />

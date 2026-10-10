@@ -3,7 +3,6 @@ import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   WAIVER_APPROVER_ROLES,
   hasBillingAccess,
-  hasFrontDeskAccess,
   type HospitalActor,
 } from "@/lib/authz/hospital";
 import { invoiceDue, validateDiscount, validatePayment, validateRefund } from "@/lib/billing/rules";
@@ -157,7 +156,7 @@ export async function requestInvoiceWaiver(params: {
   amount: number;
   reason: string;
 }): Promise<BillingActionResult> {
-  if (!hasFrontDeskAccess(params.user)) return noAccess();
+  if (!hasBillingAccess(params.user)) return noAccess();
   const waiverAmount = Math.max(0, params.amount);
   const waiverReason = params.reason.trim();
   if (!(waiverAmount > 0) || !waiverReason) {

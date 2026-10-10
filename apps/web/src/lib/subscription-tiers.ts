@@ -1,6 +1,9 @@
 /** Fixed monthly subscription tiers — OPD staff seats only (pharmacy / lab / wards / inventory later). */
 
-export const SUBSCRIPTION_TIER_IDS = ["CLINIC", "STARTER", "GROWTH"] as const;
+export const SUBSCRIPTION_TIER_IDS = ["CLINIC", "STARTER", "GROWTH", "PLUS"] as const;
+
+/** Monthly fee for each login beyond the plan's included users, before GST. */
+export const EXTRA_USER_MONTHLY_FEE = 300;
 export type SubscriptionTierId = (typeof SUBSCRIPTION_TIER_IDS)[number];
 
 /** Older DB values — still readable, mapped onto current Plan 3. */
@@ -20,6 +23,8 @@ export type SubscriptionTier = {
    * Plan 2 and Plan 3: hospital admin uses one seat.
    */
   seatLimit: number | null;
+  /** Active patient records included in the monthly fee. */
+  patientLimit: number;
   /** Suggested role mix for registration UI only — hospitals may allocate seats freely. */
   roleSuggestion: string;
   pharmacyEnabled: boolean;
@@ -32,75 +37,92 @@ export type SubscriptionTier = {
 };
 
 /**
- * Three OPD plans. Modules (pharmacy, lab, inventory, wards) are off until offered later.
- * Seats are fungible across doctor / nurse / receptionist / other staff.
- * Plan 1: the hospital admin login is extra. It uses a seat only when that admin also
- * practices as a doctor (one account, not two). Separate doctor → 4 accounts including
- * admin. Admin-as-doctor → 3 accounts.
- * Plan 2 and Plan 3: hospital admin uses one seat. Admin-as-doctor does not add another.
+ * Four OPD plans. Modules (pharmacy, lab, inventory, wards) stay off.
+ * Fees are before 18% GST. Each extra user beyond the included seats is ₹300/month before GST.
  */
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
     id: "CLINIC",
     name: "Plan 1",
-    tagline: "Base OPD clinic",
-    monthlyFee: 2_499,
+    tagline: "Base clinic",
+    monthlyFee: 1_200,
     seatLimit: 3,
-    roleSuggestion: "Admin login plus 1 doctor and 2 nurses — or admin-as-doctor plus 2 staff",
+    patientLimit: 300,
+    roleSuggestion: "3 users · 300 patients",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "3 staff logins (doctor, nurse, receptionist, or other staff)",
-      "Hospital admin is an extra login when they are not a doctor — 4 accounts total",
-      "If the admin is also the doctor, that one login uses a staff seat — 3 accounts total",
-      "Nurse-as-receptionist does not add a second login",
+      "Up to 3 users",
+      "Up to 300 patients",
+      "Extra user ₹300/month",
       "OPD, billing, appointments",
-      "Nurse station (OPD vitals)",
-      "Visit summary and prescription print",
-      "1-month free trial",
+      "1-month free trial, then monthly auto-debit",
     ],
   },
   {
     id: "STARTER",
     name: "Plan 2",
-    tagline: "Growing OPD",
-    monthlyFee: 4_499,
-    seatLimit: 6,
-    roleSuggestion: "1 admin doctor + more doctors/nurses/receptionists",
+    tagline: "700 patients",
+    monthlyFee: 2_200,
+    seatLimit: 4,
+    patientLimit: 700,
+    roleSuggestion: "4 users · 700 patients",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "6 login seats total (hospital admin counts as 1)",
-      "Suggested: 1 admin as doctor + doctors, nurses, or receptionists",
+      "Up to 4 users",
+      "Up to 700 patients",
+      "Extra user ₹300/month",
       "Everything in Plan 1",
-      "Nurse station (OPD vitals)",
-      "1-month free trial",
+      "1-month free trial, then monthly auto-debit",
     ],
   },
   {
     id: "GROWTH",
     name: "Plan 3",
-    tagline: "Larger OPD team",
-    monthlyFee: 5_999,
-    seatLimit: 9,
-    roleSuggestion: "1 admin doctor + larger clinical and front-desk team",
+    tagline: "1,100 patients",
+    monthlyFee: 3_200,
+    seatLimit: 5,
+    patientLimit: 1_100,
+    roleSuggestion: "5 users · 1,100 patients",
     pharmacyEnabled: false,
     labEnabled: false,
     inventoryEnabled: false,
     wardsEnabled: false,
     nurseStation: true,
     features: [
-      "9 login seats total (hospital admin counts as 1)",
-      "Suggested: 1 admin as doctor + doctors, nurses, or receptionists",
+      "Up to 5 users",
+      "Up to 1,100 patients",
+      "Extra user ₹300/month",
       "Everything in Plan 2",
-      "Nurse station (OPD vitals)",
-      "1-month free trial",
+      "1-month free trial, then monthly auto-debit",
+    ],
+  },
+  {
+    id: "PLUS",
+    name: "Plan 4",
+    tagline: "1,500 patients",
+    monthlyFee: 4_200,
+    seatLimit: 6,
+    patientLimit: 1_500,
+    roleSuggestion: "6 users · 1,500 patients",
+    pharmacyEnabled: false,
+    labEnabled: false,
+    inventoryEnabled: false,
+    wardsEnabled: false,
+    nurseStation: true,
+    features: [
+      "Up to 6 users",
+      "Up to 1,500 patients",
+      "Extra user ₹300/month",
+      "Everything in Plan 3",
+      "1-month free trial, then monthly auto-debit",
     ],
   },
 ];
@@ -140,6 +162,8 @@ export function publicSubscriptionTiers() {
     tagline: tier.tagline,
     monthlyFee: tier.monthlyFee,
     seatLimit: tier.seatLimit,
+    patientLimit: tier.patientLimit,
+    extraUserMonthlyFee: EXTRA_USER_MONTHLY_FEE,
     roleSuggestion: tier.roleSuggestion,
     features: tier.features,
   }));

@@ -1,5 +1,6 @@
 import type { Hospital } from "@prisma/client";
 import {
+  EXTRA_USER_MONTHLY_FEE,
   getSubscriptionTier,
   hospitalFieldsFromTier,
   requireSubscriptionTier,
@@ -29,27 +30,30 @@ export function subscriptionTotalWithGst(baseInr: number) {
   return base + subscriptionGstAmount(base);
 }
 
-export function pricingFromTier(tierId: string) {
+export function pricingFromTier(tierId: string, extraUsers = 0) {
   const tier = requireSubscriptionTier(tierId);
-  const seatLabel =
-    tier.id === "CLINIC"
-      ? "3 staff logins (admin extra unless that admin is the doctor)"
-      : tier.seatLimit == null
-        ? "unlimited login seats"
-        : `${tier.seatLimit} login seats (admin included)`;
-  const subtotal = tier.monthlyFee;
+  const extras = Math.max(0, Math.trunc(Number(extraUsers) || 0));
+  const extraFee = extras * EXTRA_USER_MONTHLY_FEE;
+  const subtotal = tier.monthlyFee + extraFee;
   const gstAmount = subscriptionGstAmount(subtotal);
   const total = subtotal + gstAmount;
+  const seatLabel = tier.seatLimit == null ? "unlimited users" : `${tier.seatLimit} users`;
   const lines: PricingLine[] = [
     {
-      description: `${tier.name} plan — ${seatLabel}`,
-      amount: subtotal,
-    },
-    {
-      description: `GST (${SUBSCRIPTION_GST_PERCENT}%)`,
-      amount: gstAmount,
+      description: `${tier.name} — ${seatLabel}, ${tier.patientLimit.toLocaleString("en-IN")} patients`,
+      amount: tier.monthlyFee,
     },
   ];
+  if (extraFee > 0) {
+    lines.push({
+      description: `${extras} extra user${extras === 1 ? "" : "s"} at ₹${EXTRA_USER_MONTHLY_FEE}`,
+      amount: extraFee,
+    });
+  }
+  lines.push({
+    description: `GST (${SUBSCRIPTION_GST_PERCENT}%)`,
+    amount: gstAmount,
+  });
   return {
     lines,
     subtotal,
@@ -57,10 +61,12 @@ export function pricingFromTier(tierId: string) {
     gstAmount,
     total,
     tier,
+    extraUsers: extras,
     includedStaffSlots: tier.seatLimit ?? 0,
-    extraStaffSlots: 0,
+    extraStaffSlots: extras,
     unlimitedStaffSeats: tier.seatLimit == null,
-    maxStaffSlots: tier.seatLimit,
+    maxStaffSlots: tier.seatLimit == null ? null : tier.seatLimit + extras,
+    patientLimit: tier.patientLimit,
     pharmacyEnabled: tier.pharmacyEnabled,
     labEnabled: tier.labEnabled,
     inventoryEnabled: tier.inventoryEnabled,
@@ -88,8 +94,8 @@ export function staffSeatLimit(
 ): number | null {
   if (hospital.unlimitedStaffSeats) return null;
   const tier = getSubscriptionTier(hospital.subscriptionTier);
-  if (tier?.seatLimit != null) return tier.seatLimit;
-  return hospital.includedStaffSlots + hospital.extraStaffSlots;
+  const included = tier?.seatLimit ?? hospital.includedStaffSlots;
+  return included + Math.max(0, hospital.extraStaffSlots);
 }
 
 /** Platform roles never use a hospital seat. Plan 1 admin exemption is applied in countHospitalStaffSeats. */

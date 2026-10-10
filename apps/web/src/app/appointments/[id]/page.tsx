@@ -251,7 +251,7 @@ export default async function AppointmentDetailPage({
   const photo = appointment.patient.photoData || "";
   const testsLiveInPopup = canAssess && (showEditableAssessment || summaryApproved);
   function labOrdersPanel() {
-    if (!canViewLab || appointment.labOrders.length === 0) return null;
+    if (!appointment || !canViewLab || appointment.labOrders.length === 0) return null;
     return (
       <LabOrderPanel
         embedded

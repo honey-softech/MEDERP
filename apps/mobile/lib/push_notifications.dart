@@ -14,7 +14,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } catch (_) {}
 }
 
-/// Android FCM — alerts when the WebView socket is suspended or the app is closed.
+/// FCM alerts when the WebView socket is suspended or the app is closed.
+/// Android uses a local notification while the app is open. iOS presents the
+/// system banner itself, including in the foreground.
 class PushNotifications {
   PushNotifications._();
 
@@ -22,13 +24,20 @@ class PushNotifications {
   static String? _token;
   static WebViewController? _webView;
 
+  static bool get _supported => Platform.isAndroid || Platform.isIOS;
+
+  static String get _platform => Platform.isIOS ? 'IOS' : 'ANDROID';
+
   static Future<void> start({required WebViewController webView}) async {
     _webView = webView;
-    if (_started || kIsWeb || !Platform.isAndroid) return;
+    if (_started || kIsWeb || !_supported) return;
     try {
       await Firebase.initializeApp();
     } catch (error) {
-      debugPrint('Firebase not configured yet (add android/app/google-services.json): $error');
+      debugPrint(
+        'Firebase not configured yet '
+        '(add android/app/google-services.json or ios/Runner/GoogleService-Info.plist): $error',
+      );
       return;
     }
     _started = true;
@@ -37,11 +46,20 @@ class PushNotifications {
 
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission(alert: true, badge: true, sound: true);
+    if (Platform.isIOS) {
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
     await SystemNotifications.ensureReady();
 
-    // App open: OS will not shade-display FCM "notification" payloads — we post a
-    // system notification ourselves so Samsung / Xiaomi / Oppo styles can apply.
+    // Android does not shade-display FCM "notification" payloads while the app
+    // is open. Post one ourselves so Samsung / Xiaomi / Oppo styles can apply.
+    // iOS shows that banner through the presentation options above.
     FirebaseMessaging.onMessage.listen((message) {
+      if (!Platform.isAndroid) return;
       final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MedERP';
       final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
       final href = message.data['href']?.toString() ?? '';
@@ -70,8 +88,19 @@ class PushNotifications {
       registerTokenOnSite(token);
     });
 
+    if (Platform.isIOS) await _waitForApnsToken(messaging);
     _token = await messaging.getToken();
     if (_token != null) await registerTokenOnSite(_token!);
+  }
+
+  /// getToken() on iOS needs the APNs device token first. It can arrive a moment
+  /// after permission is granted.
+  static Future<void> _waitForApnsToken(FirebaseMessaging messaging) async {
+    for (var attempt = 0; attempt < 5; attempt++) {
+      final apns = await messaging.getAPNSToken();
+      if (apns != null && apns.isNotEmpty) return;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
   }
 
   /// Re-run after each page load so a late sign-in still binds the token.
@@ -87,7 +116,7 @@ class PushNotifications {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: token, platform: 'ANDROID' })
+    body: JSON.stringify({ token: token, platform: '$_platform' })
   }).catch(function () {});
 })();
 ''');

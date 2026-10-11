@@ -119,6 +119,17 @@ async function sendToToken(params: {
               notificationPriority: "PRIORITY_HIGH",
             },
           },
+          apns: {
+            headers: {
+              "apns-priority": "10",
+              "apns-push-type": "alert",
+            },
+            payload: {
+              aps: {
+                sound: "default",
+              },
+            },
+          },
         },
       }),
     },

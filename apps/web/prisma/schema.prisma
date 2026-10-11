@@ -533,7 +533,7 @@ model AppUser {
   @@unique([hospitalId, employeeId])
 }
 
-/** FCM / APNs device token for background push (Android first; iOS later). */
+/** FCM device token. iOS tokens are delivered by FCM through APNs. */
 model DevicePushToken {
   id        String   @id @default(cuid())
   userId    String

@@ -322,14 +322,14 @@ function AppDownloadBadges({ className = "" }: { className?: string }) {
 
 export function MarketingLanding() {
   return (
-    <div className={`landing min-h-dvh text-[#0c1f2e] ${display.variable} ${body.variable}`}>
+    <div className={`landing text-[#0c1f2e] ${display.variable} ${body.variable}`}>
       <header className="landing-nav absolute inset-x-0 top-0 z-20 flex items-center px-5 py-5 sm:px-8 lg:px-12">
         <Link href="/" className="inline-flex items-center">
           <BrandMark size="sm" />
         </Link>
       </header>
 
-      <section className="landing-hero relative flex min-h-dvh items-end overflow-hidden px-5 pb-16 pt-28 sm:items-center sm:px-8 sm:pb-20 lg:px-12">
+      <section className="landing-hero relative flex items-end overflow-hidden px-5 pb-16 pt-28 sm:items-center sm:px-8 sm:pb-20 lg:px-12">
         <div className="landing-hero-bg absolute inset-0" aria-hidden />
         <div className="landing-hero-mesh absolute inset-0" aria-hidden />
         <HeroDoodles />

@@ -709,9 +709,26 @@ html {
 }
 
 /* -- Public marketing landing -- */
+/* overflow-x: hidden on body forces the other axis to auto and makes
+   mobile Safari scroll the body instead of the viewport — the landing
+   then hitches. clip still hides sideways overflow without that. */
+html:has(.landing),
+html:has(.landing) body {
+  overflow-x: clip;
+}
+
 .landing {
   font-family: var(--font-landing-body), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   background: #eaf6f3;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.landing-hero {
+  /* svh stays put when the mobile URL bar hides. dvh grows mid-gesture
+     and the next section looks stuck until that extra height is scrolled. */
+  min-height: 100vh;
+  min-height: 100svh;
 }
 
 .landing-brand {
@@ -895,5 +912,16 @@ html {
   .landing-fade {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* A full-screen masked grid that moves background-position, plus floating
+   SVGs, repaint on every frame and fight touch scrolling. */
+@media (pointer: coarse) {
+  .landing-hero-mesh,
+  .landing-doodle-float,
+  .landing-doodle-float-slow,
+  .landing-doodle-pulse {
+    animation: none;
   }
 }

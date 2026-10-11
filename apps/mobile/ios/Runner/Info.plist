@@ -24,6 +24,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MedERP uses the camera so hospital staff can take photos for patient records, signatures, and document uploads.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MedERP uses your location only while you are using the app, when a hospital page requests it.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MedERP uses your photo library so hospital staff can attach existing photos and documents to patient records, lab reports, and signatures.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

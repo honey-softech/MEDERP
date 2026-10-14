@@ -46,6 +46,14 @@ function NavGlyph({ href }: { href: string }) {
   const className = "h-[1.15rem] w-[1.15rem] shrink-0";
   const stroke = { fill: "none" as const, stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
+  if (href === "/account") {
+    return (
+      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
+        <circle cx="12" cy="8" r="3.2" />
+        <path d="M5.5 19.5c.8-3.2 3-5 6.5-5s5.7 1.8 6.5 5" />
+      </svg>
+    );
+  }
   if (href === "/") {
     return (
       <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
@@ -342,6 +350,26 @@ export function AppShellFrame({
               </div>
             ))}
           </nav>
+
+          <div className={`shrink-0 border-t border-border ${collapsed ? "p-2" : "p-3"}`}>
+            <Link
+              href="/account"
+              title="Account"
+              onClick={() => setMobileOpen(false)}
+              className={`flex h-10 items-center rounded-lg text-sm font-medium transition-colors ${
+                collapsed ? "justify-center px-0" : "gap-2.5 px-3"
+              } ${
+                pathname === "/account" || pathname.startsWith("/account/")
+                  ? "bg-primary-light text-primary-dark"
+                  : "text-text-secondary hover:bg-app-bg hover:text-text-primary"
+              }`}
+            >
+              <span className="hidden md:inline-flex">
+                <NavGlyph href="/account" />
+              </span>
+              <span className={collapsed ? "md:hidden" : ""}>Account</span>
+            </Link>
+          </div>
         </aside>
 
         <main className={`min-h-dvh overflow-x-hidden print:ml-0 ${collapsed ? "md:ml-[4.25rem]" : "md:ml-[16.5rem]"}`}>
@@ -363,12 +391,6 @@ export function AppShellFrame({
             </div>
             {viewMode ? <ViewModeToggle mode={viewMode} /> : null}
             <NotificationBell />
-            <Link
-              href="/account"
-              className="inline-flex h-9 shrink-0 items-center rounded-full border border-border px-3 text-xs font-medium text-text-primary hover:bg-app-bg"
-            >
-              Account
-            </Link>
             <LogoutButton />
           </header>
           <div className={`print:p-0 ${dense ? "px-3 py-2 sm:px-4 lg:px-5" : "px-4 py-4 sm:px-6 sm:py-6 lg:px-8"}`}>{children}</div>

@@ -100,6 +100,14 @@ export async function refreshRxLinePricing(orderId: string) {
   });
 }
 
+async function hospitalPharmacyEnabled(hospitalId: string) {
+  const hospital = await prisma.hospital.findUnique({
+    where: { id: hospitalId },
+    select: { pharmacyEnabled: true },
+  });
+  return Boolean(hospital?.pharmacyEnabled);
+}
+
 export async function syncPharmacyRxFromAssessment(params: {
   hospitalId: string;
   appointmentId: string;
@@ -107,6 +115,15 @@ export async function syncPharmacyRxFromAssessment(params: {
   prescription: string | null;
   orderedByUsername: string;
 }) {
+  // Pharmacy is off on current plans. Do not queue a bill or notify reception.
+  if (!(await hospitalPharmacyEnabled(params.hospitalId))) {
+    await prisma.pharmacyRxOrder.updateMany({
+      where: { appointmentId: params.appointmentId, status: "AWAITING_PAYMENT" },
+      data: { status: "CANCELLED" },
+    });
+    return null;
+  }
+
   const meds = parseMedications(params.prescription);
   if (meds.length === 0) {
     await prisma.pharmacyRxOrder.updateMany({

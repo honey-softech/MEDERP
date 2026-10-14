@@ -52,6 +52,7 @@ export async function removePlatformUser(params: {
         mobile: removedKey,
         userCode: null,
         employeeId: null,
+        email: null,
         otpCode: null,
         otpExpiresAt: null,
         otpAttempts: 0,

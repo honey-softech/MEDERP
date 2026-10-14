@@ -17,6 +17,7 @@ import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platfor
 import { upsertHospitalSubscription, unixToDate } from "@/lib/hospital-subscription";
 import { hospitalFieldsFromTier, isSubscriptionTierId, type SubscriptionTierId } from "@/lib/subscription-tiers";
 import { pricingFromSettings } from "@/lib/platform-pricing";
+import { mobileCanBeRecreated } from "@/lib/reusable-mobile";
 import {
   createReferralFromCode,
   findReferrerByCode,
@@ -125,6 +126,10 @@ export type PreparedRegistration = {
   referrerHospitalId: string | null;
   referrerHospitalName: string | null;
   referralCode: string | null;
+  /** Existing login freed by a closed hospital or deleted membership. Reused instead of inserting a second row. */
+  reuseUserId: string | null;
+  /** Another freed login still holding this email. Cleared before the new hospital admin takes it. */
+  releaseEmailUserId: string | null;
 };
 
 function normalizeEmail(value: string) {
@@ -211,32 +216,50 @@ export async function prepareHospitalRegistration(
 
   const code = await allocateUniqueHospitalCode(name, input.code);
 
-  const phoneTaken = await prisma.hospital.findFirst({ where: { phone } });
+  const phoneTaken = await prisma.hospital.findFirst({ where: { phone, isActive: true } });
   if (phoneTaken) {
     throw new HospitalRegistrationError("That hospital mobile number is already registered.", 409);
   }
 
-  const mobileTaken = await prisma.appUser.findFirst({
+  const mobileOwner = await prisma.appUser.findFirst({
     where: { mobile: adminMobile },
-    select: { id: true },
+    select: { id: true, isActive: true, hospitalId: true, hospital: { select: { isActive: true } } },
   });
-  if (mobileTaken) {
+  const reuseUserId =
+    mobileOwner &&
+    mobileCanBeRecreated({
+      isActive: mobileOwner.isActive,
+      hospitalId: mobileOwner.hospitalId,
+      hospitalIsActive: mobileOwner.hospital?.isActive ?? null,
+    })
+      ? mobileOwner.id
+      : null;
+  if (mobileOwner && !reuseUserId) {
     throw new HospitalRegistrationError(
       "That super admin mobile number is already registered. Sign in with this number, or use another.",
       409,
     );
   }
 
-  const emailTaken = await prisma.appUser.findFirst({
+  const emailOwner = await prisma.appUser.findFirst({
     where: { email: { equals: adminEmail, mode: "insensitive" } },
-    select: { id: true },
+    select: { id: true, isActive: true, hospitalId: true, hospital: { select: { isActive: true } } },
   });
-  if (emailTaken) {
+  const emailFree =
+    !emailOwner ||
+    emailOwner.id === reuseUserId ||
+    mobileCanBeRecreated({
+      isActive: emailOwner.isActive,
+      hospitalId: emailOwner.hospitalId,
+      hospitalIsActive: emailOwner.hospital?.isActive ?? null,
+    });
+  if (!emailFree) {
     throw new HospitalRegistrationError(
       "That super admin email is already registered. Sign in, or use another email.",
       409,
     );
   }
+  const releaseEmailUserId = emailOwner && emailOwner.id !== reuseUserId ? emailOwner.id : null;
 
   const adminUsername = await uniqueUsername(usernameBaseFromAdmin(adminDisplayName, adminEmail, adminMobile));
 
@@ -279,6 +302,8 @@ export async function prepareHospitalRegistration(
     referrerHospitalId,
     referrerHospitalName,
     referralCode,
+    reuseUserId,
+    releaseEmailUserId,
   };
 }
 
@@ -305,6 +330,14 @@ export async function registerHospital(input: RegisterHospitalInput) {
   const skipInvoice = Boolean(input.skipInvoice);
   const invoiceStatus = input.invoiceStatus ?? "ISSUED";
   const tier = prepared.quote.tier;
+  const passwordHash = await hashPassword(prepared.adminPassword);
+
+  if (prepared.releaseEmailUserId) {
+    await prisma.appUser.update({
+      where: { id: prepared.releaseEmailUserId },
+      data: { email: null },
+    });
+  }
 
   const hospital = await prisma.hospital.create({
     data: {
@@ -314,16 +347,20 @@ export async function registerHospital(input: RegisterHospitalInput) {
       phone: prepared.phone,
       ...hospitalFieldsFromTier(tier),
       trialEndsAt: input.trialEndsAt ?? null,
-      users: {
-        create: {
-          username: prepared.adminUsername,
-          mobile: prepared.adminMobile,
-          email: prepared.adminEmail,
-          passwordHash: await hashPassword(prepared.adminPassword),
-          isVerified: true,
-          role: "SUPER_ADMIN",
-        },
-      },
+      ...(prepared.reuseUserId
+        ? {}
+        : {
+            users: {
+              create: {
+                username: prepared.adminUsername,
+                mobile: prepared.adminMobile,
+                email: prepared.adminEmail,
+                passwordHash,
+                isVerified: true,
+                role: "SUPER_ADMIN" as const,
+              },
+            },
+          }),
     },
     include: {
       users: {
@@ -332,6 +369,44 @@ export async function registerHospital(input: RegisterHospitalInput) {
       },
     },
   });
+
+  if (prepared.reuseUserId) {
+    await prisma.appSession.deleteMany({ where: { userId: prepared.reuseUserId } });
+    const previousStaff = await prisma.staff.findUnique({ where: { appUserId: prepared.reuseUserId } });
+    if (previousStaff) {
+      await prisma.staff.update({
+        where: { id: previousStaff.id },
+        data: { appUserId: null, isActive: false },
+      });
+    }
+    await prisma.appUser.update({
+      where: { id: prepared.reuseUserId },
+      data: {
+        hospitalId: hospital.id,
+        username: prepared.adminUsername,
+        mobile: prepared.adminMobile,
+        email: prepared.adminEmail,
+        passwordHash,
+        isVerified: true,
+        isActive: true,
+        role: "SUPER_ADMIN",
+        userCode: null,
+        employeeId: null,
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+      },
+    });
+    hospital.users = [
+      {
+        id: prepared.reuseUserId,
+        username: prepared.adminUsername,
+        mobile: prepared.adminMobile,
+        email: prepared.adminEmail,
+        role: "SUPER_ADMIN",
+      },
+    ];
+  }
 
   await seedHospitalDepartments(hospital.id);
   await seedHospitalWards(hospital.id);

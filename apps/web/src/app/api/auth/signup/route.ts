@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { suggestedUsername, uniqueUsername } from "@/lib/employee";
 import { issueOtp } from "@/lib/otp";
+import { mobileCanBeRecreated } from "@/lib/reusable-mobile";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { signupSchema } from "@/lib/validation/auth";
 import { parseJsonBody } from "@/lib/validation/parse";
@@ -28,22 +29,43 @@ export async function POST(request: Request) {
 
     const existingMobile = await prisma.appUser.findFirst({
       where: { mobile },
+      include: { hospital: { select: { isActive: true } } },
     });
-    if (existingMobile?.isVerified) {
+    const reusable = existingMobile
+      ? mobileCanBeRecreated({
+          isActive: existingMobile.isActive,
+          hospitalId: existingMobile.hospitalId,
+          hospitalIsActive: existingMobile.hospital?.isActive ?? null,
+        })
+      : false;
+    if (existingMobile?.isVerified && !reusable) {
       return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
 
-    // Unverified rows are pending OTP only — allow retry (new password/role + fresh OTP)
-    // instead of locking the mobile after a failed/skipped verification.
+    // Unverified rows, and logins freed by a closed hospital or a deleted membership, can start again.
     const passwordHash = await hashPassword(password);
     const user = existingMobile
-      ? await prisma.appUser.update({
-          where: { id: existingMobile.id },
-          data: {
-            passwordHash,
-            role: requestedRole,
-            isVerified: false,
-          },
+      ? await prisma.$transaction(async (tx) => {
+          if (reusable) {
+            await tx.appSession.deleteMany({ where: { userId: existingMobile.id } });
+            const staff = await tx.staff.findUnique({ where: { appUserId: existingMobile.id } });
+            if (staff) {
+              await tx.staff.update({
+                where: { id: staff.id },
+                data: { appUserId: null, isActive: false },
+              });
+            }
+          }
+          return tx.appUser.update({
+            where: { id: existingMobile.id },
+            data: {
+              passwordHash,
+              role: requestedRole,
+              isVerified: false,
+              isActive: true,
+              ...(reusable ? { hospitalId: null, userCode: null, employeeId: null, email: null } : {}),
+            },
+          });
         })
       : await prisma.appUser.create({
           data: {

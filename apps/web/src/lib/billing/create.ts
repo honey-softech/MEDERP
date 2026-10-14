@@ -4,7 +4,7 @@ import { parseBillItems } from "@/lib/billing/rules";
 import type { BillingActionResult } from "@/lib/billing/types";
 import { doctorName, patientName } from "@/lib/display";
 import { nextInvoiceNo } from "@/lib/ids";
-import { invoiceStatusFromTotals } from "@/lib/opd/fees";
+import { consultationFeeForVisit, invoiceStatusFromTotals } from "@/lib/opd/fees";
 import { prisma } from "@/lib/prisma";
 import { hospitalScope } from "@/lib/tenancy";
 import { billIdentityForInvoice } from "@/lib/issued-document";
@@ -30,12 +30,16 @@ export async function createInvoice(params: {
   if (params.appointmentId) {
     const appointment = await prisma.appointment.findFirst({
       where: { id: params.appointmentId, ...scope, patientId: patient.id },
-      include: { doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
+      include: {
+        doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
+        department: true,
+        hospital: { select: { opdFee: true } },
+      },
     });
     if (!appointment) {
       return { ok: false, error: "Appointment not found for this patient.", status: 404 };
     }
-    const fee = Number(appointment.doctor.consultationFee ?? appointment.department.consultationFee);
+    const fee = consultationFeeForVisit(appointment);
     items = [
       {
         description:

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { labelMedicineBrandsInAuditLogs } from "@/lib/audit-brand-labels";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -8,11 +9,13 @@ export async function GET() {
     return NextResponse.json({ error: "Hospital super admin access required." }, { status: 403 });
   }
 
-  const logs = await prisma.auditLog.findMany({
-    where: { hospitalId: actor.hospitalId },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const logs = await labelMedicineBrandsInAuditLogs(
+    await prisma.auditLog.findMany({
+      where: { hospitalId: actor.hospitalId },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+  );
 
   return NextResponse.json({
     hospital: actor.hospital,

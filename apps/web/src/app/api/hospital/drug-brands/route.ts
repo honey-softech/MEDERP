@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
+import { formatBrandAuditValue } from "@/lib/audit-brand-labels";
 import {
   addPreferredManufacturer,
   listManufacturersForPicker,
@@ -112,8 +113,18 @@ export async function PUT(request: NextRequest) {
     where: { hospitalId },
     select: { manufacturerId: true },
   });
-  const previousIds = previous.map((row) => row.manufacturerId).sort();
-  const nextIds = [...ids].sort();
+  const previousIds = previous.map((row) => row.manufacturerId);
+  const nextIds = [...ids];
+  const lookupIds = [...new Set([...previousIds, ...nextIds])];
+  const manufacturers = lookupIds.length
+    ? await prisma.drugManufacturer.findMany({
+        where: { id: { in: lookupIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const nameById = new Map(manufacturers.map((row) => [row.id, row.name]));
+  const brandLabel = (manufacturerIds: string[]) =>
+    formatBrandAuditValue(manufacturerIds.map((id) => nameById.get(id) ?? id));
 
   await replacePreferredManufacturers(hospitalId, ids);
 
@@ -130,8 +141,8 @@ export async function PUT(request: NextRequest) {
     metadata: {
       manufacturerIds: ids,
       changes: diffAuditFields(
-        { manufacturerIds: previousIds },
-        { manufacturerIds: nextIds },
+        { manufacturerIds: brandLabel(previousIds) },
+        { manufacturerIds: brandLabel(nextIds) },
         { fields: ["manufacturerIds"] },
       ),
     },

@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { AuditLogTable } from "@/components/audit-log-table";
+import { labelMedicineBrandsInAuditLogs } from "@/lib/audit-brand-labels";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -7,7 +8,7 @@ export default async function HospitalAuditLogPage() {
   const user = await getCurrentUser();
   const hospitalName = user?.hospital?.name ?? "your hospital";
 
-  const [logs, users] = await Promise.all([
+  const [rawLogs, users] = await Promise.all([
     prisma.auditLog.findMany({
       where: { hospitalId: user!.hospitalId! },
       orderBy: { createdAt: "desc" },
@@ -19,6 +20,8 @@ export default async function HospitalAuditLogPage() {
       orderBy: { username: "asc" },
     }),
   ]);
+
+  const logs = await labelMedicineBrandsInAuditLogs(rawLogs);
 
   return (
     <AppShell title={`${hospitalName} audit log`}>

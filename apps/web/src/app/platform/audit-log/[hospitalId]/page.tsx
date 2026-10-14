@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AuditLogTable } from "@/components/audit-log-table";
+import { labelMedicineBrandsInAuditLogs } from "@/lib/audit-brand-labels";
 import { prisma } from "@/lib/prisma";
 
 export default async function HospitalAuditLogForSaasPage({
@@ -17,7 +18,7 @@ export default async function HospitalAuditLogForSaasPage({
 
   if (!hospital) notFound();
 
-  const [logs, users] = await Promise.all([
+  const [rawLogs, users] = await Promise.all([
     prisma.auditLog.findMany({
       where: { hospitalId: hospital.id },
       orderBy: { createdAt: "desc" },
@@ -29,6 +30,8 @@ export default async function HospitalAuditLogForSaasPage({
       orderBy: { username: "asc" },
     }),
   ]);
+
+  const logs = await labelMedicineBrandsInAuditLogs(rawLogs);
 
   return (
     <AppShell title={`${hospital.name} audit log`}>

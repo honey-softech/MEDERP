@@ -47,5 +47,6 @@ export function isExpiredTrialAllowedPath(pathname: string) {
   if (pathname === "/hospital/subscription" || pathname.startsWith("/hospital/subscription/")) return true;
   if (pathname.startsWith("/api/hospital/subscription")) return true;
   if (pathname.startsWith("/api/auth/")) return true;
+  if (pathname === "/account" || pathname.startsWith("/account/")) return true;
   return false;
 }

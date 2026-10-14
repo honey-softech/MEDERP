@@ -7,13 +7,15 @@ const PROTECTED_ROLES = new Set(["SOFTWARE_ADMIN", "HELPDESK"]);
 export async function removePlatformUser(params: {
   userId: string;
   actorId: string;
+  /** Self-service account delete. Platform console removal still blocks removing yourself. */
+  allowSelf?: boolean;
 }) {
   const user = await prisma.appUser.findUnique({ where: { id: params.userId } });
   if (!user) return { ok: false as const, error: "User not found.", status: 404 };
   if (PROTECTED_ROLES.has(user.role)) {
     return { ok: false as const, error: "Platform accounts cannot be removed.", status: 403 };
   }
-  if (user.id === params.actorId) {
+  if (!params.allowSelf && user.id === params.actorId) {
     return { ok: false as const, error: "You cannot remove your own account.", status: 400 };
   }
   if (user.mobile.startsWith("removed-") || user.mobile.startsWith("merged-") || user.mobile.startsWith("retired-")) {

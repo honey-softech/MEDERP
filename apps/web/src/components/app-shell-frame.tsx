@@ -363,6 +363,12 @@ export function AppShellFrame({
             </div>
             {viewMode ? <ViewModeToggle mode={viewMode} /> : null}
             <NotificationBell />
+            <Link
+              href="/account"
+              className="inline-flex h-9 shrink-0 items-center rounded-full border border-border px-3 text-xs font-medium text-text-primary hover:bg-app-bg"
+            >
+              Account
+            </Link>
             <LogoutButton />
           </header>
           <div className={`print:p-0 ${dense ? "px-3 py-2 sm:px-4 lg:px-5" : "px-4 py-4 sm:px-6 sm:py-6 lg:px-8"}`}>{children}</div>

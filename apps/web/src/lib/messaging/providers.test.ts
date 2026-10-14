@@ -115,6 +115,36 @@ describe("WhatsApp template builder", () => {
     ]);
   });
 
+  it("uses the login OTP template for close, leave, and delete", () => {
+    const cases = [
+      ["close-hospital", "Close hospital"],
+      ["leave-hospital", "Leave hospital"],
+      ["delete-account", "Delete account"],
+    ] as const;
+
+    for (const [purpose, status] of cases) {
+      expect(
+        templateComponents({
+          toPhone: "9876543210",
+          channel: "WHATSAPP",
+          body: "unused",
+          templateKey: "otp",
+          otp: "654321",
+          variables: { purpose, name: "Anita" },
+        }),
+      ).toEqual([
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: "Anita" },
+            { type: "text", text: status },
+            { type: "text", text: "654321" },
+          ],
+        },
+      ]);
+    }
+  });
+
   it("builds utility bill receipt with document header and named body vars", () => {
     expect(
       templateComponents(

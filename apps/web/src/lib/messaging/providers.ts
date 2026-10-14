@@ -104,12 +104,23 @@ function reminderParamFormat(): "named" | "positional" {
   return env("WHATSAPP_REMINDER_PARAMS", "named").toLowerCase() === "positional" ? "positional" : "named";
 }
 
+/** Status line for the login OTP template (`reminder`). Unknown purposes return an empty string. */
+export function otpStatusText(purpose: string) {
+  const key = purpose.trim().toLowerCase();
+  if (key === "signup") return "Sign up";
+  if (key === "password-reset") return "Password reset";
+  if (key === "public-help") return "Support request";
+  if (key === "public-help-status") return "Support status";
+  if (key === "close-hospital") return "Close hospital";
+  if (key === "leave-hospital") return "Leave hospital";
+  if (key === "delete-account") return "Delete account";
+  return "";
+}
+
 function otpStatusLabel(vars: Record<string, string>) {
   const purpose = (vars.purpose || vars.status || "").trim().toLowerCase();
-  if (purpose === "signup") return "Sign up";
-  if (purpose === "password-reset") return "Password reset";
-  if (purpose === "public-help") return "Support request";
-  if (purpose === "public-help-status") return "Support status";
+  const labeled = otpStatusText(purpose);
+  if (labeled) return labeled;
   if (vars.status?.trim()) return vars.status.trim();
   return "Access code";
 }

@@ -98,6 +98,19 @@ export const verifyOtpSchema = z
     return { mobile, otp };
   });
 
+export const actionOtpSchema = z
+  .object({
+    otp: z.unknown().optional(),
+  })
+  .transform((data, ctx) => {
+    const otp = String(data.otp ?? "").trim();
+    if (!/^\d{6}$/.test(otp)) {
+      ctx.addIssue({ code: "custom", message: "Enter the 6-digit OTP from WhatsApp." });
+      return z.NEVER;
+    }
+    return { otp };
+  });
+
 export const resetPasswordSchema = z
   .object({
     mobile: z.unknown().optional(),

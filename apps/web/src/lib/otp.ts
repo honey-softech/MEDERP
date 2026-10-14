@@ -1,7 +1,10 @@
-import { createHash, randomInt, timingSafeEqual } from "crypto";
+import { randomInt, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
+import { deliverMessage, messagingProvider, otpStatusText } from "@/lib/messaging/providers";
 import { renderTemplate } from "@/lib/messaging/templates";
+import { otpDigest } from "@/lib/otp-digest";
+
+export { hashOtp, otpDigest, isBoundOtpPurpose, BOUND_OTP_PURPOSES } from "@/lib/otp-digest";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -22,25 +25,29 @@ export function dummyOtpEnabled() {
   return messagingProvider() !== "whatsapp";
 }
 
-export function hashOtp(otp: string) {
-  return createHash("sha256").update(otp).digest("hex");
-}
-
 export function generateOtp() {
   if (dummyOtpEnabled() && messagingProvider() !== "whatsapp") return DUMMY_OTP;
   return String(randomInt(100_000, 1_000_000));
 }
 
 /** Deliver OTP on WhatsApp immediately (do not wait for the outbound queue). */
-export async function deliverOtp(mobile: string, otp: string, purpose: string, _hospitalId?: string | null) {
-  const body = renderTemplate("otp", { otp, number: otp });
+export async function deliverOtp(
+  mobile: string,
+  otp: string,
+  purpose: string,
+  _hospitalId?: string | null,
+  name?: string | null,
+) {
+  const status = otpStatusText(purpose) || "Access code";
+  const greeting = name?.trim() || "";
+  const body = renderTemplate("otp", { otp, number: otp, purpose, status, ...(greeting ? { name: greeting } : {}) });
   const result = await deliverMessage({
     toPhone: mobile,
     channel: "WHATSAPP",
     body,
     templateKey: "otp",
     otp,
-    variables: { otp, number: otp, purpose },
+    variables: { otp, number: otp, purpose, status, ...(greeting ? { name: greeting } : {}) },
   });
   if (!result.ok) {
     console.error(`[otp] WhatsApp send failed for ******${mobile.slice(-4)} (${purpose}): ${result.error}`);
@@ -55,19 +62,19 @@ export async function deliverOtp(mobile: string, otp: string, purpose: string, _
 export async function issueOtp(userId: string, mobile: string, purpose: string) {
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  const user = await prisma.appUser.findUnique({
+    where: { id: userId },
+    select: { hospitalId: true, firstName: true },
+  });
   await prisma.appUser.update({
     where: { id: userId },
     data: {
-      otpCode: hashOtp(otp),
+      otpCode: otpDigest(otp, purpose),
       otpExpiresAt: expiresAt,
       otpAttempts: 0,
     },
   });
-  const user = await prisma.appUser.findUnique({
-    where: { id: userId },
-    select: { hospitalId: true },
-  });
-  const delivery = await deliverOtp(mobile, otp, purpose, user?.hospitalId);
+  const delivery = await deliverOtp(mobile, otp, purpose, user?.hospitalId, user?.firstName);
   if (!delivery.ok && messagingProvider() === "whatsapp") {
     return {
       expiresAt,
@@ -104,10 +111,14 @@ async function clearOtp(userId: string) {
   });
 }
 
-/** Verifies OTP. On success clears it (single-use). Dummy 123456 only when dummyOtpEnabled(). */
+/**
+ * Verifies OTP. On success clears it (single-use). Dummy 123456 only when dummyOtpEnabled().
+ * Pass expectedPurpose for close-hospital, leave-hospital, and delete-account so one code cannot confirm another action.
+ */
 export async function verifyAndConsumeOtp(
   user: { id: string; otpCode: string | null; otpExpiresAt: Date | null; otpAttempts: number },
   otp: string,
+  expectedPurpose?: string,
 ): Promise<OtpVerifyResult> {
   if (isDummyOtp(otp)) {
     await clearOtp(user.id);
@@ -128,7 +139,7 @@ export async function verifyAndConsumeOtp(
     return { ok: false, error: "expired" };
   }
 
-  const match = safeEqualHex(user.otpCode, hashOtp(otp.trim()));
+  const match = safeEqualHex(user.otpCode, otpDigest(otp, expectedPurpose));
   if (!match) {
     const attempts = user.otpAttempts + 1;
     await prisma.appUser.update({

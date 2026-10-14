@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { OtpDangerAction } from "@/components/otp-danger-action";
 import { AdminDoctorProfileForm } from "@/components/admin-doctor-profile-form";
 import { DoctorAvailabilityEditor } from "@/components/doctor-availability-editor";
 import { HospitalBrandingForm } from "@/components/hospital-branding-form";
@@ -196,6 +197,14 @@ export default async function HospitalSettingsPage() {
       <SignaturePolicyForm
         initial={{ requireSignatureForApproval: hospital.requireSignatureForApproval }}
         coverage={coverage}
+      />
+
+      <OtpDangerAction
+        title="Close hospital"
+        description="Clinical records stay on file. Every staff login is detached from this hospital, so people can sign in and join another hospital. Confirm with the login OTP sent on WhatsApp."
+        sendUrl="/api/hospital/close/otp"
+        confirmUrl="/api/hospital/close"
+        confirmLabel="Close hospital"
       />
     </AppShell>
   );

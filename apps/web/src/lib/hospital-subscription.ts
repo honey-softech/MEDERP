@@ -12,7 +12,7 @@ import {
   normalizeSubscriptionTierId,
 } from "@/lib/subscription-tiers";
 
-const SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles; cancel anytime
+const SUBSCRIPTION_TOTAL_COUNT = 12; // 12 monthly charges; cancel anytime
 
 /** Unix `start_at` for Razorpay: card now, first plan debit after the free trial month. */
 export function deferredSubscriptionStartAtUnix(now = new Date()) {

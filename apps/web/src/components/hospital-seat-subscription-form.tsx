@@ -322,7 +322,7 @@ export function HospitalSeatSubscriptionForm({
             </Link>{" "}
             {hasSubscription
               ? "and understand the new amount will auto-debit from the next billing cycle."
-              : "and authorise monthly auto-debit of the amount shown until I cancel."}
+              : "and authorise monthly auto-debit of the amount shown for 12 months, unless I cancel earlier."}
           </span>
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}

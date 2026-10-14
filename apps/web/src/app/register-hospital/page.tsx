@@ -692,7 +692,7 @@ export default function RegisterHospitalPage() {
               </ul>
             ) : null}
             <p className="mt-3 text-xs text-slate-600">
-              You can change plan later from Subscription. The card is saved for monthly auto-debit after the free month.
+              You can change plan later from Subscription. The card is saved for 12 monthly charges after the free month.
             </p>
           </aside>
         </div>
@@ -710,7 +710,7 @@ export default function RegisterHospitalPage() {
             <Link href="/terms" target="_blank" className="font-medium text-teal-700 underline">
               Terms &amp; Conditions
             </Link>
-            . Registration starts a 1-month trial. The selected plan is charged monthly after that.
+            . Registration starts a 1-month trial. The selected plan is then charged monthly for 12 months.
           </span>
         </label>
 

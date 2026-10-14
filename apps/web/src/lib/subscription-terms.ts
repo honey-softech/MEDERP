@@ -2,7 +2,7 @@
 export const DEFAULT_SUBSCRIPTION_TERMS = `MedERP subscription terms
 
 1. Monthly subscription
-By registering or updating a MedERP hospital subscription, you authorise MedERP / its payment partner (Razorpay) to collect the quoted monthly amount by auto-debit (UPI AutoPay, card, or other supported mandate methods) every billing cycle until you cancel.
+By registering or updating a MedERP hospital subscription, you authorise MedERP / its payment partner (Razorpay) to collect the quoted monthly amount by auto-debit (UPI AutoPay, card, or other supported mandate methods) for 12 monthly billing cycles. You may cancel earlier from the Subscription page.
 
 2. First payment and recurring charges
 The amount shown at registration or checkout is charged immediately to start the subscription. The same monthly amount (or the updated amount after a scheduled change) will be auto-debited on each subsequent billing cycle.

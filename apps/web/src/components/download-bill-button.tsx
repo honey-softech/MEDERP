@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { secondaryButtonClass } from "@/components/auth-shell";
-import { isMedErpMobileApp } from "@/lib/drug-catalog-cache/platform";
 
 type NativeBridge = { postMessage: (message: string) => void };
 
@@ -20,34 +19,62 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-async function saveInApp(href: string, filename: string) {
-  const bridge = nativeBridge();
-  if (!bridge) throw new Error("MedERP app bridge is missing.");
+async function billBytes(href: string) {
   const response = await fetch(href, { credentials: "same-origin" });
-  if (!response.ok) throw new Error("Bill download failed.");
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error || "Could not download the bill.");
+  }
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length === 0) throw new Error("Empty bill.");
-  bridge.postMessage(JSON.stringify({ type: "download", filename, base64: bytesToBase64(bytes) }));
+  if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 4)) !== "%PDF") {
+    throw new Error("The bill file could not be read.");
+  }
+  return bytes;
+}
+
+function saveInBrowser(bytes: Uint8Array, filename: string) {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  const blob = new Blob([copy], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 export function DownloadBillButton({ invoiceId, filename }: { invoiceId: string; filename: string }) {
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   const href = `/api/invoices/${invoiceId}/pdf`;
+
+  async function onDownload() {
+    setError("");
+    setPending(true);
+    try {
+      const bytes = await billBytes(href);
+      const bridge = nativeBridge();
+      if (bridge) {
+        bridge.postMessage(JSON.stringify({ type: "download", filename, base64: bytesToBase64(bytes) }));
+        return;
+      }
+      saveInBrowser(bytes, filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not download the bill.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <span className="inline-flex flex-col">
-      <a
-        href={href}
-        className={secondaryButtonClass}
-        onClick={(event) => {
-          if (!isMedErpMobileApp()) return;
-          event.preventDefault();
-          setError("");
-          void saveInApp(href, filename).catch(() => setError("Could not download the bill."));
-        }}
-      >
-        Download bill
-      </a>
+      <button type="button" className={secondaryButtonClass} onClick={() => void onDownload()} disabled={pending}>
+        {pending ? "Downloading…" : "Download bill"}
+      </button>
       {error ? <span className="mt-1 text-sm text-red-700">{error}</span> : null}
     </span>
   );

@@ -24,10 +24,19 @@ import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { billPdfFilename } from "@/lib/billing/rules";
 import { redirect } from "next/navigation";
 
-export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoiceDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const user = await requireHospitalPage();
   if (!hasBillingAccess(user)) redirect("/");
   const id = await routeParam(params, "id");
+  const { from } = await searchParams;
+  const backHref = from === "collections" ? "/billing/collections" : "/billing";
+  const backLabel = from === "collections" ? "Back to collections" : "Back";
   const invoice = await prisma.invoice.findFirst({
     where: { id, hospitalId: user.hospitalId },
     include: {
@@ -64,8 +73,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell title={invoice.invoiceNo}>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
-        <Link href="/billing" className={secondaryButtonClass}>
-          Back
+        <Link href={backHref} className={secondaryButtonClass}>
+          {backLabel}
         </Link>
         {invoice.status !== "VOID" && invoice.status !== "DRAFT" ? (
           <SendPatientMessageButton

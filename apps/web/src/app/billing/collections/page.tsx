@@ -1,4 +1,7 @@
 import { AppShell } from "@/components/app-shell";
+import { DownloadBillButton } from "@/components/download-bill-button";
+import { secondaryButtonClass } from "@/components/auth-shell";
+import { billPdfFilename } from "@/lib/billing/rules";
 import { hasBillingAccess, dayRange, doctorName, inr, localDayKey, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -167,10 +170,20 @@ export default async function CollectionsPage({
         ) : (
           payments.map((row) => (
             <li key={row.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              {row.receivedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · {prettyEnum(row.method)} ·{" "}
-              {inr(row.amount)} · {row.patient.firstName} {row.patient.lastName}
-              {row.invoice?.appointment ? ` · ${doctorName(row.invoice.appointment.doctor)}` : ""}
-              {row.notes ? ` · ${row.notes}` : ""}
+              <p>
+                {row.receivedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · {prettyEnum(row.method)} ·{" "}
+                {inr(row.amount)} · {row.patient.firstName} {row.patient.lastName}
+                {row.invoice?.appointment ? ` · ${doctorName(row.invoice.appointment.doctor)}` : ""}
+                {row.notes ? ` · ${row.notes}` : ""}
+              </p>
+              {row.invoice ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Link href={`/billing/${row.invoice.id}?from=collections`} className={secondaryButtonClass}>
+                    View bill
+                  </Link>
+                  <DownloadBillButton invoiceId={row.invoice.id} filename={billPdfFilename(row.invoice.invoiceNo)} />
+                </div>
+              ) : null}
             </li>
           ))
         )}

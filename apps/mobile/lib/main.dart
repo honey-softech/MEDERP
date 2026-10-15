@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mederp_mobile/bill_download.dart';
+import 'package:mederp_mobile/healthcare_loader.dart';
 import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
+import 'package:mederp_mobile/web_load_error.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -41,8 +45,10 @@ class MedErpWebPage extends StatefulWidget {
 
 class _MedErpWebPageState extends State<MedErpWebPage> {
   late final WebViewController _controller;
-  int _progress = 0;
   bool _failed = false;
+  bool _opened = false;
+  int _startupAttempts = 0;
+  Timer? _startupRetry;
 
   @override
   void initState() {
@@ -65,29 +71,58 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (progress) {
-            if (!mounted) return;
-            setState(() => _progress = progress);
-          },
           onPageStarted: (_) {
             if (!mounted) return;
             setState(() => _failed = false);
           },
           onPageFinished: (_) {
+            _startupRetry?.cancel();
+            _startupAttempts = 0;
+            if (mounted) {
+              setState(() {
+                _opened = true;
+                _failed = false;
+              });
+            } else {
+              _opened = true;
+            }
             _controller.runJavaScript(lockPageZoomScript);
             _controller.runJavaScript(inAppToastGuardScript);
             PushNotifications.registerTokenOnSite();
           },
           onWebResourceError: (error) {
             if (error.isForMainFrame != true || !mounted) return;
-            setState(() => _failed = true);
+            if (isIgnoredWebLoadError(error)) return;
+            _failOrRetryStartup();
           },
         ),
       );
-    // Show the site first. Notification / FCM setup must never block the WebView load.
-    _openSite();
+    // Wait until the iOS web view exists. Loading in initState reports a
+    // cancelled first navigation as "no internet", then Try again succeeds.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openSite();
+    });
     SystemNotifications.ensureReady().catchError((_) {});
     PushNotifications.start(webView: _controller).catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    _startupRetry?.cancel();
+    super.dispose();
+  }
+
+  void _failOrRetryStartup() {
+    if (_opened || _startupAttempts >= 2) {
+      if (mounted) setState(() => _failed = true);
+      return;
+    }
+    _startupAttempts += 1;
+    _startupRetry?.cancel();
+    _startupRetry = Timer(Duration(milliseconds: 400 * _startupAttempts), () {
+      if (!mounted || _opened) return;
+      _controller.loadRequest(Uri.parse(medErpSiteUrl));
+    });
   }
 
   Future<void> _openSite() async {
@@ -100,7 +135,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       await _controller.loadRequest(Uri.parse(medErpSiteUrl));
     } catch (_) {
       if (!mounted) return;
-      setState(() => _failed = true);
+      _failOrRetryStartup();
     }
   }
 
@@ -154,11 +189,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
           child: Stack(
             children: [
               WebViewWidget(controller: _controller),
-              if (_progress < 100 && !_failed)
-                const Align(
-                  alignment: Alignment.topCenter,
-                  child: LinearProgressIndicator(minHeight: 2),
-                ),
+              if (!_opened && !_failed) const HealthcareLoader(),
               if (_failed)
                 ColoredBox(
                   color: Colors.white,
@@ -172,6 +203,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
                           const SizedBox(height: 16),
                           FilledButton(
                             onPressed: () {
+                              _startupAttempts = 0;
                               setState(() => _failed = false);
                               _openSite();
                             },

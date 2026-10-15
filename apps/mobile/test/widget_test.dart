@@ -1,9 +1,13 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mederp_mobile/bill_download.dart';
+import 'package:mederp_mobile/healthcare_loader.dart';
 import 'package:mederp_mobile/main.dart';
 import 'package:mederp_mobile/system_notifications.dart';
+import 'package:mederp_mobile/web_load_error.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
   test('mobile app opens the live MedERP site', () {
@@ -13,6 +17,29 @@ void main() {
   test('installed app locks pinch zoom', () {
     expect(lockPageZoomScript, contains('user-scalable=no'));
     expect(lockPageZoomScript, contains('maximum-scale=1'));
+    expect(lockPageZoomScript, contains('font-size:16px'));
+  });
+
+  test('a cancelled first iOS load is not treated as offline', () {
+    expect(
+      isIgnoredWebLoadError(
+        WebResourceError(errorCode: -999, description: 'cancelled', isForMainFrame: true),
+      ),
+      isTrue,
+    );
+    expect(
+      isIgnoredWebLoadError(
+        WebResourceError(errorCode: -2, description: 'net::ERR_INTERNET_DISCONNECTED', isForMainFrame: true),
+      ),
+      isFalse,
+    );
+  });
+
+  testWidgets('clinic loader is shown while the app opens', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: HealthcareLoader()));
+    expect(find.text('MedERP'), findsOneWidget);
+    expect(find.byIcon(Icons.monitor_heart), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   test('webview user agent marks the installed app', () {

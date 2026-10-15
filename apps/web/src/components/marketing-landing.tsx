@@ -353,12 +353,12 @@ export function MarketingLanding() {
               >
                 Register clinic
               </Link>
-              <Link
+              <a
                 href="/login"
                 className="landing-link-btn inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
               >
                 Sign in
-              </Link>
+              </a>
             </div>
             <div className="landing-fade landing-delay-4 mt-5">
               <p className="mb-2.5 text-xs font-medium uppercase tracking-[0.14em] text-[#1f4a46]/65">
@@ -414,12 +414,12 @@ export function MarketingLanding() {
             >
               Register clinic
             </Link>
-            <Link
+            <a
               href="/login"
               className="landing-link-btn inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
             >
               Sign in
-            </Link>
+            </a>
           </div>
         </div>
       </section>
@@ -439,9 +439,9 @@ export function MarketingLanding() {
           <Link href="/#features" className="hover:text-[#0c1f2e]">
             Features
           </Link>
-          <Link href="/login" className="hover:text-[#0c1f2e]">
+          <a href="/login" className="hover:text-[#0c1f2e]">
             Sign in
-          </Link>
+          </a>
           <Link href="/register-hospital" className="hover:text-[#0c1f2e]">
             Register
           </Link>

@@ -118,7 +118,10 @@
 body {
   background: var(--app-bg);
   color: var(--text-primary);
-  overflow-x: hidden;
+  /* clip does not turn the body into the scroll container. overflow-x: hidden
+     does, and mobile Safari / WebViews then ignore a tap on a link (long-press
+     still opens it). */
+  overflow-x: clip;
 }
 
 html {
@@ -756,17 +759,23 @@ html:has(.landing) body {
 }
 
 /* Solid CTAs — readable on the mint hero */
+.landing-cta,
+.landing-ghost,
+.landing-link-btn {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
 .landing-cta {
   background: #0a5858 !important;
   color: #ffffff !important;
   border: 1px solid #084646;
   box-shadow: 0 8px 22px rgb(10 88 88 / 0.32);
-  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 
 .landing-cta:hover {
   background: #063f3f !important;
-  transform: translateY(-1px);
   box-shadow: 0 12px 28px rgb(10 88 88 / 0.38);
 }
 
@@ -775,12 +784,11 @@ html:has(.landing) body {
   background: #ffffff !important;
   color: #0c2f2c !important;
   box-shadow: 0 6px 16px rgb(12 47 44 / 0.12);
-  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+  transition: background-color 180ms ease, border-color 180ms ease;
 }
 
 .landing-ghost:hover {
   background: #f3fffc !important;
-  transform: translateY(-1px);
 }
 
 .landing-link-btn {
@@ -811,7 +819,7 @@ html:has(.landing) body {
   position: relative;
   isolation: isolate;
   min-height: 100dvh;
-  overflow: hidden;
+  overflow-x: clip;
   /* Soft landing wash — not bleached */
   background:
     radial-gradient(ellipse 55% 40% at 88% 8%, rgb(255 214 196 / 0.22), transparent 55%),
@@ -867,16 +875,10 @@ html:has(.landing) body {
   box-shadow:
     0 1px 2px rgb(12 47 44 / 0.04),
     0 12px 32px rgb(12 47 44 / 0.08);
-  backdrop-filter: blur(8px);
-}
-
-.auth-signin .auth-card {
-  backdrop-filter: none;
 }
 
 .landing-fade {
   opacity: 0;
-  transform: translateY(14px);
   animation: landing-rise 700ms ease forwards;
 }
 
@@ -888,7 +890,6 @@ html:has(.landing) body {
 @keyframes landing-rise {
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -929,17 +930,27 @@ html:has(.landing) body {
   }
   .landing-fade {
     opacity: 1;
-    transform: none;
   }
 }
 
-/* A full-screen masked grid that moves background-position, plus floating
-   SVGs, repaint on every frame and fight touch scrolling. */
+/* A transform on a parent makes a phone ignore a tap on a link.
+   Long-press still shows Open. Keep these hit targets flat, and stop the
+   masked grid / floating doodles from repainting on every touch frame. */
 @media (pointer: coarse) {
+  .landing-fade {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
   .landing-hero-mesh,
   .landing-doodle-float,
   .landing-doodle-float-slow,
   .landing-doodle-pulse {
     animation: none;
   }
+}
+
+.auth-card a {
+  touch-action: manipulation;
 }

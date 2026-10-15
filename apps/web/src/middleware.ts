@@ -35,7 +35,7 @@ export function middleware(request: NextRequest) {
     Boolean(request.cookies.get(SESSION_COOKIE)?.value) ||
     (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ");
 
-  if ((isPublicPage || isPublicApi) && isLoggedIn && (pathname === "/login" || pathname === "/signup")) {
+  if ((isPublicPage || isPublicApi) && isLoggedIn && pathname === "/signup") {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

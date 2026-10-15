@@ -120,9 +120,9 @@ export default function SignupPage() {
       </form>
       <p className="mt-4 text-center text-sm text-slate-500">
         Already have an account?{" "}
-        <Link className="font-medium text-teal-700 hover:underline" href="/login">
+        <a className="inline-flex min-h-11 items-center font-medium text-teal-700 underline" href="/login">
           Sign in
-        </Link>
+        </a>
       </p>
       <p className="mt-2 text-center text-sm text-slate-500">
         Opening a new hospital?{" "}

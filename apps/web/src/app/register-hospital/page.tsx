@@ -763,9 +763,9 @@ export default function RegisterHospitalPage() {
       </form>
       <p className="mt-4 text-center text-sm text-slate-500">
         Already registered?{" "}
-        <Link className="font-medium text-teal-700 hover:underline" href="/login">
+        <a className="inline-flex min-h-11 items-center font-medium text-teal-700 underline" href="/login">
           Sign in
-        </Link>
+        </a>
         {" · "}
         <Link className="font-medium text-teal-700 hover:underline" href="/demo">
           Book a demo

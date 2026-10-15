@@ -214,6 +214,7 @@ export async function prepareHospitalRegistration(
   if (passwordError) {
     throw new HospitalRegistrationError(passwordError, 400);
   }
+  assertAdminPracticesAsDoctor(input);
 
   const code = await allocateUniqueHospitalCode(name, input.code);
 
@@ -328,24 +329,6 @@ export async function prepareHospitalRegistration(
 export async function registerHospital(input: RegisterHospitalInput) {
   if (input.termsAccepted === false) {
     throw new HospitalRegistrationError("You must accept the Terms & Conditions to register.", 400);
-  }
-
-  if (input.adminAsDoctor) {
-    const specialization = String(input.doctorProfile?.specialization ?? "").trim();
-    const departmentName = String(input.doctorProfile?.departmentName ?? "").trim();
-    const medicalRegNo = String(input.doctorProfile?.medicalRegNo ?? "").trim();
-    if (!specialization) {
-      throw new HospitalRegistrationError("Specialty is required when admin practices as a doctor.", 400);
-    }
-    if (!departmentName) {
-      throw new HospitalRegistrationError("Department is required when admin practices as a doctor.", 400);
-    }
-    if (!medicalRegNo) {
-      throw new HospitalRegistrationError(
-        "Medical registration number is required when admin practices as a doctor.",
-        400,
-      );
-    }
   }
 
   const prepared = await prepareHospitalRegistration(input);
@@ -592,6 +575,28 @@ export async function registerHospital(input: RegisterHospitalInput) {
   return { hospital, superAdmin, invoice, quote: prepared.quote };
 }
 
+function assertAdminPracticesAsDoctor(input: {
+  adminAsDoctor?: boolean;
+  doctorProfile?: AdminDoctorRegistrationProfile | null;
+}) {
+  if (!input.adminAsDoctor) return;
+  const specialization = String(input.doctorProfile?.specialization ?? "").trim();
+  const departmentName = String(input.doctorProfile?.departmentName ?? "").trim();
+  const medicalRegNo = String(input.doctorProfile?.medicalRegNo ?? "").trim();
+  if (!specialization) {
+    throw new HospitalRegistrationError("Specialty is required when admin practices as a doctor.", 400);
+  }
+  if (!departmentName) {
+    throw new HospitalRegistrationError("Department is required when admin practices as a doctor.", 400);
+  }
+  if (!medicalRegNo) {
+    throw new HospitalRegistrationError(
+      "Medical registration number is required when admin practices as a doctor.",
+      400,
+    );
+  }
+}
+
 /** Parse optional admin-as-doctor payload from a public registration request body. */
 export function doctorProfileFromBody(body: Record<string, unknown> | null): {
   adminAsDoctor: boolean;
@@ -602,13 +607,16 @@ export function doctorProfileFromBody(body: Record<string, unknown> | null): {
     return { adminAsDoctor: false, doctorProfile: null };
   }
   const profile = (body?.doctorProfile ?? body) as Record<string, unknown>;
+  const specialization = String(profile.specialization ?? "").trim();
+  const departmentName = String(profile.departmentName ?? "").trim() || specialization;
   return {
     adminAsDoctor: true,
     doctorProfile: {
       firstName: profile.firstName != null ? String(profile.firstName) : null,
       lastName: profile.lastName != null ? String(profile.lastName) : null,
       medicalRegNo: String(profile.medicalRegNo ?? "").trim(),
-      specialization: String(profile.specialization ?? "").trim(),
+      specialization,
+      departmentName,
       medicalDegree: profile.medicalDegree != null ? String(profile.medicalDegree) : null,
       regCouncil: profile.regCouncil != null ? String(profile.regCouncil) : null,
       postgraduate: profile.postgraduate != null ? String(profile.postgraduate) : null,

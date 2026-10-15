@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       extraStaffSlots: Number(body.extraStaffSlots ?? 0),
       termsAccepted: true,
       referralCode: body.referralCode != null ? String(body.referralCode) : null,
+      ...doctorProfileFromBody(body),
     });
 
     const result = await registerHospital({

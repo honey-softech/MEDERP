@@ -3,7 +3,7 @@
  * Currently unused while the public register form skips the payment gateway.
  */
 import { NextResponse } from "next/server";
-import { HospitalRegistrationError, prepareHospitalRegistration } from "@/lib/hospital-registration";
+import { HospitalRegistrationError, doctorProfileFromBody, prepareHospitalRegistration } from "@/lib/hospital-registration";
 import { trialEndsAtFromNow } from "@/lib/hospital-access";
 import {
   createRazorpaySubscription,
@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       labEnabled: Boolean(body.labEnabled),
       termsAccepted: true,
       referralCode: body.referralCode != null ? String(body.referralCode) : null,
+      ...doctorProfileFromBody(body),
     });
 
     const amountPaise = toPaise(prepared.quote.total);

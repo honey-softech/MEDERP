@@ -80,7 +80,7 @@ export function BoardChat({
   }
 
   return (
-    <section className="flex h-[30dvh] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-full">
+    <section className="flex h-[26rem] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-full">
       <header className="border-b border-slate-200 px-4 py-3">
         <h3 className="font-semibold text-slate-900">Hospital chat</h3>
         <p className="text-xs text-slate-500">Visible to everyone on staff</p>
@@ -132,7 +132,7 @@ export function BoardChat({
         {error ? <p className="mb-2 text-xs text-red-600">{error}</p> : null}
         <div className="flex items-end gap-2">
           <textarea
-            className="min-h-10 max-h-24 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary-light"
+            className="min-h-10 max-h-24 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary-light"
             rows={1}
             value={message}
             onChange={(event) => setMessage(event.target.value)}

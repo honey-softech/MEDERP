@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { countHospitalStaffSeats, createPlatformInvoice } from "@/lib/platform-billing";
 import { notifySubscriptionRenewalBill } from "@/lib/platform-invoice-whatsapp";
 import { extraUsersBelowUsageError, pricingFromTier } from "@/lib/platform-pricing";
-import { getRazorpayClient, razorpayConfigured, toPaise } from "@/lib/razorpay";
+import { getRazorpayClient, razorpayConfigured, razorpayErrorMessage, toPaise } from "@/lib/razorpay";
 import { trialEndsAtFromNow } from "@/lib/hospital-access";
 import {
   getSubscriptionTier,
@@ -517,6 +517,38 @@ export async function recordSubscriptionCharge(params: {
 
 const ENDED_SUBSCRIPTION_STATUSES = new Set<HospitalSubscriptionStatus>(["CANCELLED", "COMPLETED", "EXPIRED"]);
 
+/** Razorpay statuses that will not take another charge. `created` never started a mandate. */
+const REMOTE_ENDED_STATUSES = new Set(["cancelled", "completed", "expired", "created"]);
+
+/** True when Razorpay refused cancel because this subscription cannot bill again. */
+export function subscriptionCancelCanBeSkipped(message: string) {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("already been cancelled") ||
+    lower.includes("already cancelled") ||
+    lower.includes("not cancellable") ||
+    lower.includes("cannot be cancelled") ||
+    lower.includes("can't be cancelled") ||
+    lower.includes("not found") ||
+    lower.includes("does not exist") ||
+    lower.includes("no such") ||
+    lower.includes("created status") ||
+    lower.includes("created state")
+  );
+}
+
+async function markHospitalSubscriptionCancelled(subscriptionId: string, cancelledAt: Date | null) {
+  await prisma.hospitalSubscription.update({
+    where: { id: subscriptionId },
+    data: {
+      status: "CANCELLED",
+      cancelAtPeriodEnd: false,
+      cancelledAt: cancelledAt ?? new Date(),
+      nextChargeAt: null,
+    },
+  });
+}
+
 /**
  * Stops Razorpay billing for a hospital that is being removed.
  * Looks up the subscription by hospital, so it still runs after the hospital super admin is detached.
@@ -529,33 +561,36 @@ export async function cancelSubscriptionForClosedHospital(hospitalId: string) {
   }
 
   if (!razorpayConfigured()) {
-    await prisma.hospitalSubscription.update({
-      where: { id: sub.id },
-      data: {
-        status: "CANCELLED",
-        cancelAtPeriodEnd: false,
-        cancelledAt: new Date(),
-        nextChargeAt: null,
-      },
-    });
+    await markHospitalSubscriptionCancelled(sub.id, new Date());
     return { cancelled: true as const, reason: "local" as const, subscriptionId: sub.id };
+  }
+
+  const razorpay = getRazorpayClient();
+  try {
+    const remote = await razorpay.subscriptions.fetch(sub.razorpaySubscriptionId);
+    const status = String(remote.status ?? "").toLowerCase();
+    if (REMOTE_ENDED_STATUSES.has(status)) {
+      await markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
+      return { cancelled: true as const, reason: "already" as const, subscriptionId: sub.id };
+    }
+  } catch (error) {
+    const message = razorpayErrorMessage(error) || (error instanceof Error ? error.message : "");
+    if (subscriptionCancelCanBeSkipped(message)) {
+      await markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
+      return { cancelled: true as const, reason: "already" as const, subscriptionId: sub.id };
+    }
   }
 
   try {
     const updated = await cancelHospitalSubscription({ hospitalId, atCycleEnd: false });
     return { cancelled: true as const, reason: "razorpay" as const, subscriptionId: updated.id };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not cancel the hospital subscription.";
-    if (/already been cancelled|already cancelled|not found|does not exist|no such/i.test(message)) {
-      await prisma.hospitalSubscription.update({
-        where: { id: sub.id },
-        data: {
-          status: "CANCELLED",
-          cancelAtPeriodEnd: false,
-          cancelledAt: sub.cancelledAt ?? new Date(),
-          nextChargeAt: null,
-        },
-      });
+    const message =
+      razorpayErrorMessage(error) ||
+      (error instanceof Error ? error.message : "") ||
+      "Could not cancel the hospital subscription.";
+    if (subscriptionCancelCanBeSkipped(message)) {
+      await markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
       return { cancelled: true as const, reason: "already" as const, subscriptionId: sub.id };
     }
     return { cancelled: false as const, reason: "failed" as const, error: message };

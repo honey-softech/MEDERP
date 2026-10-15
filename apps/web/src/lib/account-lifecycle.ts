@@ -92,26 +92,42 @@ export async function closeHospitalRecord(
   }
 
   const detachedUsers = await prisma.$transaction(async (tx) => {
-    const current = await tx.hospital.findUnique({ where: { id: hospitalId }, select: { isActive: true } });
-    if (!current) return null;
+    const current = await tx.hospital.findUnique({
+      where: { id: hospitalId },
+      select: { isActive: true, removedAt: true },
+    });
+    if (!current || current.removedAt) return null;
     if (!current.isActive && !options?.allowInactive) return null;
 
     const users = await tx.appUser.findMany({
       where: { hospitalId, role: { notIn: [...PLATFORM_ROLES] } },
-      select: { id: true },
+      select: { id: true, mobile: true },
     });
-    const userIds = users.map((row) => row.id);
 
     await tx.staff.updateMany({
-      where: { hospitalId, appUser: { role: { notIn: [...PLATFORM_ROLES] } } },
-      data: { appUserId: null, isActive: false },
+      where: { hospitalId },
+      data: { appUserId: null, isActive: false, phone: null },
     });
 
-    if (userIds.length > 0) {
-      await tx.appSession.deleteMany({ where: { userId: { in: userIds } } });
-      await tx.appUser.updateMany({
-        where: { id: { in: userIds } },
-        data: { hospitalId: null, userCode: null, employeeId: null },
+    for (const user of users) {
+      await tx.appSession.deleteMany({ where: { userId: user.id } });
+      await tx.devicePushToken.deleteMany({ where: { userId: user.id } });
+      const released = isRemovedAccountMobile(user.mobile);
+      const retiredKey = `removed-${user.id}`.slice(0, 60);
+      await tx.appUser.update({
+        where: { id: user.id },
+        data: {
+          isActive: false,
+          isVerified: false,
+          hospitalId: null,
+          userCode: null,
+          employeeId: null,
+          email: null,
+          otpCode: null,
+          otpExpiresAt: null,
+          otpAttempts: 0,
+          ...(released ? {} : { mobile: retiredKey, username: retiredKey }),
+        },
       });
     }
 
@@ -120,8 +136,11 @@ export async function closeHospitalRecord(
       data: { status: "REJECTED", reviewNote: "Hospital closed.", reviewedAt: new Date() },
     });
 
-    await tx.hospital.update({ where: { id: hospitalId }, data: { isActive: false } });
-    return userIds.length;
+    await tx.hospital.update({
+      where: { id: hospitalId },
+      data: { isActive: false, removedAt: new Date(), phone: null, altPhones: null },
+    });
+    return users.length;
   });
 
   if (detachedUsers == null) {

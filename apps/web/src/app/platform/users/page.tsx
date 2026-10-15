@@ -11,6 +11,7 @@ export default async function PlatformUsersPickerPage() {
 
   const [hospitals, orphanRows] = await Promise.all([
     prisma.hospital.findMany({
+      where: { removedAt: null },
       orderBy: { name: "asc" },
       include: { _count: { select: { users: true } } },
     }),

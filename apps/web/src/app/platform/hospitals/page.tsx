@@ -13,6 +13,7 @@ export default async function HospitalsPage() {
   }
 
   const hospitals = await prisma.hospital.findMany({
+    where: { removedAt: null },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { users: true } },

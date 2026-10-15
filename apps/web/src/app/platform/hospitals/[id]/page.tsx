@@ -59,7 +59,7 @@ export default async function HospitalDetailPage({
     },
   });
 
-  if (!hospital) notFound();
+  if (!hospital || hospital.removedAt) notFound();
 
   const [staffUsed, referralBonusMonths] = await Promise.all([
     countHospitalStaffSeats(hospital.id),

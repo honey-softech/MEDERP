@@ -230,9 +230,9 @@ export function HospitalAdminPanel({
       <div className="mt-6 border-t border-slate-200 pt-5">
         <h4 className="font-semibold text-slate-900">Remove hospital</h4>
         <p className="mt-1 mb-3 max-w-2xl text-sm text-slate-500">
-          Staff are signed out and can join another hospital, including the hospital super admin. The Razorpay
-          subscription is cancelled so no further charges are taken. Clinical records stay, and the hospital phone
-          can be used to register again. Enter your software admin password to confirm.
+          The hospital leaves this list. Its phone number and staff login numbers are deleted so they can be
+          used to register again. The Razorpay subscription is cancelled so no further charges are taken. Clinical
+          records stay on file. Enter your software admin password to confirm.
         </p>
         <SoftwareAdminPasswordConfirm
           openLabel="Remove hospital"

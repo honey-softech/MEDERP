@@ -217,7 +217,9 @@ export async function prepareHospitalRegistration(
 
   const code = await allocateUniqueHospitalCode(name, input.code);
 
-  const phoneTaken = await prisma.hospital.findFirst({ where: { phone, isActive: true } });
+  const phoneTaken = await prisma.hospital.findFirst({
+    where: { phone, isActive: true, removedAt: null },
+  });
   if (phoneTaken) {
     throw new HospitalRegistrationError("That hospital mobile number is already registered.", 409);
   }

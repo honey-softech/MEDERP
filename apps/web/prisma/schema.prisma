@@ -397,6 +397,8 @@ model Hospital {
   followUpReminderEnabled Boolean      @default(false)
   followUpReminderDaysBefore Int       @default(1)
   trialEndsAt        DateTime?
+  /** Set when a software admin removes the hospital. Hidden from the hospital list; phone and logins are released. */
+  removedAt          DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   users         AppUser[]

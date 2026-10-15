@@ -11,6 +11,7 @@ export async function GET() {
   }
 
   const hospitals = await prisma.hospital.findMany({
+    where: { removedAt: null },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { users: true, platformInvoices: true } },

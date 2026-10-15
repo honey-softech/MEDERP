@@ -546,6 +546,18 @@ export async function cancelSubscriptionForClosedHospital(hospitalId: string) {
     return { cancelled: true as const, reason: "razorpay" as const, subscriptionId: updated.id };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not cancel the hospital subscription.";
+    if (/already been cancelled|already cancelled|not found|does not exist|no such/i.test(message)) {
+      await prisma.hospitalSubscription.update({
+        where: { id: sub.id },
+        data: {
+          status: "CANCELLED",
+          cancelAtPeriodEnd: false,
+          cancelledAt: sub.cancelledAt ?? new Date(),
+          nextChargeAt: null,
+        },
+      });
+      return { cancelled: true as const, reason: "already" as const, subscriptionId: sub.id };
+    }
     return { cancelled: false as const, reason: "failed" as const, error: message };
   }
 }

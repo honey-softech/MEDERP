@@ -93,7 +93,7 @@ export async function PATCH(request: Request, context: Ctx) {
         return NextResponse.json({ error: "Enter a valid 10-digit hospital mobile." }, { status: 400 });
       }
       const clash = await prisma.hospital.findFirst({
-        where: { phone, id: { not: id } },
+        where: { phone, id: { not: id }, removedAt: null },
         select: { id: true },
       });
       if (clash) {
@@ -238,7 +238,7 @@ export async function DELETE(request: Request, context: Ctx) {
     action: "HOSPITAL_CLOSED",
     entity: "Hospital",
     entityId: result.hospital.id,
-    summary: `${actor.username} removed hospital ${result.hospital.code}. Staff logins were detached, the subscription was cancelled, and clinical records were kept.`,
+    summary: `${actor.username} removed hospital ${result.hospital.code}. The hospital phone and staff login numbers were released, the subscription was cancelled, and clinical records were kept.`,
     metadata: { detachedUsers: result.detachedUsers, subscription: result.subscription },
   });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
 import { removePlatformUser } from "@/lib/platform-user-remove";
+import { assertSoftwareAdminPassword } from "@/lib/software-admin-password";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -10,6 +11,12 @@ export async function DELETE(request: Request, context: Ctx) {
   const actor = await getCurrentUser(request);
   if (!actor || actor.role !== "SOFTWARE_ADMIN") {
     return NextResponse.json({ error: "Software admin access required." }, { status: 403 });
+  }
+
+  const body = (await request.json().catch(() => null)) as { password?: unknown } | null;
+  const verified = await assertSoftwareAdminPassword(actor.id, body?.password);
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.error }, { status: verified.status });
   }
 
   const { id } = await context.params;
@@ -33,6 +40,7 @@ export async function DELETE(request: Request, context: Ctx) {
       previousMobile: result.user.mobile,
       previousHospitalId: result.user.hospitalId,
       previousRole: result.user.role,
+      subscription: result.subscription,
     },
   });
 

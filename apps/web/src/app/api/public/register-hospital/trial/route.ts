@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       adminEmail: body.adminEmail != null ? String(body.adminEmail) : null,
       adminPassword: String(body.adminPassword ?? ""),
       tierId: body.tierId != null ? String(body.tierId) : undefined,
+      extraStaffSlots: Number(body.extraStaffSlots ?? 0),
       termsAccepted: true,
       referralCode: body.referralCode != null ? String(body.referralCode) : null,
     });
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
       adminEmail: prepared.adminEmail,
       adminPassword: prepared.adminPassword,
       tierId: prepared.tierId,
+      extraStaffSlots: prepared.quote.extraUsers,
       skipInvoice: true,
       paymentNotes: "1-month free trial — no invoice until first paid charge.",
       termsAccepted: true,

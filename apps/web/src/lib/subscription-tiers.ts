@@ -4,6 +4,19 @@ export const SUBSCRIPTION_TIER_IDS = ["CLINIC", "STARTER", "GROWTH", "PLUS"] as 
 
 /** Monthly fee for each login beyond the plan's included users, before GST. */
 export const EXTRA_USER_MONTHLY_FEE = 300;
+
+/** Extra logins a hospital admin can add on top of a plan. */
+export const MAX_EXTRA_USERS = 100;
+
+/** Whole-number extra users, or an error message when the value is not allowed. */
+export function parseExtraUserCount(value: unknown): number {
+  if (value == null || value === "") return 0;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isInteger(n) || n < 0 || n > MAX_EXTRA_USERS) {
+    throw new Error(`Extra users must be a whole number from 0 to ${MAX_EXTRA_USERS}.`);
+  }
+  return n;
+}
 export type SubscriptionTierId = (typeof SUBSCRIPTION_TIER_IDS)[number];
 
 /** Older DB values — still readable, mapped onto current Plan 3. */

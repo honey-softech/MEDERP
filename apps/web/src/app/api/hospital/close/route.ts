@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     action: "HOSPITAL_CLOSED",
     entity: "Hospital",
     entityId: result.hospital.id,
-    summary: `${user.username} closed hospital ${result.hospital.code}. Staff logins were detached and clinical records were kept.`,
-    metadata: { detachedUsers: result.detachedUsers },
+    summary: `${user.username} closed hospital ${result.hospital.code}. Staff logins were detached, the subscription was cancelled, and clinical records were kept.`,
+    metadata: { detachedUsers: result.detachedUsers, subscription: result.subscription },
   });
 
   await clearSession();

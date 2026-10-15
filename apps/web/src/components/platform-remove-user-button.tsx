@@ -1,55 +1,37 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { SoftwareAdminPasswordConfirm } from "@/components/software-admin-password-confirm";
 
 export function PlatformRemoveUserButton({
   userId,
   label,
   redirectTo,
-  className = "text-sm font-medium text-red-600 hover:underline disabled:opacity-50",
+  cancelsSubscription = false,
 }: {
   userId: string;
   label: string;
   redirectTo?: string;
-  className?: string;
+  cancelsSubscription?: boolean;
 }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-
-  async function onRemove() {
-    if (
-      !window.confirm(
-        `Remove account "${label}" from MedERP?\n\nThey will be signed out and this mobile can sign up again. This cannot be undone from the app.`,
-      )
-    ) {
-      return;
-    }
-    setPending(true);
-    setError("");
-    try {
-      const response = await fetch(`/api/platform/users/${userId}`, { method: "DELETE" });
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) {
-        setError(data.error ?? "Could not remove account.");
-        return;
-      }
-      if (redirectTo) router.push(redirectTo);
-      else router.refresh();
-    } catch {
-      setError("Network error.");
-    } finally {
-      setPending(false);
-    }
-  }
-
   return (
-    <span className="inline-flex flex-col items-start gap-1">
-      <button type="button" className={className} disabled={pending} onClick={() => void onRemove()}>
-        {pending ? "Removing…" : "Remove"}
-      </button>
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
-    </span>
+    <SoftwareAdminPasswordConfirm
+      openLabel="Remove"
+      confirmLabel="Remove account"
+      description={
+        cancelsSubscription
+          ? `Remove account "${label}". If this is the hospital's only super admin, the Razorpay subscription is cancelled and no further charges are taken. They are signed out and this mobile can sign up again. Enter your software admin password to confirm.`
+          : `Remove account "${label}". They are signed out and this mobile can sign up again. Enter your software admin password to confirm.`
+      }
+      onConfirm={async (password) => {
+        const response = await fetch(`/api/platform/users/${userId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) return { ok: false, error: data.error ?? "Could not remove account." };
+        return { ok: true, redirectTo };
+      }}
+    />
   );
 }

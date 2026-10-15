@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, normalizeHospitalCode } from "@/lib/auth";
+import { closeHospitalRecord } from "@/lib/account-lifecycle";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { isValidHospitalCode } from "@/lib/hospital-code";
 import { isValidIndianMobile, normalizeMobile } from "@/lib/phone";
+import { assertSoftwareAdminPassword } from "@/lib/software-admin-password";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -199,4 +201,46 @@ export async function PATCH(request: Request, context: Ctx) {
   });
 
   return NextResponse.json({ ok: true, hospital });
+}
+
+export async function DELETE(request: Request, context: Ctx) {
+  const actor = await getCurrentUser(request);
+  if (!actor || actor.role !== "SOFTWARE_ADMIN") {
+    return NextResponse.json({ error: "Software admin access required." }, { status: 403 });
+  }
+
+  const body = (await request.json().catch(() => null)) as { password?: unknown } | null;
+  const verified = await assertSoftwareAdminPassword(actor.id, body?.password);
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.error }, { status: verified.status });
+  }
+
+  const { id } = await context.params;
+  const existing = await prisma.hospital.findUnique({
+    where: { id },
+    select: { id: true, name: true, code: true, isActive: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Hospital not found." }, { status: 404 });
+  }
+
+  const result = await closeHospitalRecord(existing, { allowInactive: true });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  await writeAuditLog({
+    request,
+    hospitalId: result.hospital.id,
+    actorUserId: actor.id,
+    actorUsername: actor.username,
+    actorRole: actor.role,
+    action: "HOSPITAL_CLOSED",
+    entity: "Hospital",
+    entityId: result.hospital.id,
+    summary: `${actor.username} removed hospital ${result.hospital.code}. Staff logins were detached, the subscription was cancelled, and clinical records were kept.`,
+    metadata: { detachedUsers: result.detachedUsers, subscription: result.subscription },
+  });
+
+  return NextResponse.json({ ok: true, id: result.hospital.id });
 }

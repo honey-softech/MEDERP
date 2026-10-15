@@ -15,7 +15,7 @@ import { ensureDepartmentByName, seedHospitalDepartments } from "@/lib/front-des
 import { seedHospitalWards } from "@/lib/wards";
 import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platform-billing";
 import { upsertHospitalSubscription, unixToDate } from "@/lib/hospital-subscription";
-import { hospitalFieldsFromTier, isSubscriptionTierId, type SubscriptionTierId } from "@/lib/subscription-tiers";
+import { hospitalFieldsFromTier, isSubscriptionTierId, parseExtraUserCount, requireSubscriptionTier, type SubscriptionTierId } from "@/lib/subscription-tiers";
 import { pricingFromSettings } from "@/lib/platform-pricing";
 import { mobileCanBeRecreated } from "@/lib/reusable-mobile";
 import {
@@ -59,7 +59,7 @@ export type RegisterHospitalInput = {
   adminEmail?: string | null;
   adminPassword: string;
   tierId?: string;
-  /** @deprecated use tierId */
+  /** Logins beyond the selected plan's included users. ₹300/month each before GST. */
   extraStaffSlots?: number;
   /** @deprecated use tierId */
   pharmacyEnabled?: boolean;
@@ -264,7 +264,22 @@ export async function prepareHospitalRegistration(
 
   const adminUsername = await uniqueUsername(usernameBaseFromAdmin(adminDisplayName, adminEmail, adminMobile));
 
-  const quote = await calculateRegistrationTotal({ tierId });
+  const explicitTier = Boolean(input.tierId && isSubscriptionTierId(input.tierId));
+  let extraUsers = 0;
+  if (explicitTier) {
+    try {
+      extraUsers = parseExtraUserCount(input.extraStaffSlots ?? 0);
+    } catch (error) {
+      throw new HospitalRegistrationError(
+        error instanceof Error ? error.message : "Invalid extra users.",
+        400,
+      );
+    }
+    if (requireSubscriptionTier(tierId).seatLimit == null && extraUsers > 0) {
+      throw new HospitalRegistrationError("This plan includes unlimited users.", 400);
+    }
+  }
+  const quote = await calculateRegistrationTotal({ tierId, extraUsers });
 
   if (!(quote.total > 0)) {
     throw new HospitalRegistrationError("Registration total must be greater than zero.", 400);
@@ -351,6 +366,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
       address: prepared.address,
       phone: prepared.phone,
       ...hospitalFieldsFromTier(tier),
+      extraStaffSlots: prepared.quote.extraUsers,
       trialEndsAt: input.trialEndsAt ?? null,
       ...(prepared.reuseUserId
         ? {}

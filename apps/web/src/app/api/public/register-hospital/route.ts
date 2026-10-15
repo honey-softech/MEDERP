@@ -190,6 +190,7 @@ export async function POST(request: Request) {
       adminEmail: prepared.adminEmail,
       adminPassword: prepared.adminPassword,
       tierId: prepared.tierId,
+      extraStaffSlots: prepared.quote.extraUsers,
       invoiceStatus,
       skipInvoice: mode === "subscription" && deferredBilling,
       paymentMethod: "UPI" as PaymentMethod,

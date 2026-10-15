@@ -57,7 +57,7 @@ export default async function PlatformEditHospitalUserPage({
           userId={user.id}
           label={`${user.username} / ${user.mobile}`}
           redirectTo={`/platform/users/${hospital.id}`}
-          className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          cancelsSubscription={user.role === "SUPER_ADMIN"}
         />
       </div>
       <HospitalUserForm

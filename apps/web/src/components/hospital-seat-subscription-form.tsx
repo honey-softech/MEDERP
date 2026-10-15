@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { ExtraUsersField } from "@/components/extra-users-field";
 import { loadRazorpayCheckoutScript } from "@/lib/razorpay-checkout";
-import { SUBSCRIPTION_GST_PERCENT, subscriptionTotalWithGst } from "@/lib/platform-pricing";
+import { SUBSCRIPTION_GST_PERCENT, pricingFromTier } from "@/lib/platform-pricing";
 
 type TierInfo = {
   id: string;
@@ -28,12 +29,14 @@ function inr(value: number) {
 export function HospitalSeatSubscriptionForm({
   currentUsed,
   currentLimit,
+  currentExtraUsers,
   currentMonthly,
   currentTierId,
   currentTierName,
   tiers,
   hasSubscription,
   pendingSubscriptionTier,
+  pendingExtraUsers,
   pendingMonthlyAmount,
   nextChargeAt,
   cancelAtPeriodEnd,
@@ -42,12 +45,14 @@ export function HospitalSeatSubscriptionForm({
 }: {
   currentUsed: number;
   currentLimit: number | null;
+  currentExtraUsers: number;
   currentMonthly: number;
   currentTierId: string;
   currentTierName: string;
   tiers: TierInfo[];
   hasSubscription: boolean;
   pendingSubscriptionTier: string | null;
+  pendingExtraUsers: number | null;
   pendingMonthlyAmount: number | null;
   nextChargeAt: string | null;
   cancelAtPeriodEnd: boolean;
@@ -55,17 +60,44 @@ export function HospitalSeatSubscriptionForm({
   razorpayEnabled: boolean;
 }) {
   const router = useRouter();
-  const [tierId, setTierId] = useState(currentTierId);
+  const baselineTier = pendingSubscriptionTier || currentTierId;
+  const baselineExtra = pendingExtraUsers ?? currentExtraUsers;
+  const [tierId, setTierId] = useState(baselineTier);
+  const [extraUsers, setExtraUsers] = useState(baselineExtra);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   const selected = useMemo(() => tiers.find((tier) => tier.id === tierId) ?? null, [tiers, tierId]);
-  const previewMonthly = selected
-    ? subscriptionTotalWithGst(selected.monthlyFee)
-    : currentMonthly;
-  const hasChanges = Boolean(selected && selected.id !== currentTierId);
+  const minimumExtra = selected?.seatLimit == null ? 0 : Math.max(0, currentUsed - selected.seatLimit);
+  useEffect(() => {
+    if (!selected) return;
+    if (selected.seatLimit == null) {
+      if (extraUsers !== 0) setExtraUsers(0);
+      return;
+    }
+    if (extraUsers < minimumExtra) setExtraUsers(minimumExtra);
+  }, [extraUsers, minimumExtra, selected]);
+  const preview = useMemo(() => {
+    if (!selected) return null;
+    try {
+      return pricingFromTier(selected.id, extraUsers);
+    } catch {
+      return null;
+    }
+  }, [selected, extraUsers]);
+  const previewMonthly = preview?.total ?? currentMonthly;
+  const hasChanges = Boolean(selected && (selected.id !== baselineTier || extraUsers !== baselineExtra));
+  const extraNote = !hasSubscription
+    ? extraUsers > 0
+      ? "These seats are included when auto-debit is linked."
+      : undefined
+    : extraUsers > currentExtraUsers
+      ? "Added seats are available as soon as you save. The higher amount is charged from the next billing cycle."
+      : extraUsers < currentExtraUsers
+        ? "Removed seats stay until the end of this billing cycle."
+        : undefined;
 
   async function onSchedule(event: React.FormEvent) {
     event.preventDefault();
@@ -88,6 +120,7 @@ export function HospitalSeatSubscriptionForm({
       body: JSON.stringify({
         action: "schedule",
         tierId,
+        extraUsers,
         termsAccepted,
       }),
     });
@@ -97,8 +130,11 @@ export function HospitalSeatSubscriptionForm({
       setError(data.error ?? "Could not update subscription.");
       return;
     }
+    const nextAmount = inr(Number(data.nextMonthly ?? previewMonthly));
     setMessage(
-      `Scheduled for next billing cycle. New monthly auto-debit: ${inr(Number(data.nextMonthly ?? previewMonthly))}.`,
+      data.seatsAvailableNow
+        ? `Extra users are available now. New monthly auto-debit from the next cycle: ${nextAmount}.`
+        : `Scheduled for next billing cycle. New monthly auto-debit: ${nextAmount}.`,
     );
     router.refresh();
   }
@@ -132,7 +168,7 @@ export function HospitalSeatSubscriptionForm({
       setError("Accept the Terms & Conditions before starting auto-debit.");
       return;
     }
-    const packagePayload = { tierId };
+    const packagePayload = { tierId, extraUsers };
     const createResponse = await fetch("/api/hospital/subscription/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -215,6 +251,7 @@ export function HospitalSeatSubscriptionForm({
             <dt className="text-slate-500">Staff usage</dt>
             <dd className="font-medium">
               {currentUsed}/{currentLimit == null ? "∞" : currentLimit}
+              {currentExtraUsers > 0 ? ` · ${currentExtraUsers} extra` : ""}
             </dd>
           </div>
           <div>
@@ -244,6 +281,9 @@ export function HospitalSeatSubscriptionForm({
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Pending from next cycle: {inr(pendingMonthlyAmount)}
             {pendingTierName ? ` · ${pendingTierName}` : ""}
+            {pendingExtraUsers != null && pendingExtraUsers > 0
+              ? ` · ${pendingExtraUsers} extra user${pendingExtraUsers === 1 ? "" : "s"}`
+              : ""}
           </p>
         ) : null}
         {cancelAtPeriodEnd ? (
@@ -300,6 +340,14 @@ export function HospitalSeatSubscriptionForm({
             );
           })}
         </div>
+        <ExtraUsersField
+          value={extraUsers}
+          includedSeats={selected?.seatLimit ?? null}
+          min={minimumExtra}
+          disabled={pending}
+          onChange={setExtraUsers}
+          note={extraNote}
+        />
         <div className="rounded-xl bg-slate-50 p-3 text-sm">
           <p className="text-slate-500">
             {hasSubscription ? "Next-cycle monthly total" : "Monthly auto-debit amount"} (incl. {SUBSCRIPTION_GST_PERCENT}%
@@ -331,7 +379,7 @@ export function HospitalSeatSubscriptionForm({
           {hasSubscription ? (
             <>
               <button className={buttonClass} type="submit" disabled={pending || !termsAccepted || !hasChanges}>
-                {pending ? "Saving…" : "Schedule plan change"}
+                {pending ? "Saving…" : "Schedule update"}
               </button>
               {!cancelAtPeriodEnd ? (
                 <button className={secondaryButtonClass} type="button" disabled={pending} onClick={() => void onCancel()}>

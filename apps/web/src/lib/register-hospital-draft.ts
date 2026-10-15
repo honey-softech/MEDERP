@@ -1,3 +1,5 @@
+import { MAX_EXTRA_USERS } from "@/lib/subscription-tiers";
+
 const DRAFT_KEY = "mederp.registerHospital.v3";
 
 export type RegisterDoctorDraft = {
@@ -24,6 +26,7 @@ export type RegisterHospitalDraft = {
   adminMobile: string;
   adminEmail: string;
   tierId: string;
+  extraUsers: number;
   termsAccepted: boolean;
   referralCode: string;
   adminAsDoctor: boolean;
@@ -54,6 +57,7 @@ const empty: RegisterHospitalDraft = {
   adminMobile: "",
   adminEmail: "",
   tierId: "CLINIC",
+  extraUsers: 0,
   termsAccepted: false,
   referralCode: "",
   adminAsDoctor: false,
@@ -72,6 +76,7 @@ export function loadRegisterHospitalDraft(): RegisterHospitalDraft | null {
       extraStaffSlots?: number;
       pharmacyEnabled?: boolean;
       labEnabled?: boolean;
+      extraUsers?: number;
     };
     let tierId = parsed.tierId || empty.tierId;
     // Drop obsolete module flags from old drafts — map to seat-based plans only
@@ -85,6 +90,10 @@ export function loadRegisterHospitalDraft(): RegisterHospitalDraft | null {
       ...empty,
       ...parsed,
       tierId,
+      extraUsers:
+        typeof parsed.extraUsers === "number" && Number.isInteger(parsed.extraUsers) && parsed.extraUsers > 0
+          ? Math.min(MAX_EXTRA_USERS, parsed.extraUsers)
+          : 0,
       termsAccepted: Boolean(parsed.termsAccepted),
       referralCode: typeof parsed.referralCode === "string" ? parsed.referralCode : "",
       adminAsDoctor: Boolean(parsed.adminAsDoctor),

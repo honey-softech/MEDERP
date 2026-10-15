@@ -89,6 +89,18 @@ export function pricingFromSettings(
   return pricingFromTier(tierId);
 }
 
+/** Null when the extra-user count still covers people already on the hospital. */
+export function extraUsersBelowUsageError(seatLimit: number | null, usedSeats: number, extraUsers: number) {
+  if (seatLimit == null) {
+    return extraUsers > 0 ? "This plan includes unlimited users." : null;
+  }
+  const minimum = Math.max(0, usedSeats - seatLimit);
+  if (extraUsers < minimum) {
+    return `This hospital already uses ${usedSeats} user seat${usedSeats === 1 ? "" : "s"}. Keep at least ${minimum} extra user${minimum === 1 ? "" : "s"} on this plan.`;
+  }
+  return null;
+}
+
 export function staffSeatLimit(
   hospital: Pick<Hospital, "includedStaffSlots" | "extraStaffSlots" | "unlimitedStaffSeats" | "subscriptionTier">,
 ): number | null {

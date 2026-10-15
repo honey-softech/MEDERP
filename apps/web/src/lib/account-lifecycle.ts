@@ -2,6 +2,7 @@ import type { AppRole, Prisma } from "@prisma/client";
 import { PLATFORM_ROLES, isPlatformRole } from "@/lib/auth";
 import { LAST_SUPER_ADMIN_MESSAGE, lastSuperAdminBlocksSelfService } from "@/lib/account-guards";
 import { isRemovedAccountMobile, removePlatformUser } from "@/lib/platform-user-remove";
+import { cancelSubscriptionForClosedHospital } from "@/lib/hospital-subscription";
 import { prisma } from "@/lib/prisma";
 
 export { LAST_SUPER_ADMIN_MESSAGE, lastSuperAdminBlocksSelfService };
@@ -76,16 +77,24 @@ export async function assertCanCloseHospital(actor: Actor) {
   return { ok: true as const, hospital };
 }
 
-export async function closeHospital(actor: Actor) {
-  const allowed = await assertCanCloseHospital(actor);
-  if (!allowed.ok) return allowed;
-
-  const hospital = allowed.hospital;
+export async function closeHospitalRecord(
+  hospital: { id: string; name: string; code: string },
+  options?: { allowInactive?: boolean },
+) {
   const hospitalId = hospital.id;
+  const subscription = await cancelSubscriptionForClosedHospital(hospitalId);
+  if (!subscription.cancelled && subscription.reason === "failed") {
+    return {
+      ok: false as const,
+      error: subscription.error || "Could not cancel the hospital subscription. The hospital was not removed.",
+      status: 502,
+    };
+  }
 
   const detachedUsers = await prisma.$transaction(async (tx) => {
     const current = await tx.hospital.findUnique({ where: { id: hospitalId }, select: { isActive: true } });
-    if (!current?.isActive) return null;
+    if (!current) return null;
+    if (!current.isActive && !options?.allowInactive) return null;
 
     const users = await tx.appUser.findMany({
       where: { hospitalId, role: { notIn: [...PLATFORM_ROLES] } },
@@ -119,7 +128,13 @@ export async function closeHospital(actor: Actor) {
     return { ok: false as const, error: "This hospital is already closed.", status: 400 };
   }
 
-  return { ok: true as const, hospital, detachedUsers };
+  return { ok: true as const, hospital, detachedUsers, subscription };
+}
+
+export async function closeHospital(actor: Actor) {
+  const allowed = await assertCanCloseHospital(actor);
+  if (!allowed.ok) return allowed;
+  return closeHospitalRecord(allowed.hospital);
 }
 
 export async function assertCanLeaveHospital(actor: Actor) {

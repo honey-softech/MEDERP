@@ -56,7 +56,7 @@ export default async function HospitalUsersPage() {
     seatLimit == null
       ? `Unlimited staff seats. ${usedSeats} in use.`
       : `This plan includes ${seatLimit} user${seatLimit === 1 ? "" : "s"}. ${usedSeats} in use, ${remainingSeats} remaining. Each extra user is ₹300/month.`;
-  const limitReason = `Maximum user limit reached (${usedSeats}/${seatLimit}). Upgrade your subscription plan to continue.`;
+  const limitReason = `Maximum user limit reached (${usedSeats}/${seatLimit}). Add extra users on the Subscription page (₹300/month each).`;
 
   return (
     <AppShell title="Hospital users">

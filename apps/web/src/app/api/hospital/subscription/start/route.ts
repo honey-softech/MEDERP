@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { countHospitalStaffSeats } from "@/lib/platform-billing";
+import { extraUsersBelowUsageError } from "@/lib/platform-pricing";
 import { prisma } from "@/lib/prisma";
 import {
   createRazorpaySubscription,
@@ -19,7 +21,7 @@ import {
   toPaise,
   verifyRazorpaySubscriptionSignature,
 } from "@/lib/razorpay";
-import { hospitalFieldsFromTier, isSubscriptionTierId, requireSubscriptionTier } from "@/lib/subscription-tiers";
+import { hospitalFieldsFromTier, isSubscriptionTierId, parseExtraUserCount, requireSubscriptionTier } from "@/lib/subscription-tiers";
 
 function resolveTierId(body: Record<string, unknown> | null, hospitalTier: string) {
   const fromBody = String(body?.tierId ?? "").trim();
@@ -56,16 +58,34 @@ export async function POST(request: Request) {
 
   const phase = String(body?.phase ?? "create");
   const tierId = resolveTierId(body, hospital.subscriptionTier);
+  let extraUsers = hospital.extraStaffSlots;
+  try {
+    if (body && Object.prototype.hasOwnProperty.call(body, "extraUsers")) {
+      extraUsers = parseExtraUserCount(body.extraUsers);
+    }
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid extra users." },
+      { status: 400 },
+    );
+  }
 
   try {
+    const tier = requireSubscriptionTier(tierId);
+    const usedSeats = await countHospitalStaffSeats(hospital.id);
+    const fitError = extraUsersBelowUsageError(tier.seatLimit, usedSeats, extraUsers);
+    if (fitError) {
+      return NextResponse.json({ error: fitError }, { status: 400 });
+    }
+
     if (phase === "create") {
-      const quote = await monthlyAmountForSelection({ tierId, extraUsers: hospital.extraStaffSlots });
+      const quote = await monthlyAmountForSelection({ tierId, extraUsers });
       const plan = await resolveOrCreatePlan({
         hospitalCode: hospital.code,
         amountInr: quote.total,
-        description: `MedERP ${quote.tier.name} · ${quote.tier.patientLimit} patients`,
+        description: `MedERP ${quote.tier.name} · ${quote.tier.patientLimit} patients${extraUsers ? ` · +${extraUsers} users` : ""}`,
         tierId,
-        extraUsers: hospital.extraStaffSlots,
+        extraUsers,
       });
       const subscription = await createRazorpaySubscription({
         planId: plan.id,
@@ -107,7 +127,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Payment verification failed." }, { status: 400 });
     }
 
-    const quote = await monthlyAmountForSelection({ tierId });
+    const quote = await monthlyAmountForSelection({ tierId, extraUsers });
     const razorpay = getRazorpayClient();
     const remote = await razorpay.subscriptions.fetch(razorpaySubscriptionId);
     const payment = await razorpay.payments.fetch(razorpayPaymentId);
@@ -115,10 +135,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Paid amount does not match the monthly package." }, { status: 400 });
     }
 
-    const tier = requireSubscriptionTier(tierId);
     await prisma.hospital.update({
       where: { id: hospital.id },
-      data: hospitalFieldsFromTier(tier),
+      data: {
+        ...hospitalFieldsFromTier(tier),
+        extraStaffSlots: extraUsers,
+      },
     });
 
     const subscription = await upsertHospitalSubscription({

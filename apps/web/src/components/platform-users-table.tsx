@@ -49,7 +49,11 @@ export function PlatformUsersTable({
       filter: false as const,
       render: (row: Record<string, string>) =>
         row.role === "SOFTWARE ADMIN" || row.role === "HELPDESK" ? null : (
-          <PlatformRemoveUserButton userId={row.id} label={`${row.username} / ${row.mobile}`} />
+          <PlatformRemoveUserButton
+            userId={row.id}
+            label={`${row.username} / ${row.mobile}`}
+            cancelsSubscription={row.role === "SUPER ADMIN" || row.role === "SUPER_ADMIN"}
+          />
         ),
     },
   ];

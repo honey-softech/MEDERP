@@ -60,11 +60,12 @@ async function nextPlatformInvoiceNo(prefix: string) {
   return `${prefix}-INV-${seq}`;
 }
 
-export async function calculateRegistrationTotal(selection: SubscriptionSelection | { tierId: string }) {
+export async function calculateRegistrationTotal(selection: SubscriptionSelection | { tierId: string; extraUsers?: number }) {
   if (!isSubscriptionTierId(selection.tierId)) {
     throw new Error("Choose a subscription plan.");
   }
-  return pricingFromTier(selection.tierId);
+  const extraUsers = "extraUsers" in selection ? Math.max(0, Math.trunc(Number(selection.extraUsers) || 0)) : 0;
+  return pricingFromTier(selection.tierId, extraUsers);
 }
 
 export async function createPlatformInvoice(params: {

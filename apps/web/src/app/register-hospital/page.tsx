@@ -5,17 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthShell, buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
 import { mobileValidationError } from "@/lib/phone";
-import {
-  SUBSCRIPTION_GST_PERCENT,
-  subscriptionGstAmount,
-  subscriptionTotalWithGst,
-} from "@/lib/platform-pricing";
+import { SUBSCRIPTION_GST_PERCENT, pricingFromTier } from "@/lib/platform-pricing";
 import {
   clearRegisterHospitalDraft,
   loadRegisterHospitalDraft,
   saveRegisterHospitalDraft,
   type RegisterDoctorDraft,
 } from "@/lib/register-hospital-draft";
+import { ExtraUsersField } from "@/components/extra-users-field";
 import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
 import { DOCTOR_SPECIALTIES } from "@/lib/doctor-specialties";
 import { PasswordStrength } from "@/components/password-strength";
@@ -63,6 +60,7 @@ export default function RegisterHospitalPage() {
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [tierId, setTierId] = useState("CLINIC");
+  const [extraUsers, setExtraUsers] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [referralHint, setReferralHint] = useState("");
@@ -99,6 +97,7 @@ export default function RegisterHospitalPage() {
       setAdminMobile(draft.adminMobile);
       setAdminEmail(draft.adminEmail || "");
       setTierId(draft.tierId || "CLINIC");
+      setExtraUsers(draft.extraUsers || 0);
       setTermsAccepted(draft.termsAccepted);
       setReferralCode(draft.referralCode || "");
       setAdminAsDoctor(Boolean(draft.adminAsDoctor));
@@ -126,6 +125,7 @@ export default function RegisterHospitalPage() {
       adminMobile,
       adminEmail,
       tierId,
+      extraUsers,
       termsAccepted,
       referralCode,
       adminAsDoctor,
@@ -141,6 +141,7 @@ export default function RegisterHospitalPage() {
     adminMobile,
     adminEmail,
     tierId,
+    extraUsers,
     termsAccepted,
     referralCode,
     adminAsDoctor,
@@ -213,17 +214,8 @@ export default function RegisterHospitalPage() {
 
   const quote = useMemo(() => {
     if (!selectedTier) return null;
-    const subtotal = selectedTier.monthlyFee;
-    const gstAmount = subscriptionGstAmount(subtotal);
-    return {
-      lines: [
-        { description: `${selectedTier.name} plan`, amount: subtotal },
-        { description: `GST (${SUBSCRIPTION_GST_PERCENT}%)`, amount: gstAmount },
-      ],
-      total: subscriptionTotalWithGst(subtotal),
-      maxStaff: selectedTier.seatLimit,
-    };
-  }, [selectedTier]);
+    return pricingFromTier(selectedTier.id, extraUsers);
+  }, [selectedTier, extraUsers]);
 
   const registrationPayload = useMemo(
     () => ({
@@ -236,6 +228,7 @@ export default function RegisterHospitalPage() {
       adminEmail,
       adminPassword,
       tierId,
+      extraStaffSlots: extraUsers,
       termsAccepted,
       referralCode: referralCode.trim(),
       adminAsDoctor,
@@ -251,6 +244,7 @@ export default function RegisterHospitalPage() {
       adminEmail,
       adminPassword,
       tierId,
+      extraUsers,
       termsAccepted,
       referralCode,
       adminAsDoctor,
@@ -709,6 +703,15 @@ export default function RegisterHospitalPage() {
                 );
               })}
             </div>
+            {selectedTier ? (
+              <div className="mt-3">
+                <ExtraUsersField
+                  value={extraUsers}
+                  includedSeats={selectedTier.seatLimit}
+                  onChange={setExtraUsers}
+                />
+              </div>
+            ) : null}
             {quote && selectedTier ? (
               <ul className="mt-3 space-y-1 border-t border-slate-200 pt-3 text-sm">
                 {quote.lines.map((line) => (

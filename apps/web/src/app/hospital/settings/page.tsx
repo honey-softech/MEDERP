@@ -201,7 +201,7 @@ export default async function HospitalSettingsPage() {
 
       <OtpDangerAction
         title="Close hospital"
-        description="Clinical records stay on file. Every staff login is detached from this hospital, so people can sign in and join another hospital. Confirm with the login OTP sent on WhatsApp."
+        description="Clinical records stay on file. Every staff login, including this super admin, is detached from this hospital. The monthly subscription is cancelled so no further charges are taken. Confirm with the login OTP sent on WhatsApp."
         sendUrl="/api/hospital/close/otp"
         confirmUrl="/api/hospital/close"
         confirmLabel="Close hospital"

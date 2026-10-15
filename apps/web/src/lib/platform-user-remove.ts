@@ -1,4 +1,5 @@
 import { invalidateUserSessions } from "@/lib/auth";
+import { cancelSubscriptionForClosedHospital } from "@/lib/hospital-subscription";
 import { prisma } from "@/lib/prisma";
 
 const PROTECTED_ROLES = new Set(["SOFTWARE_ADMIN", "HELPDESK"]);
@@ -24,6 +25,23 @@ export async function removePlatformUser(params: {
 
   const removedKey = `removed-${user.id}`;
   const hospitalId = user.hospitalId;
+  let subscription: Awaited<ReturnType<typeof cancelSubscriptionForClosedHospital>> | null = null;
+
+  if (user.role === "SUPER_ADMIN" && hospitalId) {
+    const otherAdmins = await prisma.appUser.count({
+      where: { hospitalId, role: "SUPER_ADMIN", isActive: true, id: { not: user.id } },
+    });
+    if (otherAdmins === 0) {
+      subscription = await cancelSubscriptionForClosedHospital(hospitalId);
+      if (!subscription.cancelled && subscription.reason === "failed") {
+        return {
+          ok: false as const,
+          error: subscription.error || "Could not cancel the hospital subscription. The account was not removed.",
+          status: 502,
+        };
+      }
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.appSession.deleteMany({ where: { userId: user.id } });
@@ -71,6 +89,7 @@ export async function removePlatformUser(params: {
       hospitalId,
       role: user.role,
     },
+    subscription,
   };
 }
 

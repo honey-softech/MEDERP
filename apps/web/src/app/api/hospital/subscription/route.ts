@@ -90,6 +90,7 @@ export async function POST(request: Request) {
       hospitalId: actor.hospitalId,
       tierId: String(body?.tierId ?? ""),
       termsAccepted: Boolean(body?.termsAccepted),
+      extraUsers: body?.extraUsers == null ? undefined : body.extraUsers,
     });
 
     await writeAuditLog({
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
       action: "SUBSCRIPTION_SCHEDULED_CHANGE",
       entity: "HospitalSubscription",
       entityId: result.subscription.id,
-      summary: `${actor.username} scheduled next-cycle plan change to ₹${result.nextMonthly}/month.`,
+        summary: `${actor.username} scheduled next-cycle plan change to ₹${result.nextMonthly}/month (${result.pendingExtraUsers} extra user${result.pendingExtraUsers === 1 ? "" : "s"}).`,
       metadata: {
         nextMonthly: result.nextMonthly,
         pendingSubscriptionTier: result.pendingSubscriptionTier,

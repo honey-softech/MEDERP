@@ -1,15 +1,17 @@
 import type { Hospital, HospitalSubscription, HospitalSubscriptionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { createPlatformInvoice } from "@/lib/platform-billing";
+import { countHospitalStaffSeats, createPlatformInvoice } from "@/lib/platform-billing";
 import { notifySubscriptionRenewalBill } from "@/lib/platform-invoice-whatsapp";
-import { pricingFromTier } from "@/lib/platform-pricing";
-import { getRazorpayClient, toPaise } from "@/lib/razorpay";
+import { extraUsersBelowUsageError, pricingFromTier } from "@/lib/platform-pricing";
+import { getRazorpayClient, razorpayConfigured, toPaise } from "@/lib/razorpay";
 import { trialEndsAtFromNow } from "@/lib/hospital-access";
 import {
   getSubscriptionTier,
   hospitalFieldsFromTier,
   isSubscriptionTierId,
   normalizeSubscriptionTierId,
+  parseExtraUserCount,
+  requireSubscriptionTier,
 } from "@/lib/subscription-tiers";
 
 const SUBSCRIPTION_TOTAL_COUNT = 12; // 12 monthly charges; cancel anytime
@@ -331,6 +333,8 @@ export async function scheduleNextCyclePackageChange(params: {
   hospitalId: string;
   tierId: string;
   termsAccepted: boolean;
+  /** Logins beyond the plan. Omit to keep the hospital's current extra users. */
+  extraUsers?: number;
 }) {
   if (!params.termsAccepted) {
     throw new Error("You must accept the Terms & Conditions before updating the subscription.");
@@ -351,23 +355,29 @@ export async function scheduleNextCyclePackageChange(params: {
     throw new Error("Subscription is not active. Restart auto-debit before changing the package.");
   }
 
-  const currentId = (sub.pendingSubscriptionTier || hospital.subscriptionTier) as string;
-  if (currentId === params.tierId) {
-    throw new Error("That plan is already active (or already scheduled).");
+  const extraUsers = params.extraUsers == null ? hospital.extraStaffSlots : parseExtraUserCount(params.extraUsers);
+  const tier = requireSubscriptionTier(params.tierId);
+  const usedSeats = await countHospitalStaffSeats(hospital.id);
+  const fitError = extraUsersBelowUsageError(tier.seatLimit, usedSeats, extraUsers);
+  if (fitError) throw new Error(fitError);
+
+  const effectiveTier = (sub.pendingSubscriptionTier || hospital.subscriptionTier) as string;
+  const effectiveExtra = sub.pendingSubscriptionTier ? sub.pendingExtraStaffSlots : hospital.extraStaffSlots;
+  if (effectiveTier === params.tierId && effectiveExtra === extraUsers) {
+    throw new Error("That plan and extra user count are already active or already scheduled.");
   }
 
   const quote = await monthlyAmountForSelection({
     tierId: params.tierId,
-    extraUsers: hospital.extraStaffSlots,
+    extraUsers,
   });
-  const tier = quote.tier;
 
   const plan = await createSubscriptionPlan({
     hospitalCode: hospital.code,
     amountInr: quote.total,
-    description: `MedERP monthly · ${tier.name} · ${tier.patientLimit} patients`,
-    tierId: tier.id,
-    extraUsers: hospital.extraStaffSlots,
+    description: `MedERP monthly · ${quote.tier.name} · ${quote.tier.patientLimit} patients${extraUsers ? ` · +${extraUsers} users` : ""}`,
+    tierId: quote.tier.id,
+    extraUsers,
   });
 
   const razorpay = getRazorpayClient();
@@ -383,16 +393,24 @@ export async function scheduleNextCyclePackageChange(params: {
     remaining_count: remaining,
   });
 
+  const seatsAvailableNow = extraUsers > hospital.extraStaffSlots;
+  if (seatsAvailableNow) {
+    await prisma.hospital.update({
+      where: { id: hospital.id },
+      data: { extraStaffSlots: extraUsers },
+    });
+  }
+
   const saved = await prisma.hospitalSubscription.update({
     where: { id: sub.id },
     data: {
       pendingPlanId: plan.id,
       pendingMonthlyAmount: quote.total,
-      pendingSubscriptionTier: tier.id,
-      pendingPharmacyEnabled: tier.pharmacyEnabled,
-      pendingLabEnabled: tier.labEnabled,
-      pendingInventoryEnabled: tier.inventoryEnabled,
-      pendingExtraStaffSlots: 0,
+      pendingSubscriptionTier: quote.tier.id,
+      pendingPharmacyEnabled: quote.tier.pharmacyEnabled,
+      pendingLabEnabled: quote.tier.labEnabled,
+      pendingInventoryEnabled: quote.tier.inventoryEnabled,
+      pendingExtraStaffSlots: extraUsers,
       termsAcceptedAt: new Date(),
       currentPeriodStart: unixToDate(updated.current_start) ?? sub.currentPeriodStart,
       currentPeriodEnd: unixToDate(updated.current_end) ?? sub.currentPeriodEnd,
@@ -406,10 +424,12 @@ export async function scheduleNextCyclePackageChange(params: {
     currentMonthly: Number(sub.monthlyAmount),
     nextMonthly: quote.total,
     nextChargeAt: saved.nextChargeAt,
-    pendingSubscriptionTier: tier.id,
-    pendingPharmacyEnabled: tier.pharmacyEnabled,
-    pendingLabEnabled: tier.labEnabled,
-    pendingInventoryEnabled: tier.inventoryEnabled,
+    pendingSubscriptionTier: quote.tier.id,
+    pendingExtraUsers: extraUsers,
+    seatsAvailableNow,
+    pendingPharmacyEnabled: quote.tier.pharmacyEnabled,
+    pendingLabEnabled: quote.tier.labEnabled,
+    pendingInventoryEnabled: quote.tier.inventoryEnabled,
     quote,
   };
 }
@@ -428,7 +448,10 @@ export async function applyPendingEntitlements(subscriptionId: string) {
     ? getSubscriptionTier(sub.pendingSubscriptionTier)
     : null;
   const fields = tier
-    ? hospitalFieldsFromTier(tier)
+    ? {
+        ...hospitalFieldsFromTier(tier),
+        extraStaffSlots: Math.max(0, sub.pendingExtraStaffSlots),
+      }
     : {
         // Legacy pending module flags ignored — modules deferred
         ...(sub.pendingExtraStaffSlots > 0
@@ -490,6 +513,41 @@ export async function recordSubscriptionCharge(params: {
   });
   await notifySubscriptionRenewalBill(invoice.id);
   return invoice;
+}
+
+const ENDED_SUBSCRIPTION_STATUSES = new Set<HospitalSubscriptionStatus>(["CANCELLED", "COMPLETED", "EXPIRED"]);
+
+/**
+ * Stops Razorpay billing for a hospital that is being removed.
+ * Looks up the subscription by hospital, so it still runs after the hospital super admin is detached.
+ */
+export async function cancelSubscriptionForClosedHospital(hospitalId: string) {
+  const sub = await prisma.hospitalSubscription.findUnique({ where: { hospitalId } });
+  if (!sub) return { cancelled: false as const, reason: "none" as const };
+  if (ENDED_SUBSCRIPTION_STATUSES.has(sub.status)) {
+    return { cancelled: true as const, reason: "already" as const, subscriptionId: sub.id };
+  }
+
+  if (!razorpayConfigured()) {
+    await prisma.hospitalSubscription.update({
+      where: { id: sub.id },
+      data: {
+        status: "CANCELLED",
+        cancelAtPeriodEnd: false,
+        cancelledAt: new Date(),
+        nextChargeAt: null,
+      },
+    });
+    return { cancelled: true as const, reason: "local" as const, subscriptionId: sub.id };
+  }
+
+  try {
+    const updated = await cancelHospitalSubscription({ hospitalId, atCycleEnd: false });
+    return { cancelled: true as const, reason: "razorpay" as const, subscriptionId: updated.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not cancel the hospital subscription.";
+    return { cancelled: false as const, reason: "failed" as const, error: message };
+  }
 }
 
 export async function cancelHospitalSubscription(params: {

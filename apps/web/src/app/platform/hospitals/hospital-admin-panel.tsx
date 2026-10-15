@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { SoftwareAdminPasswordConfirm } from "@/components/software-admin-password-confirm";
 
 function toDateInput(value?: string | Date | null) {
   if (!value) return "";
@@ -122,7 +123,8 @@ export function HospitalAdminPanel({
         <div>
           <h3 className="font-semibold">Hospital details & access</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Software admin can edit hospital profile, grant extra seats, extend trial, and stop or restore access.
+            Software admin can edit hospital profile, grant extra seats, extend trial, stop or restore access, and
+            remove the hospital.
           </p>
         </div>
         <button
@@ -224,6 +226,30 @@ export function HospitalAdminPanel({
           {pending ? "Saving…" : "Save hospital details"}
         </button>
       </form>
+
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        <h4 className="font-semibold text-slate-900">Remove hospital</h4>
+        <p className="mt-1 mb-3 max-w-2xl text-sm text-slate-500">
+          Staff are signed out and can join another hospital, including the hospital super admin. The Razorpay
+          subscription is cancelled so no further charges are taken. Clinical records stay, and the hospital phone
+          can be used to register again. Enter your software admin password to confirm.
+        </p>
+        <SoftwareAdminPasswordConfirm
+          openLabel="Remove hospital"
+          confirmLabel="Remove hospital"
+          description={`Remove ${name || "this hospital"}. This signs every staff login out of this hospital.`}
+          onConfirm={async (password) => {
+            const response = await fetch(`/api/platform/hospitals/${hospitalId}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password }),
+            });
+            const data = (await response.json().catch(() => ({}))) as { error?: string };
+            if (!response.ok) return { ok: false, error: data.error ?? "Could not remove hospital." };
+            return { ok: true, redirectTo: "/platform/hospitals" };
+          }}
+        />
+      </div>
     </section>
   );
 }

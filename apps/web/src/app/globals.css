@@ -847,6 +847,20 @@ html:has(.landing) body {
   z-index: 1;
 }
 
+/* Sign-in keeps a stable height so the keyboard does not resize and jump the card. */
+.auth-doodle-page.auth-signin {
+  min-height: 100svh;
+  overflow-x: clip;
+  overflow-y: auto;
+}
+
+.auth-signin input,
+.auth-signin textarea,
+.auth-signin select {
+  font-size: 16px;
+  scroll-margin-bottom: 7rem;
+}
+
 .auth-doodle-page .auth-card {
   border-color: rgb(12 47 44 / 0.12);
   background: rgb(255 255 255 / 0.94);
@@ -854,6 +868,10 @@ html:has(.landing) body {
     0 1px 2px rgb(12 47 44 / 0.04),
     0 12px 32px rgb(12 47 44 / 0.08);
   backdrop-filter: blur(8px);
+}
+
+.auth-signin .auth-card {
+  backdrop-filter: none;
 }
 
 .landing-fade {

@@ -24,6 +24,8 @@ export function AuthShell({
   headerAction,
   /** Soft landing-page wash + light doodles (login / register / demo). */
   doodles = false,
+  /** Sign-in stays put while the mobile keyboard opens. */
+  keyboardSafe = false,
 }: {
   title: string;
   subtitle?: string;
@@ -32,12 +34,15 @@ export function AuthShell({
   footer?: React.ReactNode;
   headerAction?: React.ReactNode;
   doodles?: boolean;
+  keyboardSafe?: boolean;
 }) {
   const shell = (
-    <div className={`flex min-h-dvh flex-col px-4 py-6 sm:px-6 lg:px-8 ${doodles ? "" : "bg-app-bg"}`}>
+    <div
+      className={`flex flex-col px-4 py-6 sm:px-6 lg:px-8 ${keyboardSafe ? "min-h-svh" : "min-h-dvh"} ${doodles ? "" : "bg-app-bg"}`}
+    >
       <div
         className={`flex flex-1 justify-center ${
-          wide ? "items-start lg:py-8" : "items-center"
+          wide ? "items-start lg:py-8" : keyboardSafe ? "items-start pt-4 sm:items-center sm:pt-0" : "items-center"
         }`}
       >
         <div
@@ -73,7 +78,7 @@ export function AuthShell({
   if (!doodles) return shell;
 
   return (
-    <div className="auth-doodle-page">
+    <div className={`auth-doodle-page${keyboardSafe ? " auth-signin" : ""}`}>
       <div className="auth-doodle-layer" aria-hidden>
         <AuthDoodles sparse={wide} />
       </div>

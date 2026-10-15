@@ -136,6 +136,7 @@ function LoginForm() {
     <AuthShell
       title="Sign in"
       doodles
+      keyboardSafe
       footer={<AuthFooterCredits />}
       headerAction={
         <button

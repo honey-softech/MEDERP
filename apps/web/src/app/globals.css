@@ -118,9 +118,7 @@
 body {
   background: var(--app-bg);
   color: var(--text-primary);
-  /* clip, not hidden: iOS ignores overflow-x hidden when a field is focused
-     and pans the page sideways. */
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 html {

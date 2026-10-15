@@ -202,18 +202,6 @@ String mobileUserAgent(String? current) {
       '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 $medErpMobileToken';
 }
 
-/// iOS zooms the whole page when a field's text is under 16px. This only
-/// raises field text. It does not lock the page scale.
-const String keepFieldScaleScript = r'''
-(function () {
-  if (document.getElementById('mederp-field-size') || !document.head) return;
-  var style = document.createElement('style');
-  style.id = 'mederp-field-size';
-  style.textContent = 'input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]):not([type=submit]):not([type=reset]):not([type=hidden]):not([type=color]):not([type=image]),textarea,select{font-size:16px !important}';
-  document.head.appendChild(style);
-})();
-''';
-
 /// Removes the website's in-page alert and forwards it to the phone notification shade.
 const String inAppToastGuardScript = r'''
 (function () {

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { AppFieldSize } from "@/components/app-field-size";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,17 +29,12 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  // Resize the page above the keyboard. A visual-only shrink makes iOS pan and crop the screen.
-  interactiveWidget: "resizes-content" as const,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-app-bg font-sans text-text-primary">
-        <AppFieldSize />
-        {children}
-      </body>
+      <body className="min-h-full bg-app-bg font-sans text-text-primary">{children}</body>
     </html>
   );
 }

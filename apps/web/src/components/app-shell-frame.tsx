@@ -271,9 +271,9 @@ export function AppShellFrame({
         ) : null}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-surface transition-[transform,width] duration-200 print:hidden ${
+          className={`fixed inset-y-0 left-0 z-40 flex-col border-r border-border bg-surface print:hidden ${
             collapsed ? "md:w-[4.25rem]" : "md:w-[16.5rem]"
-          } w-[min(16.5rem,85vw)] ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+          } w-[min(16.5rem,85vw)] ${mobileOpen ? "flex" : "hidden md:flex"}`}
         >
           <div className={`shrink-0 border-b border-border ${collapsed ? "px-2 py-3" : "px-4 py-4"}`}>
             <div className={`flex items-start gap-2 ${collapsed ? "md:justify-center" : "justify-between"}`}>

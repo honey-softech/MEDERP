@@ -184,6 +184,9 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
+        // The web page already moves for the keyboard. Shrinking the WebView
+        // as well leaves gray bars and a shifted page on iOS.
+        resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: Stack(
             children: [

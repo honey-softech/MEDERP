@@ -30,6 +30,8 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  // Resize the page above the keyboard. A visual-only shrink makes iOS pan and crop the screen.
+  interactiveWidget: "resizes-content" as const,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

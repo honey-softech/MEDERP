@@ -91,7 +91,7 @@ function AuditRevisionPanel({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = "clip";
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";

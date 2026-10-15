@@ -110,7 +110,7 @@ export function BloodTestPicker({
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = "clip";
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };

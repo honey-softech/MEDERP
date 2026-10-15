@@ -179,6 +179,70 @@ export async function createSubscriptionPlan(params: {
   });
 }
 
+type RazorpayCustomerRow = { id?: string; email?: string | null; contact?: string | null };
+
+/** Razorpay rejects a second customer when this email or mobile is already on the merchant account. */
+export function isExistingRazorpayCustomerError(error: unknown) {
+  const message = (razorpayErrorMessage(error) || (error instanceof Error ? error.message : "")).toLowerCase();
+  return message.includes("customer already exist");
+}
+
+function last10Digits(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+/** Razorpay stores Indian mobiles with a country code. 10-digit input is the same person as +91… */
+function razorpayContact(contact: string) {
+  const digits = last10Digits(contact);
+  return digits.length === 10 ? `+91${digits}` : contact.trim();
+}
+
+function sameCustomer(row: RazorpayCustomerRow, email: string, contactDigits: string) {
+  const rowEmail = String(row.email ?? "").trim().toLowerCase();
+  const rowContact = last10Digits(String(row.contact ?? ""));
+  return Boolean(row.id) && ((email && rowEmail === email) || (contactDigits && rowContact === contactDigits));
+}
+
+async function findExistingRazorpayCustomer(
+  razorpay: ReturnType<typeof getRazorpayClient>,
+  email: string,
+  contact: string,
+) {
+  const api = (
+    razorpay as unknown as {
+      api: {
+        get: (params: { url: string; data?: Record<string, string | number> }) => Promise<{ items?: RazorpayCustomerRow[] }>;
+      };
+    }
+  ).api;
+  const contactDigits = last10Digits(contact);
+  const queries: Record<string, string | number>[] = [
+    { contact, count: 10 },
+    { contact: contactDigits, count: 10 },
+    { email, count: 10 },
+  ];
+  for (const query of queries) {
+    try {
+      const listed = await api.get({ url: "/customers", data: query });
+      const match = (listed.items ?? []).find((row) => sameCustomer(row, email, contactDigits));
+      if (match?.id) return { id: match.id };
+    } catch {
+      // A filter Razorpay does not accept should not hide the original create error.
+    }
+  }
+  let skip = 0;
+  for (let page = 0; page < 5; page += 1) {
+    const listed = await api.get({ url: "/customers", data: { count: 100, skip } });
+    const items = listed.items ?? [];
+    const match = items.find((row) => sameCustomer(row, email, contactDigits));
+    if (match?.id) return { id: match.id };
+    if (items.length < 100) break;
+    skip += 100;
+  }
+  return null;
+}
+
 export async function createRazorpayCustomer(params: {
   name: string;
   email: string;
@@ -187,21 +251,29 @@ export async function createRazorpayCustomer(params: {
 }) {
   const razorpay = getRazorpayClient();
   const email = params.email.trim().toLowerCase();
-  const contact = params.contact.trim();
+  const contact = razorpayContact(params.contact);
   const name = params.name.trim() || params.hospitalCode;
 
-  // fail_existing: 0 returns the existing customer when email/contact already exist.
-  const customer = await razorpay.customers.create({
-    name: name.slice(0, 50),
-    email,
-    contact,
-    fail_existing: 0,
-    notes: {
-      hospitalCode: params.hospitalCode,
-      purpose: "mederp_subscription",
-    },
-  });
-  return customer as { id: string };
+  try {
+    // fail_existing: 0 should return the existing customer. Razorpay still errors when the
+    // saved contact format differs (+91 versus 10 digits) or email and mobile sit on different customers.
+    const customer = await razorpay.customers.create({
+      name: name.slice(0, 50),
+      email,
+      contact,
+      fail_existing: 0,
+      notes: {
+        hospitalCode: params.hospitalCode,
+        purpose: "mederp_subscription",
+      },
+    });
+    return customer as { id: string };
+  } catch (error) {
+    if (!isExistingRazorpayCustomerError(error)) throw error;
+    const existing = await findExistingRazorpayCustomer(razorpay, email, contact);
+    if (existing) return existing;
+    throw error;
+  }
 }
 
 export async function createRazorpaySubscription(params: {
@@ -222,13 +294,18 @@ export async function createRazorpaySubscription(params: {
 
   let customerId: string | undefined;
   if (email && contact) {
-    const customer = await createRazorpayCustomer({
-      name: params.adminUsername || params.hospitalCode,
-      email,
-      contact,
-      hospitalCode: params.hospitalCode,
-    });
-    customerId = customer.id;
+    try {
+      const customer = await createRazorpayCustomer({
+        name: params.adminUsername || params.hospitalCode,
+        email,
+        contact,
+        hospitalCode: params.hospitalCode,
+      });
+      customerId = customer.id;
+    } catch (error) {
+      // Card setup can still open without linking a customer id. Checkout collects the payer.
+      if (!isExistingRazorpayCustomerError(error)) throw error;
+    }
   }
 
   const nowUnix = Math.floor(Date.now() / 1000);
@@ -247,7 +324,7 @@ export async function createRazorpaySubscription(params: {
       ? {
           notify_info: {
             ...(email ? { notify_email: email } : {}),
-            ...(contact ? { notify_phone: contact } : {}),
+            ...(contact ? { notify_phone: razorpayContact(contact) } : {}),
           },
         }
       : {}),

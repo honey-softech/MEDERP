@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { subscriptionCancelCanBeSkipped } from "@/lib/hospital-subscription";
+import { isExistingRazorpayCustomerError, subscriptionCancelCanBeSkipped } from "@/lib/hospital-subscription";
 
 describe("subscription cancel when removing a hospital", () => {
   it("treats a subscription Razorpay will not bill again as already finished", () => {
@@ -11,5 +11,12 @@ describe("subscription cancel when removing a hospital", () => {
   it("keeps a live billing failure blocking removal", () => {
     expect(subscriptionCancelCanBeSkipped("Razorpay authentication failed")).toBe(false);
     expect(subscriptionCancelCanBeSkipped("")).toBe(false);
+  });
+});
+
+describe("existing Razorpay customer", () => {
+  it("recognises the merchant duplicate error", () => {
+    expect(isExistingRazorpayCustomerError(new Error("Customer already exists for the merchant"))).toBe(true);
+    expect(isExistingRazorpayCustomerError(new Error("Could not start card setup"))).toBe(false);
   });
 });

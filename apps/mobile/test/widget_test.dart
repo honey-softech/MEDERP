@@ -14,6 +14,12 @@ void main() {
     expect(medErpSiteUrl, 'https://mederp.co.in');
   });
 
+  test('field text stays at 16px so iOS does not zoom the page', () {
+    expect(keepFieldScaleScript, contains('font-size:16px'));
+    expect(keepFieldScaleScript.contains('user-scalable'), isFalse);
+    expect(keepFieldScaleScript.contains('maximum-scale'), isFalse);
+  });
+
   test('a cancelled first iOS load is not treated as offline', () {
     expect(
       isIgnoredWebLoadError(

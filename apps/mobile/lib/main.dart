@@ -86,6 +86,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             } else {
               _opened = true;
             }
+            _controller.runJavaScript(keepFieldScaleScript);
             _controller.runJavaScript(inAppToastGuardScript);
             PushNotifications.registerTokenOnSite();
           },

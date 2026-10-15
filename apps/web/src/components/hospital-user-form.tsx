@@ -147,11 +147,12 @@ export default function HospitalUserForm({
   const [accountOpen, setAccountOpen] = useState(false);
   const [employmentOpen, setEmploymentOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
-  const [professionalOpen, setProfessionalOpen] = useState(false);
+  const [professionalOpen, setProfessionalOpen] = useState(initial?.role === "DOCTOR");
 
   const role = roleLocked ? "SUPER_ADMIN" : values.role ?? "RECEPTIONIST";
 
   function setField<K extends keyof HospitalUserFormInitial>(key: K, value: HospitalUserFormInitial[K]) {
+    if (key === "role" && value === "DOCTOR") setProfessionalOpen(true);
     setValues((current) => ({ ...current, [key]: value }));
   }
 
@@ -315,12 +316,14 @@ export default function HospitalUserForm({
         onToggle={() => setEmploymentOpen((open) => !open)}
         hint="Department, designation, and joining dates"
       >
-        <Select
-          label="Department"
-          value={values.departmentId ?? ""}
-          onChange={(v) => setField("departmentId", v)}
-          options={[{ value: "", label: "Select department" }, ...departments.map((row) => ({ value: row.id, label: row.label }))]}
-        />
+        {role === "DOCTOR" ? null : (
+          <Select
+            label="Department"
+            value={values.departmentId ?? ""}
+            onChange={(v) => setField("departmentId", v)}
+            options={[{ value: "", label: "Select department" }, ...departments.map((row) => ({ value: row.id, label: row.label }))]}
+          />
+        )}
         <Field label="Sub-department" value={values.subDepartment} onChange={(v) => setField("subDepartment", v)} />
         <Field label="Designation" value={values.designation} onChange={(v) => setField("designation", v)} placeholder="Senior Consultant" />
         <Field label="Job title" value={values.jobTitle} onChange={(v) => setField("jobTitle", v)} />
@@ -362,8 +365,15 @@ export default function HospitalUserForm({
           title="Doctor professional information"
           open={professionalOpen}
           onToggle={() => setProfessionalOpen((open) => !open)}
-          hint="Registration, fees, and qualifications"
+          hint="Registration, department, fees, and qualifications"
         >
+          <Select
+            label="Department"
+            required
+            value={values.departmentId ?? ""}
+            onChange={(v) => setField("departmentId", v)}
+            options={[{ value: "", label: "Select department" }, ...departments.map((row) => ({ value: row.id, label: row.label }))]}
+          />
           <DoctorProfessionalFields
             values={values}
             onChange={(key, value) => setField(key, value)}

@@ -85,5 +85,6 @@ export {
   parseLocalDay,
   reminderMessage,
   seedHospitalDepartments,
+  ensureDepartmentByName,
   staffIdForAppUser,
 } from "@/lib/opd/scheduling";

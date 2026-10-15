@@ -120,6 +120,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
 
+    if (role === "DOCTOR" && !input.departmentId) {
+      return NextResponse.json({ error: "Select a department for the doctor." }, { status: 400 });
+    }
     if (input.departmentId) {
       const department = await prisma.department.findFirst({
         where: { id: input.departmentId, hospitalId },

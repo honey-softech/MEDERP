@@ -11,7 +11,7 @@ import {
 } from "@/lib/hospital-code";
 import { mobileValidationError } from "@/lib/phone";
 import { allocateHospitalUserIdentity, parseEmployeeBody, uniqueUsername, upsertAdminDoctorStaff } from "@/lib/employee";
-import { seedHospitalDepartments } from "@/lib/front-desk";
+import { ensureDepartmentByName, seedHospitalDepartments } from "@/lib/front-desk";
 import { seedHospitalWards } from "@/lib/wards";
 import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platform-billing";
 import { upsertHospitalSubscription, unixToDate } from "@/lib/hospital-subscription";
@@ -39,6 +39,7 @@ export type AdminDoctorRegistrationProfile = {
   lastName?: string | null;
   medicalRegNo: string;
   specialization: string;
+  departmentName?: string | null;
   medicalDegree?: string | null;
   regCouncil?: string | null;
   postgraduate?: string | null;
@@ -314,9 +315,13 @@ export async function registerHospital(input: RegisterHospitalInput) {
 
   if (input.adminAsDoctor) {
     const specialization = String(input.doctorProfile?.specialization ?? "").trim();
+    const departmentName = String(input.doctorProfile?.departmentName ?? "").trim();
     const medicalRegNo = String(input.doctorProfile?.medicalRegNo ?? "").trim();
     if (!specialization) {
-      throw new HospitalRegistrationError("Specialization is required when admin practices as a doctor.", 400);
+      throw new HospitalRegistrationError("Specialty is required when admin practices as a doctor.", 400);
+    }
+    if (!departmentName) {
+      throw new HospitalRegistrationError("Department is required when admin practices as a doctor.", 400);
     }
     if (!medicalRegNo) {
       throw new HospitalRegistrationError(
@@ -430,6 +435,10 @@ export async function registerHospital(input: RegisterHospitalInput) {
     });
 
     if (input.adminAsDoctor && input.doctorProfile) {
+      const department = await ensureDepartmentByName(
+        hospital.id,
+        String(input.doctorProfile.departmentName ?? "").trim(),
+      );
       const parsed = parseEmployeeBody(
         {
           firstName,
@@ -437,6 +446,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
           mobile: prepared.adminMobile,
           email: prepared.adminEmail,
           username: prepared.adminUsername,
+          departmentId: department?.id,
           medicalRegNo: input.doctorProfile.medicalRegNo,
           specialization: input.doctorProfile.specialization,
           medicalDegree: input.doctorProfile.medicalDegree,

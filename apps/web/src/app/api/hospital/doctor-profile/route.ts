@@ -250,21 +250,22 @@ export async function PUT(request: Request) {
   const specialization = String(body.specialization ?? "").trim();
   const medicalRegNo = String(body.medicalRegNo ?? "").trim();
   if (!specialization) {
-    return NextResponse.json({ error: "Specialization is required." }, { status: 400 });
+    return NextResponse.json({ error: "Select a specialty." }, { status: 400 });
   }
   if (!medicalRegNo) {
     return NextResponse.json({ error: "Medical registration number is required." }, { status: 400 });
   }
 
-  const departmentId = String(body.departmentId ?? "").trim() || null;
-  if (departmentId) {
-    const dept = await prisma.department.findFirst({
-      where: { id: departmentId, hospitalId: scoped.user.hospitalId },
-      select: { id: true },
-    });
-    if (!dept) {
-      return NextResponse.json({ error: "Select a valid department." }, { status: 400 });
-    }
+  const departmentId = String(body.departmentId ?? "").trim();
+  if (!departmentId) {
+    return NextResponse.json({ error: "Select a department." }, { status: 400 });
+  }
+  const dept = await prisma.department.findFirst({
+    where: { id: departmentId, hospitalId: scoped.user.hospitalId },
+    select: { id: true },
+  });
+  if (!dept) {
+    return NextResponse.json({ error: "Select a valid department." }, { status: 400 });
   }
 
   const firstName = String(body.firstName ?? scoped.user.firstName ?? "").trim() || scoped.user.username;

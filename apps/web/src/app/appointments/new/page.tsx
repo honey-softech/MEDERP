@@ -65,7 +65,11 @@ export default async function NewAppointmentPage({
       : Promise.resolve(null),
   ]);
 
-  const doctorOptions = doctors.map((doctor) => ({ id: doctor.id, label: doctorName(doctor) }));
+  const doctorOptions = doctors.map((doctor) => ({
+    id: doctor.id,
+    label: doctorName(doctor),
+    departmentId: doctor.departmentId,
+  }));
 
   return (
     <AppShell title={walkin || staffWalkIn ? "Walk-in registration" : "Book appointment"}>

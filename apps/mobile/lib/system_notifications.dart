@@ -202,6 +202,28 @@ String mobileUserAgent(String? current) {
       '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 $medErpMobileToken';
 }
 
+/// Keeps the installed app at the page's normal scale. Pinch and double-tap zoom stay off.
+const String lockPageZoomScript = r'''
+(function () {
+  var content = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no';
+  var metas = document.querySelectorAll('meta[name="viewport"]');
+  if (!metas.length && document.head) {
+    var created = document.createElement('meta');
+    created.name = 'viewport';
+    document.head.appendChild(created);
+    metas = document.querySelectorAll('meta[name="viewport"]');
+  }
+  for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', content);
+  document.documentElement.style.touchAction = 'pan-x pan-y';
+  if (document.body) document.body.style.touchAction = 'pan-x pan-y';
+  if (window.__mederpZoomLock) return;
+  window.__mederpZoomLock = true;
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+    document.addEventListener(name, function (event) { event.preventDefault(); }, { passive: false });
+  });
+})();
+''';
+
 /// Removes the website's in-page alert and forwards it to the phone notification shade.
 const String inAppToastGuardScript = r'''
 (function () {

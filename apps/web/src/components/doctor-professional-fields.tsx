@@ -1,6 +1,7 @@
 "use client";
 
 import { fieldClass } from "@/components/auth-shell";
+import { DOCTOR_SPECIALTIES } from "@/lib/doctor-specialties";
 
 export type DoctorProfessionalValues = {
   medicalRegNo?: string | null;
@@ -56,8 +57,7 @@ export function DoctorProfessionalFields({
         placeholder="MD – Cardiology"
       />
       <Field label="Fellowship" value={values.fellowship} onChange={(v) => onChange("fellowship", v)} />
-      <Field
-        label="Specialization"
+      <SpecialtyField
         value={values.specialization}
         onChange={(v) => onChange("specialization", v)}
         required={requireCore}
@@ -115,6 +115,41 @@ function Field({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+    </label>
+  );
+}
+
+function SpecialtyField({
+  value,
+  onChange,
+  required,
+}: {
+  value?: string | null;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  const current = value?.trim() ?? "";
+  const options = current && !DOCTOR_SPECIALTIES.some((item) => item.toLowerCase() === current.toLowerCase())
+    ? [current, ...DOCTOR_SPECIALTIES]
+    : [...DOCTOR_SPECIALTIES];
+
+  return (
+    <label className="text-sm font-medium text-slate-700">
+      Specialty
+      {required ? <span className="text-red-600"> *</span> : null}
+      <select
+        className={fieldClass}
+        value={current}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Select specialty</option>
+        {options.map((item) => (
+          <option key={item} value={item}>
+            {item}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

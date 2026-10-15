@@ -123,6 +123,18 @@ export async function PATCH(request: Request, context: Ctx) {
     if (clash) {
       return NextResponse.json({ error: "Mobile number is already registered." }, { status: 409 });
     }
+    if (role === "DOCTOR" && !input.departmentId) {
+      return NextResponse.json({ error: "Select a department for the doctor." }, { status: 400 });
+    }
+    if (input.departmentId) {
+      const department = await prisma.department.findFirst({
+        where: { id: input.departmentId, hospitalId },
+        select: { id: true },
+      });
+      if (!department) {
+        return NextResponse.json({ error: "Department must belong to this hospital." }, { status: 400 });
+      }
+    }
 
     const roleChanged = role !== existing.role;
     const deactivated = existing.isActive !== false && input.isActive === false;

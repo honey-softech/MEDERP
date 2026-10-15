@@ -5,6 +5,7 @@ export type RegisterDoctorDraft = {
   lastName: string;
   medicalRegNo: string;
   specialization: string;
+  departmentName: string;
   medicalDegree: string;
   regCouncil: string;
   postgraduate: string;
@@ -34,6 +35,7 @@ const emptyDoctor: RegisterDoctorDraft = {
   lastName: "",
   medicalRegNo: "",
   specialization: "",
+  departmentName: "",
   medicalDegree: "",
   regCouncil: "",
   postgraduate: "",

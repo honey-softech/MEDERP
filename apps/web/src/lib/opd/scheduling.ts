@@ -196,7 +196,7 @@ export async function doctorIsOnLeave(hospitalId: string, doctorId: string, at: 
 export const DEFAULT_DEPARTMENTS = [
   { code: "CARD", name: "Cardiology", description: "Heart and vascular care", consultationFee: 800 },
   { code: "GEN", name: "General Medicine", description: "Outpatient general care", consultationFee: 500 },
-  { code: "ORTHO", name: "Orthopedics", description: "Bone and joint care", consultationFee: 700 },
+  { code: "ORTHO", name: "Orthopaedics", description: "Bone and joint care", consultationFee: 700 },
   { code: "ENT", name: "ENT", description: "Ear, nose and throat", consultationFee: 500 },
   { code: "PED", name: "Paediatrics", description: "Child health", consultationFee: 500 },
 ];
@@ -211,6 +211,45 @@ export async function seedHospitalDepartments(hospitalId: string) {
       }),
     ),
   );
+}
+
+const DEPARTMENT_NAME_ALIASES: Record<string, string[]> = {
+  orthopaedics: ["orthopaedics", "orthopedics"],
+  orthopedics: ["orthopaedics", "orthopedics"],
+  paediatrics: ["paediatrics", "pediatrics"],
+  pediatrics: ["paediatrics", "pediatrics"],
+};
+
+function departmentCode(name: string) {
+  const code = name.toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 8);
+  return code || "DEPT";
+}
+
+/** Find this hospital's department by name, or create it from the doctor's choice. */
+export async function ensureDepartmentByName(hospitalId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const aliases = DEPARTMENT_NAME_ALIASES[trimmed.toLowerCase()] ?? [trimmed.toLowerCase()];
+  const existing = await prisma.department.findMany({
+    where: { hospitalId },
+    select: { id: true, name: true, code: true },
+  });
+  const match = existing.find((row) => aliases.includes(row.name.trim().toLowerCase()));
+  if (match) return match;
+
+  let code = departmentCode(trimmed);
+  if (existing.some((row) => row.code === code)) {
+    code = `${code.slice(0, 6)}${String(existing.length + 1).padStart(2, "0")}`.slice(0, 8);
+  }
+  return prisma.department.create({
+    data: {
+      hospitalId,
+      name: trimmed,
+      code,
+      description: trimmed,
+    },
+    select: { id: true, name: true, code: true },
+  });
 }
 
 export function reminderMessage(input: {

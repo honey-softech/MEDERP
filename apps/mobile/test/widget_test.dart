@@ -10,6 +10,11 @@ void main() {
     expect(medErpSiteUrl, 'https://mederp.co.in');
   });
 
+  test('installed app locks pinch zoom', () {
+    expect(lockPageZoomScript, contains('user-scalable=no'));
+    expect(lockPageZoomScript, contains('maximum-scale=1'));
+  });
+
   test('webview user agent marks the installed app', () {
     expect(mobileUserAgent(null), contains(medErpMobileToken));
     expect(mobileUserAgent('Mozilla/5.0'), 'Mozilla/5.0 $medErpMobileToken');

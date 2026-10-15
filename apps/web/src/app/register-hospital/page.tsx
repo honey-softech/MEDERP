@@ -17,6 +17,7 @@ import {
   type RegisterDoctorDraft,
 } from "@/lib/register-hospital-draft";
 import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
+import { DOCTOR_SPECIALTIES } from "@/lib/doctor-specialties";
 import { PasswordStrength } from "@/components/password-strength";
 import { passwordValidationError, stripSuperAdminName, superAdminNameError } from "@/lib/password-policy";
 import {
@@ -71,6 +72,7 @@ export default function RegisterHospitalPage() {
     lastName: "",
     medicalRegNo: "",
     specialization: "",
+    departmentName: "",
     medicalDegree: "",
     regCouncil: "",
     postgraduate: "",
@@ -343,7 +345,11 @@ export default function RegisterHospitalPage() {
     }
     if (adminAsDoctor) {
       if (!doctorProfile.specialization.trim()) {
-        setError("Enter specialization for the admin doctor profile.");
+        setError("Select a specialty for the admin doctor profile.");
+        return false;
+      }
+      if (!doctorProfile.departmentName.trim()) {
+        setError("Select a department for the admin doctor profile.");
         return false;
       }
       if (!doctorProfile.medicalRegNo.trim()) {
@@ -619,10 +625,36 @@ export default function RegisterHospitalPage() {
                       onChange={(e) => setDoctorProfile((c) => ({ ...c, lastName: e.target.value }))}
                     />
                   </label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Department <span className="text-red-600">*</span>
+                    <select
+                      className={fieldClass}
+                      value={doctorProfile.departmentName}
+                      required
+                      onChange={(event) =>
+                        setDoctorProfile((current) => ({ ...current, departmentName: event.target.value }))
+                      }
+                    >
+                      <option value="">Select department</option>
+                      {DOCTOR_SPECIALTIES.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <DoctorProfessionalFields
                     values={doctorProfile}
                     onChange={(key, value) =>
-                      setDoctorProfile((current) => ({ ...current, [key]: value }))
+                      setDoctorProfile((current) => {
+                        const next = { ...current, [key]: value };
+                        if (key === "specialization" && typeof value === "string") {
+                          if (!current.departmentName || current.departmentName === current.specialization) {
+                            next.departmentName = value;
+                          }
+                        }
+                        return next;
+                      })
                     }
                     requireCore
                   />

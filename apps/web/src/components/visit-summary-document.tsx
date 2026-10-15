@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SignatureBlock } from "@/components/signature-block";
+import { visitSignoffLine } from "@/lib/doctor-specialties";
 import { parseMedications, readableClinicalText } from "@/lib/visit-summary";
 
 export function VisitSummaryDocument({
@@ -220,9 +221,7 @@ export function VisitSummaryDocument({
           <SignatureBlock
             role=""
             name={signatureName || physician}
-            credentials={
-              [signatureCredentials, departmentName].filter(Boolean).join("\n") || departmentName
-            }
+            credentials={visitSignoffLine(signatureCredentials, departmentName)}
             imageData={draft ? null : signatureImage}
           />
         </section>

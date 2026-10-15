@@ -7,6 +7,7 @@ import { buttonClass, fieldClass, primaryButtonClass } from "@/components/auth-s
 import { PatientPicker, type PatientOption } from "@/components/patient-picker";
 
 type Option = { id: string; label: string };
+type DoctorOption = Option & { departmentId?: string | null };
 
 function combineDateAndTime(dateIso: string, timeHm: string) {
   if (!dateIso || !timeHm) return "";
@@ -23,7 +24,7 @@ export function AppointmentForm({
   defaultDepartmentId,
   redirectToVisit = false,
 }: {
-  doctors: Option[];
+  doctors: DoctorOption[];
   departments: Option[];
   defaultQueueType?: "SCHEDULED" | "WALK_IN";
   initialPatient?: PatientOption | null;
@@ -40,6 +41,7 @@ export function AppointmentForm({
   const [scheduledTime, setScheduledTime] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [doctorId, setDoctorId] = useState(defaultDoctorId ?? "");
+  const [departmentId, setDepartmentId] = useState(defaultDepartmentId ?? "");
   const [onLeaveIds, setOnLeaveIds] = useState<string[]>([]);
   const [slotMode, setSlotMode] = useState(false);
   const [slots, setSlots] = useState<{ minute: number; label: string }[]>([]);
@@ -75,6 +77,11 @@ export function AppointmentForm({
     const minute = now.getHours() * 60 + now.getMinutes();
     return walkInWindows.filter((window) => window.endMinute > minute);
   }, [walkInWindows]);
+  function selectDoctor(nextId: string) {
+    setDoctorId(nextId);
+    const doctor = doctors.find((row) => row.id === nextId);
+    setDepartmentId(doctor?.departmentId ?? "");
+  }
   const lockedDoctor = lockDoctor ? doctors.find((row) => row.id === defaultDoctorId) : null;
   const selectedOnLeave = Boolean(doctorId && onLeaveIds.includes(doctorId));
   const walkInNoWindowToday = isWalkIn && walkInConfigured && walkInWindows.length === 0;
@@ -286,7 +293,7 @@ export function AppointmentForm({
             name="doctorId"
             required
             value={doctorId}
-            onChange={(event) => setDoctorId(event.target.value)}
+            onChange={(event) => selectDoctor(event.target.value)}
           >
             <option value="">Select doctor</option>
             {doctors.map((item) => (
@@ -313,7 +320,13 @@ export function AppointmentForm({
       )}
       <label className="text-sm font-medium text-slate-700">
         Department
-        <select className={fieldClass} name="departmentId" required defaultValue={defaultDepartmentId ?? ""}>
+        <select
+          className={fieldClass}
+          name="departmentId"
+          required
+          value={departmentId}
+          onChange={(event) => setDepartmentId(event.target.value)}
+        >
           <option value="">Select department</option>
           {departments.map((item) => (
             <option key={item.id} value={item.id}>

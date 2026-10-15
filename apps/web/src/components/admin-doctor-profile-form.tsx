@@ -240,11 +240,12 @@ export function AdminDoctorProfileForm({
                 />
               </label>
               <label className="text-sm font-medium text-slate-700">
-                Department
+                Department <span className="text-red-600">*</span>
                 <select
                   className={fieldClass}
                   value={values.departmentId ?? ""}
                   onChange={(e) => setField("departmentId", e.target.value)}
+                  required
                 >
                   <option value="">Select department</option>
                   {departments.map((dept) => (

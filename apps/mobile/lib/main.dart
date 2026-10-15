@@ -86,7 +86,6 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             } else {
               _opened = true;
             }
-            _controller.runJavaScript(lockPageZoomScript);
             _controller.runJavaScript(inAppToastGuardScript);
             PushNotifications.registerTokenOnSite();
           },
@@ -129,7 +128,6 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
     try {
       final current = await _controller.getUserAgent();
       await _controller.setUserAgent(mobileUserAgent(current));
-      await _controller.enableZoom(false);
       await _configureAndroid();
       if (!mounted) return;
       await _controller.loadRequest(Uri.parse(medErpSiteUrl));

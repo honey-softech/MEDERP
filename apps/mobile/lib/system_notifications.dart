@@ -202,55 +202,6 @@ String mobileUserAgent(String? current) {
       '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 $medErpMobileToken';
 }
 
-/// Keeps the installed app at the page's normal scale. Pinch and double-tap zoom stay off.
-/// Fields use 16px text so iOS does not zoom the page when a field is tapped.
-const String lockPageZoomScript = r'''
-(function () {
-  var content = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no';
-  var editing = false;
-  function isField(node) {
-    if (!node || !node.tagName) return false;
-    var tag = node.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-  }
-  function lock() {
-    if (editing) return;
-    var metas = document.querySelectorAll('meta[name="viewport"]');
-    if (!metas.length && document.head) {
-      var created = document.createElement('meta');
-      created.name = 'viewport';
-      document.head.appendChild(created);
-      metas = document.querySelectorAll('meta[name="viewport"]');
-    }
-    for (var i = 0; i < metas.length; i++) {
-      if (metas[i].getAttribute('content') !== content) metas[i].setAttribute('content', content);
-    }
-  }
-  if (!document.getElementById('mederp-field-zoom-fix') && document.head) {
-    var style = document.createElement('style');
-    style.id = 'mederp-field-zoom-fix';
-    style.textContent = 'html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]):not([type=submit]):not([type=reset]):not([type=hidden]):not([type=color]):not([type=image]),textarea,select{font-size:16px !important}';
-    document.head.appendChild(style);
-  }
-  lock();
-  if (window.__mederpZoomLock) return;
-  window.__mederpZoomLock = true;
-  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
-    document.addEventListener(name, function (event) { event.preventDefault(); }, { passive: false });
-  });
-  document.addEventListener('focusin', function (event) {
-    if (isField(event.target)) editing = true;
-  });
-  document.addEventListener('focusout', function () {
-    editing = false;
-    setTimeout(lock, 60);
-  });
-  if (document.head) {
-    new MutationObserver(lock).observe(document.head, { subtree: true, attributes: true, attributeFilter: ['content'] });
-  }
-})();
-''';
-
 /// Removes the website's in-page alert and forwards it to the phone notification shade.
 const String inAppToastGuardScript = r'''
 (function () {

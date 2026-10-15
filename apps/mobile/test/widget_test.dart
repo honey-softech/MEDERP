@@ -14,12 +14,6 @@ void main() {
     expect(medErpSiteUrl, 'https://mederp.co.in');
   });
 
-  test('installed app locks pinch zoom', () {
-    expect(lockPageZoomScript, contains('user-scalable=no'));
-    expect(lockPageZoomScript, contains('maximum-scale=1'));
-    expect(lockPageZoomScript, contains('font-size:16px'));
-  });
-
   test('a cancelled first iOS load is not treated as offline', () {
     expect(
       isIgnoredWebLoadError(

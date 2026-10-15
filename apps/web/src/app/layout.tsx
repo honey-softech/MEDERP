@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { LockAppZoom } from "@/components/lock-app-zoom";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,10 +34,7 @@ export const viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-app-bg font-sans text-text-primary">
-        <LockAppZoom />
-        {children}
-      </body>
+      <body className="min-h-full bg-app-bg font-sans text-text-primary">{children}</body>
     </html>
   );
 }

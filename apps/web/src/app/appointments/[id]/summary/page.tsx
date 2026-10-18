@@ -9,6 +9,7 @@ import {
   DOCTOR_VISIT_ROLES,
   PRINT_SUMMARY_ROLES,
   doctorName,
+  printableDoctorLabel,
   prettyEnum,
   requireHospitalPage,
 } from "@/lib/front-desk";
@@ -134,7 +135,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
         printedAt={printedAt}
         draft={!approved}
         signatureImage={visitSignatureImage(appointment.assessment)}
-        signatureName={appointment.assessment.approvedByDisplayName}
+        signatureName={printableDoctorLabel(appointment.assessment.approvedByDisplayName)}
         signatureCredentials={appointment.assessment.approvedByCredentials}
       />
       </div>

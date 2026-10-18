@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit";
 import { hasSendableMobile, patientMobileDigits } from "@/lib/billing/rules";
-import { inr } from "@/lib/display";
+import { humanizeLoginHandle, inr } from "@/lib/display";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { renderTemplate } from "@/lib/messaging/templates";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
@@ -14,7 +14,8 @@ export function adminDisplayName(user: {
   username: string;
 }) {
   const full = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-  return full || user.username;
+  if (full) return full;
+  return humanizeLoginHandle(user.username) || user.username;
 }
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

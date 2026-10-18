@@ -1,4 +1,5 @@
 import { pad } from "@/lib/ids";
+import { stripUsernameRoleSuffix } from "@/lib/usernames";
 
 export function tokenLabel(n: number | null | undefined) {
   if (!n) return "—";
@@ -68,6 +69,13 @@ function lettersOnly(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** Turn a login handle into a printable name (strips adm/doc/… role tags). */
+export function humanizeLoginHandle(username: string) {
+  const local = username.includes("@") ? username.split("@")[0]! : username;
+  const stripped = stripUsernameRoleSuffix(local.replace(/[._]+/g, " ").trim());
+  return stripped.replace(/\s+/g, " ").trim();
+}
+
 /** True when a stored staff label was seeded from the login handle / email local-part. */
 export function isLoginHandleDisplayName(
   display: string,
@@ -89,7 +97,20 @@ export function isLoginHandleDisplayName(
 function formatDoctorDisplayName(full: string) {
   const cleaned = normalizePersonName(full);
   if (!cleaned) return "Dr.";
-  return /^dr\.?\s/i.test(cleaned) ? cleaned : `Dr. ${cleaned}`;
+  const withoutDr = cleaned.replace(/^dr\.?\s+/i, "").trim();
+  // Single-token labels often came from the login handle (e.g. dhanushadm) — strip role tags.
+  const namePart = withoutDr.includes(" ")
+    ? withoutDr
+    : humanizeLoginHandle(withoutDr) || withoutDr;
+  if (!namePart) return "Dr.";
+  return `Dr. ${namePart}`;
+}
+
+/** Clean a stored signature / stamp name that may still include adm/doc from an old login handle. */
+export function printableDoctorLabel(name: string | null | undefined) {
+  const cleaned = normalizePersonName(name ?? "");
+  if (!cleaned) return null;
+  return formatDoctorDisplayName(cleaned);
 }
 
 /**
@@ -120,8 +141,7 @@ export function doctorName(doctor: {
   if (seeded) return formatDoctorDisplayName(seeded);
 
   if (username) {
-    const handle = username.includes("@") ? username.split("@")[0]! : username;
-    const humanized = handle.replace(/[._]/g, " ").replace(/\s*doc$/i, "").trim();
+    const humanized = humanizeLoginHandle(username);
     if (humanized) return formatDoctorDisplayName(humanized);
   }
   return "Dr.";

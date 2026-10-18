@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { doctorName } from "@/lib/front-desk";
+import { doctorName, humanizeLoginHandle } from "@/lib/front-desk";
 import { suggestedSignatureName } from "@/lib/usernames";
 
 export type SignatureSnapshot = {
@@ -45,7 +45,7 @@ export function signatureNameFor(user: {
   if (asDoctor) {
     return doctorName({ firstName, lastName, appUser: { username: user.username } });
   }
-  return user.username;
+  return humanizeLoginHandle(user.username) || user.username;
 }
 
 export function signatureCredentialsFor(user: {

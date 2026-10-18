@@ -6,6 +6,7 @@ import {
   doctorName,
   isLoginHandleDisplayName,
   parsePatientAge,
+  printableDoctorLabel,
 } from "@/lib/display";
 
 describe("patient age helpers", () => {
@@ -56,5 +57,23 @@ describe("doctorName", () => {
   it("detects username-seeded staff labels", () => {
     expect(isLoginHandleDisplayName("john doe", "john.doe")).toBe(true);
     expect(isLoginHandleDisplayName("Priya Sharma", "priyasharmadoc")).toBe(false);
+  });
+
+  it("strips admin/doctor role tags from login-handle names on print", () => {
+    expect(
+      doctorName({
+        firstName: "dhanushadm",
+        lastName: "",
+        appUser: { username: "dhanushadm" },
+      }),
+    ).toBe("Dr. dhanush");
+    expect(
+      doctorName({
+        firstName: null,
+        lastName: null,
+        appUser: { username: "priyasharmadoc" },
+      }),
+    ).toBe("Dr. priyasharma");
+    expect(printableDoctorLabel("Dr. dhanushadm")).toBe("Dr. dhanush");
   });
 });

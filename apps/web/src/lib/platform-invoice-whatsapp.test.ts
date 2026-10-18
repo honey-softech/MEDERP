@@ -4,7 +4,7 @@ import { adminDisplayName, billingPeriodLabel } from "@/lib/platform-invoice-wha
 describe("subscription bill helpers", () => {
   it("uses the SUPER_ADMIN full name, then username", () => {
     expect(adminDisplayName({ firstName: "Ravi", lastName: "Sharma", username: "apexadmin" })).toBe("Ravi Sharma");
-    expect(adminDisplayName({ firstName: null, lastName: null, username: "apexadmin" })).toBe("apexadmin");
+    expect(adminDisplayName({ firstName: null, lastName: null, username: "dhanushadm" })).toBe("dhanush");
   });
 
   it("formats the subscription period for the WhatsApp template", () => {

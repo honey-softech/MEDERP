@@ -1,7 +1,9 @@
 import type { AppRole, LeaveStatus, LeaveType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES } from "@/lib/auth";
+import { doctorName, humanizeLoginHandle, isLoginHandleDisplayName } from "@/lib/display";
 import { notifyHospitalRole, notifyUser } from "@/lib/notifications";
+import { stripUsernameRoleSuffix } from "@/lib/usernames";
 
 const LEAVE_TYPES: LeaveType[] = ["CASUAL", "SICK", "EARNED", "EMERGENCY", "OTHER"];
 
@@ -37,10 +39,23 @@ export function staffDisplayName(staff: {
 }) {
   const full = `${staff.firstName} ${staff.lastName}`.trim();
   if (full) {
-    if (staff.role === "DOCTOR" && !/^dr/i.test(full)) return `Dr. ${full}`;
+    if (staff.role === "DOCTOR") {
+      return doctorName({
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        appUser: staff.appUser ? { username: staff.appUser.username } : null,
+      });
+    }
+    // Strip role tags if the name was seeded from the login handle (e.g. raviadm).
+    if (!full.includes(" ") && staff.appUser?.username && isLoginHandleDisplayName(full, staff.appUser.username)) {
+      return humanizeLoginHandle(staff.appUser.username) || full;
+    }
     return full;
   }
-  return staff.appUser?.username ?? "Staff";
+  if (staff.appUser?.username) {
+    return humanizeLoginHandle(staff.appUser.username) || staff.appUser.username;
+  }
+  return "Staff";
 }
 
 function staffRoleForAppRole(role: AppRole): UserRole | null {
@@ -65,8 +80,9 @@ export async function ensureStaffForUser(params: {
   const staffRole = staffRoleForAppRole(params.role);
   if (!staffRole) return null;
 
-  const parts = params.username.replace(/[._]/g, " ").split(/\s+/).filter(Boolean);
-  const firstName = parts[0] ?? params.username;
+  const humanized = humanizeLoginHandle(params.username) || stripUsernameRoleSuffix(params.username);
+  const parts = humanized.replace(/[._]/g, " ").split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || humanized || params.username;
   const lastName = parts.slice(1).join(" ");
   const email = `${params.username.toLowerCase()}@hospital.local`;
 

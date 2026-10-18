@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { doctorName, prettyEnum } from "@/lib/front-desk";
+import { doctorName, printableDoctorLabel, prettyEnum } from "@/lib/front-desk";
 import { visitSignoffLine } from "@/lib/doctor-specialties";
 import {
   drawClinicalRow,
@@ -134,7 +134,7 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
     );
 
     drawSignoff(doc, {
-      name: input.assessment.approvedByDisplayName || physician,
+      name: printableDoctorLabel(input.assessment.approvedByDisplayName) || physician,
       credentials: visitSignoffLine(input.assessment.approvedByCredentials, input.departmentName),
       imageData: input.assessment.approvedBySignatureImage ?? input.assessment.approvedBySignature?.imageData,
     });

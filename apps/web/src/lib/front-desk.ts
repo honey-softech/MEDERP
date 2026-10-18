@@ -47,9 +47,11 @@ export {
   ageLabel,
   ageYears,
   doctorName,
+  humanizeLoginHandle,
   inr,
   patientName,
   physicianLine,
+  printableDoctorLabel,
   prettyEnum,
   tokenLabel,
 } from "@/lib/display";

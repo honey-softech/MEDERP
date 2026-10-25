@@ -323,9 +323,12 @@ function AppDownloadBadges({ className = "" }: { className?: string }) {
 export function MarketingLanding() {
   return (
     <div className={`landing text-[#0c1f2e] ${display.variable} ${body.variable}`}>
-      <header className="landing-nav absolute inset-x-0 top-0 z-20 flex items-center px-5 py-5 sm:px-8 lg:px-12">
+      <header className="landing-nav absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
         <Link href="/" className="inline-flex items-center">
           <BrandMark size="sm" />
+        </Link>
+        <Link href="/privacy" className="text-sm font-semibold text-[#1f4a46] hover:text-[#0c1f2e]">
+          Privacy
         </Link>
       </header>
 
@@ -453,6 +456,9 @@ export function MarketingLanding() {
           </Link>
           <Link href="/terms" className="hover:text-[#0c1f2e]">
             Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-[#0c1f2e]">
+            Privacy
           </Link>
         </div>
         <div className="mx-auto mt-8 max-w-5xl">

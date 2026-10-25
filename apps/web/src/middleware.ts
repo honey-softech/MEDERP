@@ -10,6 +10,7 @@ const publicPaths = [
   "/forgot-password",
   "/register-hospital",
   "/terms",
+  "/privacy",
   "/help",
   "/demo",
 ];

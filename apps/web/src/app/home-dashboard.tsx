@@ -12,6 +12,7 @@ import {
   dayRange,
   doctorName,
   groupByDoctor,
+  humanizeLoginHandle,
   inr,
   listBookableDoctors,
   localDayKey,
@@ -25,15 +26,31 @@ import { prisma } from "@/lib/prisma";
 import { resolveViewContext } from "@/lib/view-mode";
 import type { AppRole } from "@prisma/client";
 
+function titleCaseName(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function prettyName(
   user: { username: string; firstName?: string | null; lastName?: string | null; role: AppRole },
   asDoctor = false,
 ) {
+  if (user.role === "DOCTOR" || asDoctor) {
+    const labeled = doctorName({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      appUser: { username: user.username, firstName: user.firstName, lastName: user.lastName },
+    });
+    const name = labeled.replace(/^dr\.?\s+/i, "").trim();
+    const titled = titleCaseName(name);
+    return titled ? `Dr. ${titled}` : labeled;
+  }
   const fromAccount = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-  const cleaned = (fromAccount || user.username.replace(/[._]/g, " ")).replace(/\s+/g, " ").trim();
-  const titled = cleaned.replace(/\b\w/g, (letter) => letter.toUpperCase());
-  if ((user.role === "DOCTOR" || asDoctor) && !/^dr\b/i.test(titled)) return `Dr. ${titled}`;
-  return titled;
+  const source = fromAccount || user.username;
+  const cleaned = (source.includes(" ") ? source : humanizeLoginHandle(source) || source)
+    .replace(/[._]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return titleCaseName(cleaned);
 }
 
 function bannerCopy(

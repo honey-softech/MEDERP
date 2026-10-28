@@ -87,17 +87,11 @@ export function InvoiceActions({
   invoiceId,
   due,
   paid,
-  canApproveWaiver,
-  canRequestWaiver = true,
-  waiverStatus,
   fullPaymentRequired = false,
 }: {
   invoiceId: string;
   due: number;
   paid: number;
-  canApproveWaiver: boolean;
-  canRequestWaiver?: boolean;
-  waiverStatus: string;
   fullPaymentRequired?: boolean;
 }) {
   const router = useRouter();
@@ -127,9 +121,6 @@ export function InvoiceActions({
         invoiceId={invoiceId}
         due={due}
         paid={paid}
-        canApproveWaiver={canApproveWaiver}
-        canRequestWaiver={canRequestWaiver}
-        waiverStatus={waiverStatus}
         pending={pending}
         error={error}
         onRun={run}
@@ -194,9 +185,6 @@ export function InvoiceAdjustments({
   invoiceId,
   due,
   paid,
-  canApproveWaiver,
-  canRequestWaiver = true,
-  waiverStatus,
   pending: pendingProp,
   error: errorProp,
   onRun,
@@ -204,9 +192,6 @@ export function InvoiceAdjustments({
   invoiceId: string;
   due?: number;
   paid: number;
-  canApproveWaiver: boolean;
-  canRequestWaiver?: boolean;
-  waiverStatus: string;
   pending?: string;
   error?: string;
   onRun?: (action: string, extra: Record<string, unknown>) => Promise<void> | void;
@@ -264,48 +249,6 @@ export function InvoiceAdjustments({
           </button>
         </div>
       </form>
-
-      <form
-        className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const form = new FormData(event.currentTarget);
-          void run("waiver-request", { amount: Number(form.get("amount")), reason: form.get("reason") });
-        }}
-      >
-        <h4 className="sm:col-span-3 font-medium">Waiver (needs approval)</h4>
-        {waiverStatus === "PENDING" ? (
-          <p className="sm:col-span-3 text-sm text-amber-800">Waiver is waiting for Super Admin or accountant approval.</p>
-        ) : null}
-        {waiverStatus === "APPROVED" ? (
-          <p className="sm:col-span-3 text-sm text-teal-800">Waiver approved. Collect the reduced amount below.</p>
-        ) : null}
-        <label className="text-sm font-medium text-slate-700">
-          Amount
-          <input className={fieldClass} name="amount" type="number" min="0.01" step="0.01" required />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Reason
-          <input className={fieldClass} name="reason" required />
-        </label>
-        <div className="flex items-end gap-2">
-          {canRequestWaiver ? (
-            <button className={secondaryButtonClass} type="submit" disabled={busy === "waiver-request"}>
-              Request waiver
-            </button>
-          ) : null}
-          {canApproveWaiver && waiverStatus === "PENDING" ? (
-            <>
-              <button className={secondaryButtonClass} type="button" onClick={() => void run("waiver-decide", { approve: true })}>
-                Approve
-              </button>
-              <button className={secondaryButtonClass} type="button" onClick={() => void run("waiver-decide", { approve: false })}>
-                Reject
-              </button>
-            </>
-          ) : null}
-        </div>
-      </form>
       </>
       ) : null}
 
@@ -349,99 +292,6 @@ export function InvoiceAdjustments({
 
       {shownError ? <p className="text-sm text-red-600">{shownError}</p> : null}
     </div>
-  );
-}
-
-export function OfferVisitWaiver({
-  appointmentId,
-  patientId,
-  canApproveWaiver,
-}: {
-  appointmentId: string;
-  patientId: string;
-  canApproveWaiver: boolean;
-}) {
-  const router = useRouter();
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setPending(true);
-    const form = new FormData(event.currentTarget);
-    const created = await fetch("/api/invoices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patientId, appointmentId }),
-    });
-    const createdBody = await created.json().catch(() => ({}));
-    const invoiceId = createdBody.invoice?.id as string | undefined;
-    if (!created.ok || !invoiceId) {
-      setPending(false);
-      setError(createdBody.error ?? "Could not open the bill for a waiver.");
-      return;
-    }
-
-    const requested = await fetch(`/api/invoices/${invoiceId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "waiver-request",
-        amount: Number(form.get("amount")),
-        reason: form.get("reason"),
-      }),
-    });
-    const requestedBody = await requested.json().catch(() => ({}));
-    if (!requested.ok) {
-      setPending(false);
-      setError(requestedBody.error ?? "Could not request the waiver.");
-      router.refresh();
-      return;
-    }
-
-    if (canApproveWaiver) {
-      const decided = await fetch(`/api/invoices/${invoiceId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "waiver-decide", approve: true }),
-      });
-      const decidedBody = await decided.json().catch(() => ({}));
-      if (!decided.ok) {
-        setPending(false);
-        setError(decidedBody.error ?? "Could not approve the waiver.");
-        router.refresh();
-        return;
-      }
-    }
-
-    setPending(false);
-    router.refresh();
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="mb-6 grid max-w-3xl gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3 sm:p-6">
-      <div className="sm:col-span-3">
-        <h3 className="font-semibold">Waiver</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Offer this before you collect. After approval, collect the reduced balance.
-        </p>
-      </div>
-      <label className="text-sm font-medium text-slate-700">
-        Amount
-        <input className={fieldClass} name="amount" type="number" min="0.01" step="0.01" required />
-      </label>
-      <label className="text-sm font-medium text-slate-700">
-        Reason
-        <input className={fieldClass} name="reason" required />
-      </label>
-      <div className="flex items-end">
-        <button className={secondaryButtonClass} type="submit" disabled={pending}>
-          {pending ? "Saving…" : canApproveWaiver ? "Apply waiver" : "Request waiver"}
-        </button>
-      </div>
-      {error ? <p className="sm:col-span-3 text-sm text-red-600">{error}</p> : null}
-    </form>
   );
 }
 

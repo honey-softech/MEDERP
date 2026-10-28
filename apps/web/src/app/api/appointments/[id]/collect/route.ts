@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import {
   BILLING_ROLES,
-  amountsMatch,
   doctorName,
   forbidUnless,
   invoiceStatusFromTotals,
@@ -81,44 +80,57 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: "Hospital not found." }, { status: 400 });
   }
 
-  const charge = existing ? Number(existing.netTotal) : amount;
-  if (!existing && !(charge > 0)) {
+  if (!(amount > 0)) {
     return NextResponse.json({ error: "Enter the OPD amount." }, { status: 400 });
   }
-  const due = existing ? Number(existing.netTotal) - Number(existing.paidAmount) : charge;
-  if (!amountsMatch(amount, due)) {
-    return NextResponse.json(
-      { error: `Check-in requires the full amount of ₹${due.toFixed(2)}. Partial payment is not allowed.` },
-      { status: 400 },
-    );
-  }
+  const alreadyPaid = existing ? Number(existing.paidAmount) : 0;
+  const billTotal = alreadyPaid + amount;
 
   const signature = await activeSignatureFor(scoped.user.id, scoped.user.hospitalId);
   const issued = await billIdentityForInvoice(scoped.user.hospitalId, appointment.patientId);
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-    const invoice =
-      existing ??
-      (await tx.invoice.create({
-        data: {
-          hospitalId: scoped.user.hospitalId,
-          invoiceNo: await nextInvoiceNo(scoped.user.hospitalId, hospital.code),
-          patientId: appointment.patientId,
-          appointmentId: appointment.id,
-          ...issued,
-          status: "ISSUED",
-          subtotal: charge,
-          discountAmount: 0,
-          netTotal: charge,
-          items: {
-            create: {
-              description: `Consultation — ${appointment.department.name} with ${doctorName(appointment.doctor)}`,
-              amount: charge,
+    const description = `Consultation — ${appointment.department.name} with ${doctorName(appointment.doctor)}`;
+    const invoice = existing
+      ? await tx.invoice.update({
+          where: { id: existing.id },
+          data: {
+            subtotal: billTotal,
+            discountAmount: 0,
+            waiverAmount: 0,
+            waiverReason: null,
+            waiverStatus: "NONE",
+            netTotal: billTotal,
+          },
+        })
+      : await tx.invoice.create({
+          data: {
+            hospitalId: scoped.user.hospitalId,
+            invoiceNo: await nextInvoiceNo(scoped.user.hospitalId, hospital.code),
+            patientId: appointment.patientId,
+            appointmentId: appointment.id,
+            ...issued,
+            status: "ISSUED",
+            subtotal: billTotal,
+            discountAmount: 0,
+            netTotal: billTotal,
+            items: {
+              create: {
+                description,
+                amount: billTotal,
+              },
             },
           },
-        },
-      }));
+        });
+    if (existing) {
+      const line = await tx.invoiceItem.findFirst({ where: { invoiceId: existing.id }, orderBy: { id: "asc" } });
+      if (line) {
+        await tx.invoiceItem.update({ where: { id: line.id }, data: { amount: billTotal, description } });
+      } else {
+        await tx.invoiceItem.create({ data: { invoiceId: existing.id, description, amount: billTotal } });
+      }
+    }
 
     await tx.payment.create({
       data: {

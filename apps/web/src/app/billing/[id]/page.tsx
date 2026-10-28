@@ -9,7 +9,6 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { SignatureBlock } from "@/components/signature-block";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
-  WAIVER_APPROVER_ROLES,
   doctorName,
   hasBillingAccess,
   inr,
@@ -197,9 +196,6 @@ export default async function InvoiceDetailPage({
           invoiceId={invoice.id}
           due={due}
           paid={Number(invoice.paidAmount)}
-          canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-          canRequestWaiver={hasBillingAccess(user)}
-          waiverStatus={invoice.waiverStatus}
           fullPaymentRequired={Boolean(invoice.appointmentId)}
         />
       </div>

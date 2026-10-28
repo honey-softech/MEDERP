@@ -5,7 +5,6 @@ import { InvoiceAdjustments } from "@/components/billing-forms";
 import { LabPaymentForm } from "@/components/lab-payment-form";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
-  WAIVER_APPROVER_ROLES,
   hasBillingAccess,
   inr,
   patientName,
@@ -87,9 +86,6 @@ export default async function CollectLabPage({ params }: { params: Promise<{ id:
           invoiceId={invoice.id}
           due={due}
           paid={Number(invoice.paidAmount)}
-          canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-          canRequestWaiver={hasBillingAccess(user)}
-          waiverStatus={invoice.waiverStatus}
         />
       </div>
 

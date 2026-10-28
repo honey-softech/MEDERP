@@ -10,13 +10,11 @@ export function VisitPaymentForm({
   appointmentId,
   due,
   doctorLabel,
-  amountLocked = false,
   afterPayHref,
 }: {
   appointmentId: string;
   due: number;
   doctorLabel: string;
-  amountLocked?: boolean;
   /** Nurse and doctor continue to the visit for vitals (and consult). */
   afterPayHref?: string;
 }) {
@@ -57,7 +55,7 @@ export function VisitPaymentForm({
       <div>
         <h3 className="font-semibold">Record payment</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Consultation is credited to {doctorLabel}. Collect the full OPD amount — partial payment is not allowed.
+          Consultation is credited to {doctorLabel}. The amount starts from the visit&apos;s OPD rate. Reception, nursing, or the doctor can change it, then collect that amount.
         {afterPayHref ? " After payment, record vitals on the visit." : ""}
         </p>
       </div>
@@ -99,12 +97,9 @@ export function VisitPaymentForm({
           step="0.01"
           defaultValue={due.toFixed(2)}
           required
-          readOnly={amountLocked}
         />
         <span className="mt-1 block font-normal text-slate-500">
-          {amountLocked
-            ? "Pay this full balance. Partial payment is not allowed at check-in."
-            : "Default is ₹500 (or the hospital OPD rate). You can enter a different amount, then collect it in full."}
+          Change this if this visit should be charged a different amount.
         </span>
       </label>
 

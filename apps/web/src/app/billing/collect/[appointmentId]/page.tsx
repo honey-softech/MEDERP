@@ -4,7 +4,6 @@ import { MissingRecord } from "@/components/missing-record";
 import { routeParam } from "@/lib/route-param";
 import { AppShell } from "@/components/app-shell";
 import { VisitPaymentForm } from "@/components/visit-payment-form";
-import { InvoiceAdjustments, OfferVisitWaiver } from "@/components/billing-forms";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import { canSendIssuedInvoice } from "@/lib/billing/rules";
@@ -17,7 +16,6 @@ import {
   prettyEnum,
   requireHospitalPage,
   tokenLabel,
-  WAIVER_APPROVER_ROLES,
 } from "@/lib/front-desk";
 import { invoiceWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
@@ -54,13 +52,11 @@ export default async function CollectVisitPaymentPage({
   }
 
   const invoice = appointment.invoices[0] ?? null;
-  const fee = invoice
-    ? Number(invoice.netTotal)
-    : consultationFeeForVisit({ ...appointment, hospital: appointment.hospital });
+  const defaultFee = consultationFeeForVisit({ ...appointment, hospital: appointment.hospital });
   const paid = invoice ? Number(invoice.paidAmount) : 0;
-  const due = Math.max(0, fee - paid);
+  const suggested = invoice && paid > 0 ? Math.max(0, Number(invoice.netTotal) - paid) : defaultFee;
+  const due = suggested;
   const doctorLabel = doctorName(appointment.doctor);
-  const amountLocked = Boolean(invoice);
   const billAlreadySent =
     invoice && canSendIssuedInvoice(invoice.status)
       ? await invoiceWhatsAppSent({
@@ -118,40 +114,20 @@ export default async function CollectVisitPaymentPage({
             <dd className="font-medium">{appointment.department.name}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">OPD amount</dt>
-            <dd className="font-medium">{inr(fee)}</dd>
+            <dt className="text-xs uppercase tracking-wide text-slate-500">Default OPD amount</dt>
+            <dd className="font-medium">{inr(defaultFee)}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">Balance due</dt>
-            <dd className="font-medium">{inr(due)}</dd>
+            <dt className="text-xs uppercase tracking-wide text-slate-500">Already collected</dt>
+            <dd className="font-medium">{inr(paid)}</dd>
           </div>
         </dl>
       </article>
 
-      {invoice ? (
-        <div className="mb-6 max-w-3xl">
-          <InvoiceAdjustments
-            invoiceId={invoice.id}
-            due={due}
-            paid={paid}
-            canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-            canRequestWaiver
-            waiverStatus={invoice.waiverStatus}
-          />
-        </div>
-      ) : (
-        <OfferVisitWaiver
-          appointmentId={appointment.id}
-          patientId={appointment.patientId}
-          canApproveWaiver={WAIVER_APPROVER_ROLES.includes(user.role)}
-        />
-      )}
-
       <VisitPaymentForm
         appointmentId={appointment.id}
-        due={due}
+        due={due > 0 ? due : defaultFee}
         doctorLabel={doctorLabel}
-        amountLocked={amountLocked}
         afterPayHref={continueToVisit ? visitHref : undefined}
       />
     </AppShell>

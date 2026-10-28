@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     const user = existingMobile
       ? await prisma.$transaction(async (tx) => {
           if (reusable) {
+            await tx.devicePushToken.deleteMany({ where: { userId: existingMobile.id } });
             await tx.appSession.deleteMany({ where: { userId: existingMobile.id } });
             const staff = await tx.staff.findUnique({ where: { appUserId: existingMobile.id } });
             if (staff) {

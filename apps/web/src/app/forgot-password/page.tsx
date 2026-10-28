@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthShell title="Reset password" subtitle="Enter your registered mobile number. We will send a 6-digit OTP on WhatsApp.">
+    <AuthShell backHref="/login" title="Reset password" subtitle="Enter your registered mobile number. We will send a 6-digit OTP on WhatsApp.">
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block text-sm font-medium text-slate-700">
           Mobile number

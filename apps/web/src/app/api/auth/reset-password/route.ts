@@ -45,6 +45,7 @@ export async function POST(request: Request) {
         otpAttempts: 0,
       },
     }),
+    prisma.devicePushToken.deleteMany({ where: { userId: user.id } }),
     prisma.appSession.deleteMany({ where: { userId: user.id } }),
   ]);
 

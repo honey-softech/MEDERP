@@ -100,7 +100,10 @@ export async function clearSession() {
 }
 
 export async function invalidateUserSessions(userId: string) {
-  await prisma.appSession.deleteMany({ where: { userId } });
+  await prisma.$transaction([
+    prisma.devicePushToken.deleteMany({ where: { userId } }),
+    prisma.appSession.deleteMany({ where: { userId } }),
+  ]);
 }
 
 export async function getCurrentUser(request?: Request) {

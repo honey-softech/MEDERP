@@ -11,6 +11,7 @@ export default async function TermsPage() {
   return (
     <AuthShell
       wide
+      backHref="/"
       title="Terms & Conditions"
       subtitle="MedERP hospital SaaS subscription, monthly auto-debit, and package changes."
     >

@@ -81,7 +81,7 @@ export default function PublicHelpPage() {
 
   if (step === "done") {
     return (
-      <AuthShell title="Request submitted" subtitle="MedERP support has your ticket.">
+      <AuthShell kicker="Support" title="Request submitted" subtitle="MedERP support has your ticket." backHref="/login">
         <p className="text-sm text-slate-700">
           Your request {ticketNumber ? <span className="font-mono font-semibold">{ticketNumber}</span> : null}{" "}
           is with the support team. If your account can sign in again after they fix it, use the login page.
@@ -95,7 +95,9 @@ export default function PublicHelpPage() {
 
   return (
     <AuthShell
-      title="Need help signing in?"
+      kicker="Support"
+      backHref="/login"
+      title="Send a query"
       subtitle="Verify your registered mobile, then tell us what went wrong. Works even if your account was deactivated."
     >
       {step === "otp" ? (

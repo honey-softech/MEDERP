@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { AuthShell, fieldClass, iconButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { AuthShell, fieldClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { AuthFooterCredits, PasswordField } from "@/components/auth-branding";
 import { isValidIndianMobile, mobileValidationError, normalizeMobile } from "@/lib/phone";
 import { signInPasswordError } from "@/lib/password-policy";
+import { notifyNativeSession } from "@/lib/native-app-session";
 import { useIsMedErpMobileApp } from "@/lib/use-mederp-mobile-app";
 
 const LOGIN_MOBILE_KEY = "mederp.login.mobile";
@@ -38,15 +39,15 @@ function LoginHelpDialog({ onClose }: { onClose: () => void }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="login-help-title"
-          className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+          className="relative w-full max-w-sm rounded-3xl border border-[#10211e]/10 bg-[#fbfaf7] p-5 shadow-[0_24px_50px_-28px_rgb(16_33_30_/_0.45)]"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h2 id="login-help-title" className="text-lg font-semibold text-slate-900">
+              <h2 id="login-help-title" className="text-lg font-semibold text-[#10211e]">
                 Help
               </h2>
-              <p className="mt-1 text-sm text-slate-500">Choose how you want to get support.</p>
+              <p className="mt-1 text-sm text-[#5c726c]">Choose how you want to get support.</p>
             </div>
             <button type="button" className={secondaryButtonClass} onClick={onClose}>
               Close
@@ -125,6 +126,7 @@ export function LoginForm({ isMobileApp = false }: { isMobileApp?: boolean }) {
         return;
       }
 
+      notifyNativeSession("signed-in");
       const next = safeNextPath(searchParams.get("next")) || data.redirectTo || "/";
       window.location.replace(next);
     } catch {
@@ -136,13 +138,15 @@ export function LoginForm({ isMobileApp = false }: { isMobileApp?: boolean }) {
   return (
     <AuthShell
       title="Sign in"
+      kicker="Clinic access"
+      subtitle="Use the mobile number registered for your clinic."
       doodles
       keyboardSafe
       footer={<AuthFooterCredits />}
       headerAction={
         <button
           type="button"
-          className={iconButtonClass}
+          className="auth-help"
           aria-label="Help"
           title="Help"
           onClick={() => setHelpOpen(true)}
@@ -174,7 +178,7 @@ export function LoginForm({ isMobileApp = false }: { isMobileApp?: boolean }) {
           <p className="text-sm text-teal-700">Password updated. Sign in with your new password.</p>
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button className={`${primaryButtonClass} min-w-0 flex-1`} type="submit" disabled={pending}>
             {pending ? "Signing in…" : "Sign in"}
           </button>

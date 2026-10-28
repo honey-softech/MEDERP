@@ -552,17 +552,24 @@ model AppUser {
   @@unique([hospitalId, employeeId])
 }
 
-/** FCM device token. iOS tokens are delivered by FCM through APNs. */
+/** FCM device token. iOS tokens are delivered by FCM through APNs.
+ *  Tied to the session that registered the phone. Signing out deletes that
+ *  session, and the token row goes with it, so a signed-out phone stops
+ *  receiving alerts even if another session for the same person is still open.
+ */
 model DevicePushToken {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   userId    String
-  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  user      AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?
+  session   AppSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  token     String      @unique
   platform  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   @@index([userId])
+  @@index([sessionId])
 }
 
 /// Scanned signature + seal for a staff member. Rows are write-once: replacing a
@@ -620,6 +627,7 @@ model AppSession {
   expiresAt  DateTime
   lastSeenAt DateTime @default(now())
   createdAt  DateTime @default(now())
+  pushTokens DevicePushToken[]
 
   @@index([userId, lastSeenAt])
 }

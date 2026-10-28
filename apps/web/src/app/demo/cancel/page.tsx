@@ -30,7 +30,7 @@ function CancelForm() {
   }
 
   return (
-    <AuthShell title="Cancel demo" subtitle={done ? "This demo has been cancelled." : "This frees the slot on our calendar."} doodles>
+    <AuthShell backHref="/demo" title="Cancel demo" subtitle={done ? "This demo has been cancelled." : "This frees the slot on our calendar."} doodles>
       {done ? (
         <Link className={secondaryButtonClass} href="/demo">
           Book another time

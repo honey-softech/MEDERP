@@ -81,7 +81,8 @@ export function DemoBookForm() {
 
   return (
     <AuthShell
-      title="Book a MedERP demo"
+      kicker="Walkthrough"
+      title="Book a demo"
       subtitle="Pick an open slot. Google Calendar will email you the invite and Meet link."
       wide
       doodles

@@ -1,12 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { clearStoredDevicePushToken, notifyNativeSession, readStoredDevicePushToken } from "@/lib/native-app-session";
 
 export function LogoutButton() {
   const router = useRouter();
 
   async function onLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    const deviceToken = readStoredDevicePushToken();
+    notifyNativeSession("signed-out");
+    clearStoredDevicePushToken();
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(deviceToken ? { deviceToken } : {}),
+    });
     router.push("/login");
     router.refresh();
   }

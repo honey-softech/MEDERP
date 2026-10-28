@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mederp_mobile/bill_download.dart';
 import 'package:mederp_mobile/main.dart';
+import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
 
 void main() {
@@ -27,6 +28,9 @@ void main() {
     expect(download?.filename, 'bill_INV_1.pdf');
     expect(download?.bytes, utf8.encode('%PDF'));
     expect(isNativeDownloadMessage('{"title":"MedERP","body":"Saved"}'), isFalse);
+    expect(nativeSessionAction('{"type":"signed-out"}'), 'signed-out');
+    expect(nativeSessionAction('{"type":"signed-in"}'), 'signed-in');
+    expect(nativeSessionAction('{"title":"MedERP","body":"Saved"}'), isNull);
     expect(parseNativeBillDownload('{"type":"download","filename":"bill.pdf","base64":""}'), isNull);
   });
 }

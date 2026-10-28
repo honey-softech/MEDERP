@@ -9,6 +9,7 @@ function hashToken(token: string) {
 }
 
 export type LoadedSession = {
+  id: string;
   token: string;
   expiresAt: Date;
   user: NonNullable<Awaited<ReturnType<typeof loadUserFromSession>>>["user"];
@@ -43,11 +44,13 @@ export async function loadSessionByToken(token: string | null | undefined): Prom
 
   const user = session.user;
   if (user.isActive === false) {
+    await prisma.devicePushToken.deleteMany({ where: { userId: user.id } }).catch(() => undefined);
     await prisma.appSession.deleteMany({ where: { userId: user.id } }).catch(() => undefined);
     return null;
   }
 
   if (user.hospitalId && user.hospital && user.hospital.isActive === false) {
+    await prisma.devicePushToken.deleteMany({ where: { userId: user.id } }).catch(() => undefined);
     await prisma.appSession.deleteMany({ where: { userId: user.id } }).catch(() => undefined);
     return null;
   }
@@ -65,7 +68,7 @@ export async function loadSessionByToken(token: string | null | undefined): Prom
       .catch(() => undefined);
   }
 
-  return { token, expiresAt, user };
+  return { id: session.id, token, expiresAt, user };
 }
 
 export async function getUserBySessionToken(token: string | null | undefined) {

@@ -400,6 +400,7 @@ export async function registerHospital(input: RegisterHospitalInput) {
   });
 
   if (prepared.reuseUserId) {
+    await prisma.devicePushToken.deleteMany({ where: { userId: prepared.reuseUserId } });
     await prisma.appSession.deleteMany({ where: { userId: prepared.reuseUserId } });
     const previousStaff = await prisma.staff.findUnique({ where: { appUserId: prepared.reuseUserId } });
     if (previousStaff) {

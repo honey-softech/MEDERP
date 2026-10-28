@@ -37,6 +37,7 @@ export async function POST(request: Request, context: Ctx) {
 
   const suffix = `merged-${duplicate.id.slice(-6)}`;
   await prisma.$transaction(async (tx) => {
+    await tx.devicePushToken.deleteMany({ where: { userId: duplicate.id } });
     await tx.appSession.deleteMany({ where: { userId: duplicate.id } });
     await tx.staffNotification.updateMany({ where: { userId: duplicate.id }, data: { userId: survivor.id } });
     await tx.hospitalJoinRequest.updateMany({ where: { userId: duplicate.id }, data: { userId: survivor.id } });

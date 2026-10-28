@@ -91,7 +91,6 @@ export async function POST(request: Request) {
     username: user.username,
     mobile: user.mobile,
     role: user.role,
-    sessionToken: session.token,
     redirectTo: homeForRole(user.role, user.hospitalId),
   });
   response.cookies.set(SESSION_COOKIE, session.token, sessionCookieOptions(session.expiresAt));

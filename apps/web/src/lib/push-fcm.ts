@@ -1,3 +1,4 @@
+import { partitionPushTokens } from "@/lib/device-push";
 import { prisma } from "@/lib/prisma";
 import type { StaffNotice } from "@/lib/realtime-events";
 
@@ -139,8 +140,27 @@ async function sendToToken(params: {
   return { ok: false as const, status: response.status, text };
 }
 
-/** Best-effort FCM fan-out. No-op when Firebase is not configured. */
+/** Best-effort FCM fan-out. No-op when Firebase is not configured.
+ *  Tokens with no live sign-in session are removed and never sent, including
+ *  registrations left behind by a phone that has already signed out.
+ */
 export async function sendFcmToUser(userId: string, notice: StaffNotice) {
+  const rows = await prisma.devicePushToken.findMany({
+    where: { userId },
+    select: { id: true, token: true, session: { select: { expiresAt: true } } },
+  });
+  const { live, staleIds } = partitionPushTokens(
+    rows.map((row) => ({
+      id: row.id,
+      token: row.token,
+      sessionExpiresAt: row.session?.expiresAt ?? null,
+    })),
+  );
+  if (staleIds.length > 0) {
+    await prisma.devicePushToken.deleteMany({ where: { id: { in: staleIds } } }).catch(() => null);
+  }
+  if (live.length === 0) return;
+
   const account = serviceAccountFromEnv();
   const projectId = account?.project_id?.trim();
   if (!account || !projectId) return;
@@ -148,11 +168,7 @@ export async function sendFcmToUser(userId: string, notice: StaffNotice) {
   const accessToken = await getAccessToken(account);
   if (!accessToken) return;
 
-  const tokens = await prisma.devicePushToken.findMany({
-    where: { userId },
-    select: { id: true, token: true },
-  });
-  if (tokens.length === 0) return;
+  const tokens = live;
 
   await Promise.all(
     tokens.map(async (row) => {

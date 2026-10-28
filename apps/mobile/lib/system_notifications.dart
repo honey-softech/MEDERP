@@ -98,6 +98,13 @@ class SystemNotifications {
     return false;
   }
 
+  static Future<void> clearAll() async {
+    try {
+      if (!_ready) await ensureReady();
+      await _plugin.cancelAll();
+    } catch (_) {}
+  }
+
   static Future<void> showFromBridge(String raw) async {
     if (!_ready) await ensureReady();
     if (!await _allowed()) return;

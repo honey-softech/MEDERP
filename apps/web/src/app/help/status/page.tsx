@@ -125,6 +125,7 @@ export default function HelpStatusPage() {
 
   return (
     <AuthShell
+      backHref="/help"
       title="Check helpdesk status"
       subtitle="Verify your registered mobile to see tickets you opened from Contact support or while locked out."
       wide

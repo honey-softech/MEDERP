@@ -481,6 +481,7 @@ async function retireDoctorLogin(
   tx: Prisma.TransactionClient,
   userId: string,
 ) {
+  await tx.devicePushToken.deleteMany({ where: { userId } });
   await tx.appSession.deleteMany({ where: { userId } });
   const retiredKey = `retired-${userId}`;
   await tx.appUser.update({

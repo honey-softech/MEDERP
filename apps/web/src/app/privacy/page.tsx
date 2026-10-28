@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { AuthBack } from "@/components/auth-back";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 
 export const metadata: Metadata = {
@@ -23,13 +24,13 @@ export default function PrivacyPage() {
   return (
     <div className={`landing text-[#0c1f2e] ${display.variable} ${body.variable}`}>
       <header className="flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
-        <Link href="/" className="inline-flex items-center gap-2.5">
-          <Image src="/mederp-icon.png" alt="" width={36} height={36} className="h-9 w-9 rounded-md" />
-          <span className="landing-brand text-xl font-semibold text-[#0c2f2c]">MedERP</span>
-        </Link>
-        <Link href="/" className="text-sm font-semibold text-[#1f4a46] hover:text-[#0c1f2e]">
-          Home
-        </Link>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <AuthBack href="/" />
+          <Link href="/" className="inline-flex items-center gap-2.5">
+            <Image src="/mederp-icon.png" alt="" width={36} height={36} className="h-9 w-9 rounded-md" />
+            <span className="landing-brand text-xl font-semibold text-[#0c2f2c]">MedERP</span>
+          </Link>
+        </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-5 pb-16 sm:px-8">

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -21,6 +22,9 @@ class PushNotifications {
   PushNotifications._();
 
   static bool _started = false;
+  static bool _signedOut = false;
+  static int _epoch = 0;
+  static Future<void> _tail = Future<void>.value();
   static String? _token;
   static WebViewController? _webView;
 
@@ -59,7 +63,7 @@ class PushNotifications {
     // is open. Post one ourselves so Samsung / Xiaomi / Oppo styles can apply.
     // iOS shows that banner through the presentation options above.
     FirebaseMessaging.onMessage.listen((message) {
-      if (!Platform.isAndroid) return;
+      if (_signedOut || !Platform.isAndroid) return;
       final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MedERP';
       final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
       final href = message.data['href']?.toString() ?? '';
@@ -84,13 +88,77 @@ class PushNotifications {
     }
 
     messaging.onTokenRefresh.listen((token) {
+      if (_signedOut) return;
       _token = token;
       registerTokenOnSite(token);
     });
 
+    if (_signedOut) return;
     if (Platform.isIOS) await _waitForApnsToken(messaging);
     _token = await messaging.getToken();
-    if (_token != null) await registerTokenOnSite(_token!);
+    if (_signedOut || _token == null) return;
+    await registerTokenOnSite(_token!);
+  }
+
+  /// Sign-out. Drops the FCM registration so iOS/Android cannot keep alerting
+  /// this phone, and ignores token refreshes until the next sign-in.
+  static Future<void> stopForSignOut() {
+    return _enqueue(() async {
+      final epoch = ++_epoch;
+      _signedOut = true;
+      _token = null;
+      final messaging = FirebaseMessaging.instance;
+      try {
+        await messaging.setAutoInitEnabled(false);
+      } catch (_) {}
+      if (epoch != _epoch) return;
+      if (Platform.isIOS) {
+        try {
+          await messaging.setForegroundNotificationPresentationOptions(
+            alert: false,
+            badge: false,
+            sound: false,
+          );
+        } catch (_) {}
+      }
+      if (epoch != _epoch) return;
+      try {
+        await messaging.deleteToken();
+      } catch (_) {}
+      if (epoch != _epoch) return;
+      await SystemNotifications.clearAll();
+    });
+  }
+
+  /// Next sign-in. A new FCM token is issued and registered only after this.
+  static Future<void> resumeAfterSignIn() {
+    return _enqueue(() async {
+      final epoch = ++_epoch;
+      _signedOut = false;
+      try {
+        final messaging = FirebaseMessaging.instance;
+        await messaging.setAutoInitEnabled(true);
+        if (epoch != _epoch) return;
+        if (Platform.isIOS) {
+          await messaging.setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+          await _waitForApnsToken(messaging);
+        }
+        if (epoch != _epoch) return;
+        _token = await messaging.getToken();
+        if (epoch != _epoch || _token == null) return;
+        await registerTokenOnSite(_token!);
+      } catch (_) {}
+    });
+  }
+
+  static Future<void> _enqueue(Future<void> Function() action) {
+    final run = _tail.catchError((_) {}).then((_) => action());
+    _tail = run;
+    return run;
   }
 
   /// getToken() on iOS needs the APNs device token first. It can arrive a moment
@@ -105,6 +173,7 @@ class PushNotifications {
 
   /// Re-run after each page load so a late sign-in still binds the token.
   static Future<void> registerTokenOnSite([String? token]) async {
+    if (_signedOut) return;
     final value = (token ?? _token)?.trim();
     final controller = _webView;
     if (value == null || value.isEmpty || controller == null) return;
@@ -112,6 +181,7 @@ class PushNotifications {
     await controller.runJavaScript('''
 (function () {
   var token = '$escaped';
+  try { sessionStorage.setItem('mederp.devicePushToken', token); } catch (e) {}
   fetch('/api/device-tokens', {
     method: 'POST',
     credentials: 'include',
@@ -120,5 +190,18 @@ class PushNotifications {
   }).catch(function () {});
 })();
 ''');
+  }
+}
+
+/// `signed-out` or `signed-in` when the site posts a session change. Null otherwise.
+String? nativeSessionAction(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final type = decoded['type'];
+    if (type == 'signed-out' || type == 'signed-in') return type as String;
+    return null;
+  } catch (_) {
+    return null;
   }
 }

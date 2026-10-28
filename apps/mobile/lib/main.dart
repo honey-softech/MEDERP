@@ -63,6 +63,15 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             if (download != null) saveNativeBill(download);
             return;
           }
+          final sessionAction = nativeSessionAction(raw);
+          if (sessionAction == 'signed-out') {
+            PushNotifications.stopForSignOut();
+            return;
+          }
+          if (sessionAction == 'signed-in') {
+            PushNotifications.resumeAfterSignIn();
+            return;
+          }
           SystemNotifications.showFromBridge(raw);
         },
       )

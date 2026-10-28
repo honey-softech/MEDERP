@@ -51,6 +51,7 @@ function ResetPasswordForm() {
 
   return (
     <AuthShell
+      backHref="/forgot-password"
       title="Set a new password"
       subtitle="Enter the 6-digit WhatsApp OTP. Use 8+ characters with upper and lower case, a number, and a symbol."
     >

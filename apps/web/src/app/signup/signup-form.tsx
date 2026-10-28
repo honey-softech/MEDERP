@@ -72,6 +72,8 @@ export function SignupForm({ isMobileApp = false }: { isMobileApp?: boolean }) {
 
   return (
     <AuthShell
+      kicker="Staff account"
+      backHref="/login"
       title="Create your account"
       subtitle="Sign up with your mobile. Your account is only active after you enter the OTP we send. Then request to join a listed hospital."
     >

@@ -15,6 +15,8 @@ import {
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
+import { formatClinicDate } from "@/lib/clinic-time";
+import { printClock } from "@/lib/print-document-pdf";
 import { ageGenderLine, encounterNumber, generalExaminationRows, visitDateLabel } from "@/lib/visit-summary";
 import { visitLetterhead, visitSignatureImage } from "@/lib/issued-document";
 
@@ -57,15 +59,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
       )
     : false;
 
-  const printedAt = new Date().toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  const printedAt = printClock();
 
   return (
     <AppShell title="Visit summary">
@@ -125,11 +119,7 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
         vitalsRows={generalExaminationRows(appointment.vitals ? toVitalsValues(appointment.vitals) : null)}
         systemicExamination={appointment.assessment.examination}
         advice={appointment.assessment.advice}
-        followUpAt={
-          appointment.assessment.followUpAt
-            ? appointment.assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
-            : null
-        }
+        followUpAt={appointment.assessment.followUpAt ? formatClinicDate(appointment.assessment.followUpAt) : null}
         visitOutcome={appointment.assessment.visitOutcome}
         prescription={appointment.assessment.prescription}
         printedAt={printedAt}

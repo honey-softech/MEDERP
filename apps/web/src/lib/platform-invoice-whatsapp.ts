@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { CLINIC_TIME_ZONE } from "@/lib/clinic-time";
 import { writeAuditLog } from "@/lib/audit";
 import { hasSendableMobile, patientMobileDigits } from "@/lib/billing/rules";
 import { inr, personLabel } from "@/lib/display";
@@ -32,10 +33,37 @@ const LONG_MONTHS = [
   "December",
 ];
 
+function clinicMonthDay(value: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: CLINIC_TIME_ZONE,
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+    })
+      .formatToParts(value)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const monthIndex = Number(parts.month) - 1;
+  return {
+    day: parts.day,
+    shortMonth: SHORT_MONTHS[monthIndex] ?? "",
+    longMonth: LONG_MONTHS[monthIndex] ?? "",
+    year: parts.year,
+  };
+}
+
 export function billingPeriodLabel(start?: Date | null, end?: Date | null, fallback?: Date | null) {
-  const fmt = (value: Date) => `${value.getDate()} ${SHORT_MONTHS[value.getMonth()]} ${value.getFullYear()}`;
+  const fmt = (value: Date) => {
+    const parts = clinicMonthDay(value);
+    return `${parts.day} ${parts.shortMonth} ${parts.year}`;
+  };
   if (start && end) return `${fmt(start)} – ${fmt(end)}`;
-  if (fallback) return `${LONG_MONTHS[fallback.getMonth()]} ${fallback.getFullYear()}`;
+  if (fallback) {
+    const parts = clinicMonthDay(fallback);
+    return `${parts.longMonth} ${parts.year}`;
+  }
   return "this billing cycle";
 }
 

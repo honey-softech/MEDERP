@@ -1,3 +1,4 @@
+import { formatClinicDate } from "@/lib/clinic-time";
 import { prisma } from "@/lib/prisma";
 import { normalizeHospitalCode } from "@/lib/auth";
 import { notifyUser } from "@/lib/notifications";
@@ -35,7 +36,7 @@ export function extendTrialEnd(current: Date | null | undefined, months: number,
 
 function formatTrialDate(value: Date | null | undefined) {
   if (!value) return "not set";
-  return value.toLocaleDateString("en-IN", { dateStyle: "medium" });
+  return formatClinicDate(value);
 }
 
 /** Active hospital that owns this code, or null when the code is unknown or inactive. */

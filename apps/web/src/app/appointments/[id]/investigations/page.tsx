@@ -11,7 +11,9 @@ import {
   requireHospitalPage,
   tokenLabel,
 } from "@/lib/front-desk";
+import { formatClinicDateTime } from "@/lib/clinic-time";
 import { appointmentWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
+import { printClock } from "@/lib/print-document-pdf";
 import { prisma } from "@/lib/prisma";
 import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { ageGenderLine } from "@/lib/visit-summary";
@@ -61,10 +63,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
     })),
   );
 
-  const printedAt = new Date().toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const printedAt = printClock();
 
   return (
     <AppShell title="Tests / scans">
@@ -98,7 +97,7 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
           phone={appointment.patient.phone ?? ""}
           doctor={physicianLine(appointment.doctor)}
           department={appointment.department.name}
-          visitDate={appointment.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+          visitDate={formatClinicDateTime(appointment.scheduledAt)}
           token={tokenLabel(appointment.tokenNumber)}
           items={items}
           printedBy={user.username}

@@ -1,3 +1,4 @@
+import { CLINIC_TIME_ZONE } from "@/lib/clinic-time";
 import { ageLabel, prettyEnum } from "@/lib/front-desk";
 import type { VitalsValues } from "@/lib/vitals";
 
@@ -80,7 +81,14 @@ function collectText(node: unknown, parts: string[]) {
 }
 
 export function visitDateLabel(value: Date) {
-  return value.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+  return value
+    .toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: CLINIC_TIME_ZONE,
+    })
+    .toUpperCase();
 }
 
 export function genderShort(gender: string) {
@@ -94,7 +102,14 @@ export function ageGenderLine(dob: Date, gender: string) {
 }
 
 export function encounterNumber(hospitalCode: string, scheduledAt: Date, tokenNumber?: number | null) {
-  const day = scheduledAt.toISOString().slice(0, 10).replace(/-/g, "");
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLINIC_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(scheduledAt)
+    .replace(/-/g, "");
   if (tokenNumber) return `${hospitalCode}${day}${String(tokenNumber).padStart(4, "0")}`;
   return `${hospitalCode}${day}`;
 }

@@ -91,8 +91,8 @@ export function AuthShell({
           </aside>
           <div className="auth-card">{children}</div>
         </div>
-        {footer ? <div className="auth-foot">{footer}</div> : null}
       </div>
+      {footer ? <div className="auth-foot">{footer}</div> : null}
     </div>
   );
 }

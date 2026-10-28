@@ -1,4 +1,5 @@
 import type { MedicalCertificateType } from "@prisma/client";
+import { CLINIC_TIME_ZONE } from "@/lib/clinic-time";
 import { ageLabel, prettyEnum } from "@/lib/display";
 
 export const CERTIFICATE_TYPES = ["SICK_LEAVE", "FITNESS", "GENERAL"] as const;
@@ -113,7 +114,12 @@ export function fitnessPurposeLabel(fitFor?: string | null) {
 }
 
 export function formatCertDate(value: Date) {
-  return value.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return value.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: CLINIC_TIME_ZONE,
+  });
 }
 
 export function restPeriodLabel(from?: Date | null, to?: Date | null) {

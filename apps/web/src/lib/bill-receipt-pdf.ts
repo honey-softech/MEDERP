@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatClinicDateTime } from "@/lib/clinic-time";
 import { inr, prettyEnum } from "@/lib/front-desk";
 import type { ReceiptCollector } from "@/lib/billing/receipt-collector";
 
@@ -36,7 +37,7 @@ export type BillReceiptPdfInput = {
 };
 
 function when(value: Date) {
-  return value.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return formatClinicDateTime(value);
 }
 
 function imageFromDataUrl(dataUrl: string) {

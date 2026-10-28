@@ -1,3 +1,4 @@
+import { formatClinicDateTime } from "@/lib/clinic-time";
 import { doctorName, isLoginHandleDisplayName } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 import { staffIsOnApprovedLeave } from "@/lib/staff-leave";
@@ -259,7 +260,7 @@ export function reminderMessage(input: {
   when: Date;
   token?: string;
 }) {
-  const when = input.when.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  const when = formatClinicDateTime(input.when);
   const token = input.token ? ` Token ${input.token}.` : "";
   return `Hi ${input.patient}, reminder for your appointment with ${input.doctor} at ${input.hospital} on ${when}.${token}`;
 }

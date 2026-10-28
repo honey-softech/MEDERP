@@ -116,9 +116,9 @@ export function ManagedByCredit({ compact = false }: { compact?: boolean } = {})
 /** Compact credits for auth page footers (outside the card). */
 export function AuthFooterCredits() {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+    <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
       <DeveloperCredit compact />
-      <span className="hidden text-slate-300 sm:inline" aria-hidden>
+      <span className="text-slate-300" aria-hidden>
         ·
       </span>
       <ManagedByCredit compact />

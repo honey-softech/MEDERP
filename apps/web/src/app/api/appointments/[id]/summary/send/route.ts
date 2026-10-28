@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { renderTemplate } from "@/lib/messaging/templates";
+import { formatVisitSummaryWhen } from "@/lib/clinic-time";
 import { printClock } from "@/lib/print-document-pdf";
 import { toVitalsValues } from "@/lib/vitals";
 import { generalExaminationRows } from "@/lib/visit-summary";
@@ -60,10 +61,7 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: "Add a 10-digit mobile number on the patient record first." }, { status: 400 });
   }
 
-  const when = appointment.scheduledAt.toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const when = formatVisitSummaryWhen(appointment);
   const letterhead = visitLetterhead(appointment.assessment, appointment.hospital);
   const variables = {
     patient: patientName(appointment.patient),

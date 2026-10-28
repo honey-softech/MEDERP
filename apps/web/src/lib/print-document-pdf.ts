@@ -1,4 +1,5 @@
 import type PDFDocument from "pdfkit";
+import { formatClinicPrintStamp } from "@/lib/clinic-time";
 
 export const PRINT_INK = "#1a1a1a";
 export const PRINT_MUTED = "#616161";
@@ -23,15 +24,7 @@ export type PrintSignoff = {
 };
 
 export function printClock(date = new Date()) {
-  return date.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  return formatClinicPrintStamp(date);
 }
 
 export function imageFromDataUrl(dataUrl?: string | null) {

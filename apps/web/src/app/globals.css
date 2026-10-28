@@ -1159,19 +1159,35 @@ html:has(.landing) body {
 }
 
 .auth-stage.auth-signin {
+  display: flex;
   min-height: 100svh;
+  flex-direction: column;
   overflow-y: auto;
 }
 
+.auth-stage.auth-signin .auth-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: safe center;
+}
+
+.auth-signin .auth-foot {
+  margin-top: 0;
+  padding-bottom: 1.25rem;
+}
+
 .auth-bar,
-.auth-body {
+.auth-body,
+.auth-foot {
   padding-left: 1rem;
   padding-right: 1rem;
 }
 
 @media (min-width: 640px) {
   .auth-bar,
-  .auth-body {
+  .auth-body,
+  .auth-foot {
     padding-left: 2rem;
     padding-right: 2rem;
   }
@@ -1318,6 +1334,7 @@ html:has(.landing) body {
 
 .auth-foot {
   margin-top: 1.25rem;
+  padding-bottom: 0.25rem;
   text-align: center;
 }
 

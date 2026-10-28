@@ -1,4 +1,5 @@
 import type { ReminderChannel, ReminderSource } from "@prisma/client";
+import { formatReminderClock } from "@/lib/clinic-time";
 import { doctorName, patientName, tokenLabel } from "@/lib/display";
 import { reminderMessage } from "@/lib/opd/scheduling";
 import { prisma } from "@/lib/prisma";
@@ -34,14 +35,14 @@ function reminderVariables(params: {
   hospitalName: string;
   visitAt: Date;
 }) {
-  const when = params.visitAt;
+  const clock = formatReminderClock(params.visitAt, params.appointment.scheduledAt);
   return {
     patient: patientName(params.appointment.patient),
     doctor: doctorName(params.appointment.doctor),
     hospital: params.hospitalName,
-    when: when.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
-    date: when.toLocaleDateString("en-IN", { dateStyle: "medium" }),
-    time: when.toLocaleTimeString("en-IN", { timeStyle: "short" }),
+    when: clock.when,
+    date: clock.date,
+    time: clock.time || params.hospitalName,
     token: params.appointment.tokenNumber ? tokenLabel(params.appointment.tokenNumber) : "",
   };
 }

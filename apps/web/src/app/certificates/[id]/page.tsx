@@ -13,6 +13,7 @@ import {
   requireHospitalPage,
 } from "@/lib/front-desk";
 import { certificateWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
+import { printClock } from "@/lib/print-document-pdf";
 import { prisma } from "@/lib/prisma";
 import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { ageGenderLine } from "@/lib/visit-summary";
@@ -48,15 +49,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
       })
     : false;
 
-  const printedAt = new Date().toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  const printedAt = printClock();
 
   return (
     <AppShell title="Medical certificate">

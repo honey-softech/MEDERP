@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatClinicDate } from "@/lib/clinic-time";
 import { doctorName, printableDoctorLabel, prettyEnum } from "@/lib/front-desk";
 import { visitSignoffLine } from "@/lib/doctor-specialties";
 import {
@@ -65,9 +66,7 @@ export type VisitSummaryPdfInput = {
 export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise<Buffer> {
   const patientName = `${input.patient.firstName} ${input.patient.lastName}`.trim();
   const medicines = parseMedications(readableClinicalText(input.assessment.prescription));
-  const followUp = input.assessment.followUpAt
-    ? input.assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
-    : null;
+  const followUp = input.assessment.followUpAt ? formatClinicDate(input.assessment.followUpAt) : null;
   const outcome =
     input.assessment.visitOutcome === "DISCHARGE"
       ? "Discharged"

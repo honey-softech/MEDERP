@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatClinicDate } from "@/lib/clinic-time";
 import { inr } from "@/lib/display";
 import {
   PRINT_INK,
@@ -78,7 +79,7 @@ export async function buildPlatformInvoicePdf(input: PlatformInvoicePdfInput): P
       .font("Helvetica")
       .fontSize(9)
       .fillColor(PRINT_MUTED)
-      .text(input.issuedAt.toLocaleDateString("en-IN", { dateStyle: "medium" }), rightX, doc.y, {
+      .text(formatClinicDate(input.issuedAt), rightX, doc.y, {
         width: width * 0.38,
         align: "right",
       });
@@ -123,7 +124,7 @@ export async function buildPlatformInvoicePdf(input: PlatformInvoicePdfInput): P
         .font("Helvetica")
         .fontSize(9)
         .fillColor(PRINT_MUTED)
-        .text(`Paid ${input.paidAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}`, { width: colW });
+        .text(`Paid ${formatClinicDate(input.paidAt)}`, { width: colW });
     }
     if (input.periodLabel) {
       doc.font("Helvetica").fontSize(9).fillColor(PRINT_MUTED).text(`Period ${input.periodLabel}`, { width: colW });

@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatClinicDateTime } from "@/lib/clinic-time";
 import { physicianLine, tokenLabel } from "@/lib/front-desk";
 import {
   drawLetterhead,
@@ -79,7 +80,7 @@ export async function buildInvestigationListPdf(input: InvestigationListPdfInput
     doc.fillColor("#64748b").text("Doctor · ", { continued: true });
     doc.fillColor("#0f172a").text(`${doctor} · ${input.departmentName}`);
     doc.fillColor("#64748b").text("Visit · ", { continued: true });
-    const visitWhen = input.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+    const visitWhen = formatClinicDateTime(input.scheduledAt);
     doc
       .fillColor("#0f172a")
       .text(`${visitWhen}${input.tokenNumber ? ` · Token ${tokenLabel(input.tokenNumber)}` : ""}`);

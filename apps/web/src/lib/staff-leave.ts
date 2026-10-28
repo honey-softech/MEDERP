@@ -1,4 +1,5 @@
 import type { AppRole, LeaveStatus, LeaveType, UserRole } from "@prisma/client";
+import { formatClinicDate } from "@/lib/clinic-time";
 import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES } from "@/lib/auth";
 import { doctorName, humanizeLoginHandle, isLoginHandleDisplayName } from "@/lib/display";
@@ -288,7 +289,7 @@ export async function recordApprovedLeave(params: {
       userId: staff.appUserId,
       href: "/leave",
       title: "Leave recorded",
-      body: `Leave was recorded for ${leave.startAt.toLocaleDateString("en-IN")} – ${leave.endAt.toLocaleDateString("en-IN")}.`,
+      body: `Leave was recorded for ${formatClinicDate(leave.startAt)} – ${formatClinicDate(leave.endAt)}.`,
     });
   }
 
@@ -369,7 +370,7 @@ export async function reviewStaffLeave(params: {
       title: status === "APPROVED" ? "Leave approved" : "Leave rejected",
       body:
         status === "APPROVED"
-          ? `Your leave from ${leave.startAt.toLocaleDateString("en-IN")} was approved.`
+          ? `Your leave from ${formatClinicDate(leave.startAt)} was approved.`
           : `Your leave request was rejected${params.reviewNote ? `: ${params.reviewNote}` : "."}`,
     });
   }

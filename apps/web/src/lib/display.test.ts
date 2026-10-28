@@ -6,6 +6,7 @@ import {
   doctorName,
   isLoginHandleDisplayName,
   parsePatientAge,
+  personLabel,
   printableDoctorLabel,
 } from "@/lib/display";
 
@@ -66,14 +67,30 @@ describe("doctorName", () => {
         lastName: "",
         appUser: { username: "dhanushadm" },
       }),
-    ).toBe("Dr. dhanush");
+    ).toBe("Dr. Dhanush");
     expect(
       doctorName({
         firstName: null,
         lastName: null,
         appUser: { username: "priyasharmadoc" },
       }),
-    ).toBe("Dr. priyasharma");
-    expect(printableDoctorLabel("Dr. dhanushadm")).toBe("Dr. dhanush");
+    ).toBe("Dr. Priyasharma");
+    expect(printableDoctorLabel("Dr. dhanushadm")).toBe("Dr. Dhanush");
+  });
+
+  it("never shows a login handle as a person's name", () => {
+    expect(
+      personLabel({ firstName: "dhanushadm", lastName: "", username: "dhanushadm", role: "SUPER_ADMIN" }),
+    ).toBe("Dhanush");
+    expect(
+      personLabel({
+        firstName: "dhanushadm",
+        lastName: "",
+        username: "dhanushadm",
+        role: "SUPER_ADMIN",
+        staffRole: "DOCTOR",
+      }),
+    ).toBe("Dr. Dhanush");
+    expect(personLabel({ username: "dhanushadm", role: "DOCTOR" })).toBe("Dr. Dhanush");
   });
 });

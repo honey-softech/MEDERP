@@ -142,6 +142,7 @@ export function LoginForm({ isMobileApp = false }: { isMobileApp?: boolean }) {
       subtitle="Use the mobile number registered for your clinic."
       doodles
       keyboardSafe
+      showBack={!isMobileApp}
       footer={<AuthFooterCredits />}
       headerAction={
         <button

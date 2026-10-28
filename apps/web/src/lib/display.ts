@@ -1,5 +1,5 @@
 import { pad } from "@/lib/ids";
-import { stripUsernameRoleSuffix } from "@/lib/usernames";
+import { stripUsernameRoleSuffix, titleCasePersonName } from "@/lib/usernames";
 
 export function tokenLabel(n: number | null | undefined) {
   if (!n) return "—";
@@ -73,7 +73,7 @@ function lettersOnly(value: string) {
 export function humanizeLoginHandle(username: string) {
   const local = username.includes("@") ? username.split("@")[0]! : username;
   const stripped = stripUsernameRoleSuffix(local.replace(/[._]+/g, " ").trim());
-  return stripped.replace(/\s+/g, " ").trim();
+  return titleCasePersonName(stripped);
 }
 
 /** True when a stored staff label was seeded from the login handle / email local-part. */
@@ -100,8 +100,8 @@ function formatDoctorDisplayName(full: string) {
   const withoutDr = cleaned.replace(/^dr\.?\s+/i, "").trim();
   // Single-token labels often came from the login handle (e.g. dhanushadm) — strip role tags.
   const namePart = withoutDr.includes(" ")
-    ? withoutDr
-    : humanizeLoginHandle(withoutDr) || withoutDr;
+    ? titleCasePersonName(withoutDr)
+    : humanizeLoginHandle(withoutDr) || titleCasePersonName(withoutDr);
   if (!namePart) return "Dr.";
   return `Dr. ${namePart}`;
 }
@@ -145,6 +145,32 @@ export function doctorName(doctor: {
     if (humanized) return formatDoctorDisplayName(humanized);
   }
   return "Dr.";
+}
+
+/** Name shown to staff. Login handles such as dhanushadm never appear. Doctors are "Dr. Dhanush". */
+export function personLabel(person: {
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
+  role?: string | null;
+  staffRole?: string | null;
+}) {
+  const isDoctor = person.role === "DOCTOR" || person.staffRole === "DOCTOR";
+  if (isDoctor) {
+    return doctorName({
+      firstName: person.firstName,
+      lastName: person.lastName,
+      appUser: {
+        username: person.username,
+        firstName: person.firstName,
+        lastName: person.lastName,
+      },
+    });
+  }
+  const full = [person.firstName, person.lastName].filter(Boolean).join(" ").trim();
+  const username = person.username?.trim() ?? "";
+  if (full && !isLoginHandleDisplayName(full, username)) return titleCasePersonName(full);
+  return humanizeLoginHandle(full || username) || titleCasePersonName(full) || username;
 }
 
 export function physicianLine(doctor: {

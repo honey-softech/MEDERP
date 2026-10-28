@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 
 export default async function MyLeavePage() {
   const user = await requireHospitalPage();
-  if (!canApplyLeave(user.role)) redirect("/");
+  if (!canApplyLeave(user.role, user.staffProfile)) redirect("/");
 
   const leaves = await prisma.staffLeave.findMany({
     where: {

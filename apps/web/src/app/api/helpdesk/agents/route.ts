@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { personLabel } from "@/lib/display";
 import { getCurrentUser } from "@/lib/auth";
 import { canHandleHelpdesk } from "@/lib/helpdesk";
 import { prisma } from "@/lib/prisma";
@@ -40,8 +41,12 @@ export async function GET(request: Request) {
       id: agent.id,
       username: agent.username,
       role: agent.role,
-      displayName:
-        [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim() || agent.username,
+      displayName: personLabel({
+        firstName: agent.firstName,
+        lastName: agent.lastName,
+        username: agent.username,
+        role: agent.role,
+      }),
       openCount: agent._count.assignedTickets,
     })),
   });

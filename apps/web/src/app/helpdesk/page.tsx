@@ -14,6 +14,7 @@ import {
   type HelpdeskQueueView,
   viewCountWhere,
 } from "@/lib/helpdesk-queue";
+import { personLabel } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 
 type Search = { [key: string]: string | string[] | undefined };
@@ -128,7 +129,11 @@ export default async function HelpdeskPage({
   const agentOptions = agents.map((agent) => ({
     id: agent.id,
     username: agent.username,
-    displayName: [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim() || agent.username,
+    displayName: personLabel({
+      firstName: agent.firstName,
+      lastName: agent.lastName,
+      username: agent.username,
+    }),
   }));
 
   return (

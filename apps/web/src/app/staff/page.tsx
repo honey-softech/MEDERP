@@ -1,27 +1,11 @@
 import { AppShell } from "@/components/app-shell";
 import { FilterableTable } from "@/components/filterable-table";
 import { requireHospitalPage } from "@/lib/front-desk";
+import { personLabel } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 
 function prettyRole(role: string) {
   return role.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function staffDisplayName(row: {
-  role: string;
-  username: string;
-  firstName: string | null;
-  lastName: string | null;
-  staffProfile: { firstName: string; lastName: string } | null;
-}) {
-  const fromProfile = row.staffProfile
-    ? `${row.staffProfile.firstName} ${row.staffProfile.lastName}`.trim()
-    : "";
-  const fromUser = `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim();
-  const name = fromUser || fromProfile || row.username.replace(/[._]/g, " ");
-  const titled = name.replace(/\b\w/g, (letter) => letter.toUpperCase());
-  if (row.role === "DOCTOR" && !/^dr\b/i.test(titled)) return `Dr. ${titled}`;
-  return titled;
 }
 
 export default async function StaffPage() {
@@ -41,6 +25,7 @@ export default async function StaffPage() {
       employeeId: true,
       staffProfile: {
         select: {
+          role: true,
           firstName: true,
           lastName: true,
           email: true,
@@ -64,7 +49,13 @@ export default async function StaffPage() {
         searchPlaceholder="Search name, role, or department"
         rows={people.map((row) => ({
           id: row.id,
-          name: staffDisplayName(row),
+          name: personLabel({
+            firstName: row.firstName || row.staffProfile?.firstName,
+            lastName: row.lastName || row.staffProfile?.lastName,
+            username: row.username,
+            role: row.role,
+            staffRole: row.staffProfile?.role,
+          }),
           role: prettyRole(row.role),
           dept: row.staffProfile?.department?.name ?? row.staffProfile?.jobTitle ?? row.staffProfile?.designation ?? "—",
           mobile: row.mobile || row.staffProfile?.phone || "—",

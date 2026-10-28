@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, leave: result.leave });
   }
 
-  if (!canApplyLeave(scoped.user.role)) {
+  if (!canApplyLeave(scoped.user.role, scoped.user.staffProfile)) {
     return NextResponse.json({ error: "Your role cannot apply for leave." }, { status: 403 });
   }
 

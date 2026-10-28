@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { AccountPanel } from "@/components/account-panel";
 import { selfServiceBlockReason } from "@/lib/account-lifecycle";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
+import { personLabel } from "@/lib/display";
 import { cardClass } from "@/lib/ui";
 
 export default async function AccountPage() {
@@ -20,7 +21,13 @@ export default async function AccountPage() {
   }
 
   const blocked = await selfServiceBlockReason(user);
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.username;
+  const name = personLabel({
+    firstName: user.firstName,
+    lastName: user.lastName,
+    username: user.username,
+    role: user.role,
+    staffRole: user.staffProfile?.role,
+  });
   const hospitalLabel = user.hospital ? `${user.hospital.name} · ${user.hospital.code}` : null;
 
   return (

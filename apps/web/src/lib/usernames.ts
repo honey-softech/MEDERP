@@ -16,6 +16,18 @@ function letters(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** Printable name: "dhanush" → "Dhanush". */
+export function titleCasePersonName(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => {
+      const lower = part.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
 /**
  * Remove internal role tags (adm, doc, nur, …) and uniqueness digits from a login handle
  * so display names stay human — e.g. dhanushadm → dhanush, priyasharmadoc2 → priyasharma.
@@ -49,8 +61,8 @@ export function suggestedSignatureName(firstName: string, lastName: string, role
   if (!lastName.trim() && !firstName.includes(" ")) {
     full = stripUsernameRoleSuffix(firstName) || full;
   }
-  if (role === "DOCTOR") {
-    return /^dr\.?\s/i.test(full) ? full : `Dr. ${full}`;
-  }
-  return full;
+  const titled = titleCasePersonName(full.replace(/^dr\.?\s+/i, ""));
+  if (!titled) return "";
+  if (role === "DOCTOR") return `Dr. ${titled}`;
+  return titled;
 }

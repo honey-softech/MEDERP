@@ -1,7 +1,10 @@
 import type { AppRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendFcmToUser } from "@/lib/push-fcm";
 import { pushNotificationToUser } from "@/lib/realtime";
-import type { StaffNotice } from "@/lib/realtime-events";
+import { HOSPITAL_CHAT_NOTICE_TITLES, type StaffNotice } from "@/lib/realtime-events";
+
+export { HOSPITAL_CHAT_NOTICE_TITLES };
 
 function toNotice(row: {
   id: string;
@@ -73,6 +76,31 @@ export async function notifyFrontDesk(
   if (hospital?.nurseAsReceptionist) roles.push("NURSE");
   const counts = await Promise.all(roles.map((role) => notifyHospitalRole({ ...params, role })));
   return counts.reduce((sum, count) => sum + count, 0);
+}
+
+/** Phone push only. Nothing is written for the notification bell. */
+export async function pushUsers(params: {
+  userIds: string[];
+  title: string;
+  body: string;
+  href?: string | null;
+}) {
+  const userIds = [...new Set(params.userIds.filter(Boolean))];
+  if (userIds.length === 0) return 0;
+  const createdAt = new Date().toISOString();
+  await Promise.all(
+    userIds.map((userId) =>
+      sendFcmToUser(userId, {
+        id: `push-${userId}-${createdAt}`,
+        title: params.title,
+        body: params.body,
+        href: params.href ?? null,
+        isRead: true,
+        createdAt,
+      }),
+    ),
+  );
+  return userIds.length;
 }
 
 export async function notifyHospitalStaffExcept(params: {

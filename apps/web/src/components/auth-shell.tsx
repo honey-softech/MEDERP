@@ -40,6 +40,7 @@ export function AuthShell({
   keyboardSafe = false,
   kicker = "MedERP",
   backHref = "/",
+  showBack = true,
 }: {
   title: string;
   subtitle?: string;
@@ -52,15 +53,17 @@ export function AuthShell({
   kicker?: string;
   /** Used when this screen was opened directly and there is no previous page. */
   backHref?: string;
+  /** The installed app opens on sign-in, so Back has nowhere to go. The website keeps it. */
+  showBack?: boolean;
 }) {
   void _doodles;
 
   return (
     <div className={`auth-stage ${display.variable} ${body.variable}${keyboardSafe ? " auth-signin" : ""}`}>
       <header className="auth-top">
-        <div className={`mx-auto flex w-full items-center justify-between gap-3 px-5 py-3.5 sm:px-8 ${wide ? "max-w-[90rem]" : "max-w-6xl"}`}>
+        <div className={`auth-bar mx-auto flex w-full items-center justify-between gap-3 py-3.5 ${wide ? "max-w-[90rem]" : "max-w-6xl"}`}>
           <div className="flex min-w-0 items-center gap-2.5">
-            <AuthBack href={backHref} />
+            {showBack ? <AuthBack href={backHref} /> : null}
             <Link href="/" className="inline-flex min-w-0 items-center gap-2.5">
             <Image
               src="/mederp-icon.png"
@@ -77,10 +80,10 @@ export function AuthShell({
         </div>
       </header>
 
-      <div className={`mx-auto w-full px-4 pb-8 sm:px-8 ${wide ? "max-w-[90rem]" : "max-w-6xl"}`}>
+      <div className={`auth-body mx-auto w-full pb-8 ${wide ? "max-w-[90rem]" : "max-w-6xl"}`}>
         <div className={`auth-split ${wide ? "auth-split-wide" : ""}`}>
           <aside className="auth-aside">
-            <div className="min-w-0">
+            <div className="auth-aside-copy min-w-0">
               <p className="auth-kicker">{kicker}</p>
               <h1 className="auth-title">{title}</h1>
             </div>

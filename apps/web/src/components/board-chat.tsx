@@ -15,11 +15,12 @@ type ChatPost = {
     firstName: string | null;
     lastName: string | null;
     role: string;
+    staffProfile?: { role?: string | null } | null;
   };
 };
 
 function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const parts = name.replace(/^dr\.?\s+/i, "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();

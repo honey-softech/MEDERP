@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { JoinRequestActions } from "@/components/join-request-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { personLabel } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 
 export default async function HospitalJoinRequestsPage() {
@@ -12,7 +13,7 @@ export default async function HospitalJoinRequestsPage() {
     where: { hospitalId: user.hospitalId },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
-      user: { select: { username: true, mobile: true } },
+      user: { select: { username: true, firstName: true, lastName: true, role: true, mobile: true } },
     },
   });
 
@@ -33,7 +34,14 @@ export default async function HospitalJoinRequestsPage() {
           {pending.map((item) => (
             <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4">
-                <p className="font-semibold">{item.user.username}</p>
+                <p className="font-semibold">
+                  {personLabel({
+                    firstName: item.user.firstName,
+                    lastName: item.user.lastName,
+                    username: item.user.username,
+                    role: item.requestedRole,
+                  })}
+                </p>
                 <p className="text-sm text-slate-500">
                   {item.user.mobile} · requested {item.requestedRole.replace(/_/g, " ").toLowerCase()}
                 </p>
@@ -50,7 +58,13 @@ export default async function HospitalJoinRequestsPage() {
           <ul className="space-y-2 text-sm text-slate-600">
             {others.map((item) => (
               <li key={item.id} className="rounded-xl border border-slate-100 bg-white px-4 py-3">
-                {item.user.username} · {item.status.toLowerCase()} · {item.requestedRole.replace(/_/g, " ")}
+                {personLabel({
+                  firstName: item.user.firstName,
+                  lastName: item.user.lastName,
+                  username: item.user.username,
+                  role: item.requestedRole,
+                })}{" "}
+                · {item.status.toLowerCase()} · {item.requestedRole.replace(/_/g, " ")}
               </li>
             ))}
           </ul>

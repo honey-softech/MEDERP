@@ -1163,6 +1163,53 @@ html:has(.landing) body {
   overflow-y: auto;
 }
 
+.auth-bar,
+.auth-body {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .auth-bar,
+  .auth-body {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Phone sign-in: header, title, and form share one column and sit in the screen. */
+@media (max-width: 959px) {
+  .auth-stage.auth-signin {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .auth-stage.auth-signin .auth-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: safe center;
+    padding-top: 0.75rem;
+  }
+
+  .auth-signin .auth-aside,
+  .auth-signin .auth-card {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .auth-signin .auth-title {
+    font-size: 2.15rem;
+  }
+
+  .auth-signin .auth-lead {
+    max-width: none;
+    text-wrap: balance;
+  }
+}
+
 .auth-brand {
   font-family: var(--font-landing-display), Georgia, "Times New Roman", serif;
 }
@@ -1352,20 +1399,30 @@ html:has(.landing) body {
 
   .auth-split-wide .auth-aside {
     display: grid;
-    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
-    align-items: end;
-    gap: 1.25rem 2.5rem;
+    grid-template-columns: auto minmax(18rem, 1fr);
+    grid-template-areas: "copy lead";
+    align-items: center;
+    gap: 1.5rem 3rem;
     min-height: 0;
-    padding: 1.6rem 2rem 1.45rem;
+    padding: 1.6rem 2.25rem 1.5rem;
+  }
+
+  .auth-split-wide .auth-aside-copy {
+    grid-area: copy;
   }
 
   .auth-split-wide .auth-title {
+    max-width: none;
     font-size: clamp(2.4rem, 3vw, 3.35rem);
   }
 
   .auth-split-wide .auth-lead {
+    grid-area: lead;
     margin-top: 0;
-    max-width: 40rem;
+    max-width: none;
+    justify-self: stretch;
+    font-size: 1.05rem;
+    line-height: 1.55;
   }
 
   .auth-card {

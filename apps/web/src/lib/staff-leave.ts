@@ -7,8 +7,13 @@ import { stripUsernameRoleSuffix } from "@/lib/usernames";
 
 const LEAVE_TYPES: LeaveType[] = ["CASUAL", "SICK", "EARNED", "EMERGENCY", "OTHER"];
 
-export function canApplyLeave(role: AppRole) {
-  return STAFF_ROLES.includes(role);
+/** Staff apply for themselves. A hospital admin who also practices uses the same Leave page in doctor view. */
+export function canApplyLeave(
+  role: AppRole,
+  staffProfile?: { role: string; isActive: boolean } | null,
+) {
+  if (STAFF_ROLES.includes(role)) return true;
+  return role === "SUPER_ADMIN" && staffProfile?.role === "DOCTOR" && staffProfile.isActive;
 }
 
 export function canReviewLeave(role: AppRole) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { HOSPITAL_CHAT_NOTICE_TITLES } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { pushNotificationsRead } from "@/lib/realtime";
 
@@ -9,8 +10,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
 
+  await prisma.staffNotification.deleteMany({
+    where: { userId: user.id, title: { in: [...HOSPITAL_CHAT_NOTICE_TITLES] } },
+  });
+
   const notifications = await prisma.staffNotification.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, title: { notIn: [...HOSPITAL_CHAT_NOTICE_TITLES] } },
     orderBy: { createdAt: "desc" },
     take: 40,
   });

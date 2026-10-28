@@ -1,6 +1,6 @@
 import type { AppRole, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { notifyHospitalStaffExcept, notifyUser } from "@/lib/notifications";
+import { HOSPITAL_CHAT_NOTICE_TITLES, pushUsers } from "@/lib/notifications";
 
 export { boardAuthorName, prettyRole } from "@/lib/board-display";
 
@@ -17,6 +17,7 @@ const authorSelect = {
   firstName: true,
   lastName: true,
   role: true,
+  staffProfile: { select: { role: true } },
 } satisfies Prisma.AppUserSelect;
 
 export type BoardAuthor = {
@@ -25,6 +26,7 @@ export type BoardAuthor = {
   firstName: string | null;
   lastName: string | null;
   role: AppRole;
+  staffProfile: { role: string } | null;
 };
 
 export type BoardReply = {
@@ -162,10 +164,18 @@ export async function createAnnouncement(params: {
     },
   });
 
-  await notifyHospitalStaffExcept({
-    hospitalId: params.hospitalId,
-    exceptUserId: params.authorId,
-    title: "New hospital message",
+  const listeners = await prisma.appUser.findMany({
+    where: {
+      hospitalId: params.hospitalId,
+      id: { not: params.authorId },
+      isVerified: true,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  await pushUsers({
+    userIds: listeners.map((user) => user.id),
+    title: HOSPITAL_CHAT_NOTICE_TITLES[0],
     body: `${params.authorName}: ${params.title}`,
     href: "/",
   });
@@ -227,10 +237,9 @@ export async function createReply(params: {
   });
 
   if (announcement.authorId !== params.authorId) {
-    await notifyUser({
-      hospitalId: params.hospitalId,
-      userId: announcement.authorId,
-      title: "Reply on hospital chat",
+    await pushUsers({
+      userIds: [announcement.authorId],
+      title: HOSPITAL_CHAT_NOTICE_TITLES[1],
       body: `${params.authorName} replied to “${announcement.title}”.`,
       href: "/",
     });

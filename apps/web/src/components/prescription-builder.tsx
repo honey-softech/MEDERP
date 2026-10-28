@@ -40,7 +40,7 @@ const MAX_RECENT = 12;
 const rxInputClass =
   "h-8 min-w-0 rounded-lg border border-border px-2.5 text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light sm:h-9";
 const filterClass =
-  "h-7 max-w-[9.5rem] rounded-md border border-border bg-surface px-1.5 text-[11px] text-text-primary outline-none focus:border-primary";
+  "h-6 w-full min-w-0 rounded-md border border-border bg-surface px-1 py-0 text-[10px] leading-none text-text-primary outline-none focus:border-primary sm:h-7 sm:px-1.5 sm:text-[11px]";
 
 type Timing = { m: boolean; a: boolean; n: boolean };
 type ManufacturerFilter = "boost" | "preferred" | "all" | string;
@@ -185,6 +185,15 @@ export function PrescriptionBuilder({
     if (next !== value) onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync outward only when rows change
   }, [rows]);
+
+  // Repeat last Rx updates the text from outside. The list is local state, so
+  // adopt that text immediately instead of waiting for a later remount.
+  useEffect(() => {
+    if (textFromRows(rows) === value) return;
+    setRows(rowsFromText(value));
+    setEditingKey(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rows are compared against the incoming value
+  }, [value]);
 
   useEffect(() => {
     if (suppressSearchRef.current) {
@@ -494,7 +503,7 @@ export function PrescriptionBuilder({
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="grid grid-cols-3 gap-1">
           <label className="sr-only" htmlFor={`${listId}-mfr`}>
             Manufacturer filter
           </label>
@@ -504,7 +513,7 @@ export function PrescriptionBuilder({
             value={manufacturerFilter}
             onChange={(event) => setManufacturerFilter(event.target.value)}
           >
-            <option value="boost">★ Preferred first</option>
+            <option value="boost">★ Preferred</option>
             <option value="preferred">Preferred only</option>
             <option value="all">All manufacturers</option>
             {preferredManufacturers.map((name) => (
@@ -539,7 +548,7 @@ export function PrescriptionBuilder({
             className={filterClass}
             value={strengthFilter}
             onChange={(event) => setStrengthFilter(event.target.value)}
-            placeholder="Strength e.g. 500mg"
+            placeholder="Strength"
             list={`${listId}-strengths`}
           />
           <datalist id={`${listId}-strengths`}>
@@ -551,7 +560,7 @@ export function PrescriptionBuilder({
           </datalist>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-nowrap items-center gap-0.5 overflow-x-auto">
           {(
             [
               { key: "m" as const, label: "M", title: "Morning" },
@@ -565,14 +574,14 @@ export function PrescriptionBuilder({
               title={slot.title}
               aria-pressed={timing[slot.key]}
               onClick={() => toggleTiming(slot.key)}
-              className={`inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 text-[11px] font-semibold ${
+              className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-[10px] font-semibold sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-[11px] ${
                 timing[slot.key] ? "bg-primary text-white" : "border border-border bg-surface text-text-secondary"
               }`}
             >
               {slot.label}
             </button>
           ))}
-          <span className="text-[10px] tabular-nums text-text-disabled">{timingLabel(timing)}</span>
+          <span className="shrink-0 text-[10px] tabular-nums text-text-disabled">{timingLabel(timing)}</span>
           {(
             [
               { id: "sos" as const, label: "SOS", active: sos, onClick: toggleSos, title: "As needed" },
@@ -586,7 +595,7 @@ export function PrescriptionBuilder({
               title={chip.title}
               aria-pressed={chip.active}
               onClick={chip.onClick}
-              className={`h-7 rounded-md px-1.5 text-[11px] font-semibold ${
+              className={`h-6 shrink-0 rounded-md px-1 text-[10px] font-semibold sm:h-7 sm:px-1.5 sm:text-[11px] ${
                 chip.active ? "bg-primary text-white" : "border border-border bg-surface text-text-secondary"
               }`}
             >
@@ -598,7 +607,7 @@ export function PrescriptionBuilder({
               key={item.value}
               type="button"
               aria-pressed={duration === item.value}
-              className={`h-7 min-w-7 rounded-md px-1.5 text-[11px] font-medium ${
+              className={`h-6 min-w-6 shrink-0 rounded-md px-1 text-[10px] font-medium sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-[11px] ${
                 duration === item.value ? "bg-primary text-white" : "border border-border bg-surface text-text-primary"
               }`}
               onClick={() => setDuration((current) => (current === item.value ? "" : item.value))}

@@ -4,6 +4,7 @@ import { HospitalUsersPanel } from "@/components/hospital-users-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { countHospitalStaffSeats } from "@/lib/platform-billing";
 import { staffSeatLimit } from "@/lib/platform-pricing";
+import { personLabel } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 import { backfillHospitalUserIdentity } from "@/lib/employee";
 
@@ -30,6 +31,7 @@ export default async function HospitalUsersPage() {
         role: true,
         isVerified: true,
         isActive: true,
+        staffProfile: { select: { role: true } },
       },
     }),
     prisma.department.findMany({
@@ -88,7 +90,13 @@ export default async function HospitalUsersPage() {
           id: row.id,
           code: row.userCode ?? "—",
           employeeId: row.employeeId ?? "—",
-          username: row.firstName ? `${row.firstName} ${row.lastName ?? ""}`.trim() : row.username,
+          username: personLabel({
+            firstName: row.firstName,
+            lastName: row.lastName,
+            username: row.username,
+            role: row.role,
+            staffRole: row.staffProfile?.role,
+          }),
           mobile: row.mobile,
           role: row.role.replace(/_/g, " "),
           verified: row.isActive === false ? "Inactive" : row.isVerified ? "Active" : "Pending OTP",

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
-import { REALTIME_EVENTS, type StaffNotice } from "@/lib/realtime-events";
+import { isHospitalChatNotice, REALTIME_EVENTS, type StaffNotice } from "@/lib/realtime-events";
 
 type RealtimeContextValue = {
   items: StaffNotice[];
@@ -123,6 +123,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on("disconnect", () => setConnected(false));
     socket.on("connect_error", () => setConnected(false));
     socket.on(REALTIME_EVENTS.notification, (notice: StaffNotice) => {
+      if (isHospitalChatNotice(notice.title)) return;
       setItems((current) => [notice, ...current.filter((item) => item.id !== notice.id)].slice(0, 40));
       if (!notice.isRead) setUnreadCount((current) => current + 1);
       if (isMedErpMobileApp()) {

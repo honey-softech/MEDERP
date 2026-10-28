@@ -1,13 +1,19 @@
+import { personLabel } from "@/lib/display";
+
 export function boardAuthorName(author: {
   firstName?: string | null;
   lastName?: string | null;
   username: string;
   role: string;
+  staffProfile?: { role?: string | null } | null;
 }) {
-  const full = [author.firstName, author.lastName].filter(Boolean).join(" ").trim();
-  const base = full || author.username.replace(/[._]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-  if (author.role === "DOCTOR" && !/^dr\b/i.test(base)) return `Dr. ${base}`;
-  return base;
+  return personLabel({
+    firstName: author.firstName,
+    lastName: author.lastName,
+    username: author.username,
+    role: author.role,
+    staffRole: author.staffProfile?.role,
+  });
 }
 
 export function prettyRole(role: string) {

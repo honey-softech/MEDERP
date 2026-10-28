@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeProvider } from "@/components/realtime-provider";
@@ -48,141 +48,281 @@ function NavPulse() {
   return <span aria-hidden className={`nav-pulse ml-auto ${pending ? "is-pending" : ""}`} />;
 }
 
-function NavGlyph({ href }: { href: string }) {
-  const className = "h-[1.15rem] w-[1.15rem] shrink-0";
-  const stroke = { fill: "none" as const, stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+type NavIconKind =
+  | "account"
+  | "home"
+  | "plus"
+  | "settings"
+  | "team"
+  | "share"
+  | "demo"
+  | "users"
+  | "hospital"
+  | "audit"
+  | "replies"
+  | "inbox"
+  | "card"
+  | "tag"
+  | "book"
+  | "rx"
+  | "package"
+  | "chart"
+  | "wallet"
+  | "flask"
+  | "certificate"
+  | "pulse"
+  | "queue"
+  | "patients"
+  | "calendar"
+  | "badge"
+  | "bed"
+  | "pill"
+  | "receipt"
+  | "leave"
+  | "headset";
 
-  if (href === "/account") {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
+function navIconKind(href: string): NavIconKind {
+  if (href === "/account") return "account";
+  if (href === "/") return "home";
+  if (href.startsWith("/platform/hospitals/new")) return "plus";
+  if (href.startsWith("/platform/billing-settings") || href.startsWith("/hospital/settings")) return "settings";
+  if (href.startsWith("/platform/helpdesk-team")) return "team";
+  if (href.startsWith("/platform/referrals")) return "share";
+  if (href.startsWith("/platform/demos")) return "demo";
+  if (href.startsWith("/platform/users") || href.startsWith("/hospital/users")) return "users";
+  if (href.startsWith("/platform/hospitals") || href === "/join" || href.startsWith("/join")) return "hospital";
+  if (href.includes("audit-log")) return "audit";
+  if (href.startsWith("/helpdesk/canned-replies")) return "replies";
+  if (href.includes("join-requests")) return "inbox";
+  if (href.startsWith("/hospital/subscription")) return "card";
+  if (href.startsWith("/hospital/lab-prices") || href.startsWith("/drug-brands")) return "tag";
+  if (href.startsWith("/medicine-catalog")) return "book";
+  if (href.startsWith("/pharmacy/prescriptions")) return "rx";
+  if (href.startsWith("/pharmacy/stock-in")) return "package";
+  if (href.startsWith("/billing/reports")) return "chart";
+  if (href.startsWith("/billing/collections")) return "wallet";
+  if (href.startsWith("/billing/lab") || href.startsWith("/lab")) return "flask";
+  if (href.startsWith("/certificates")) return "certificate";
+  if (href.startsWith("/nurse")) return "pulse";
+  if (href.startsWith("/queue")) return "queue";
+  if (href.startsWith("/patients")) return "patients";
+  if (href.startsWith("/appointments")) return "calendar";
+  if (href.startsWith("/staff")) return "badge";
+  if (href.startsWith("/wards")) return "bed";
+  if (href.startsWith("/pharmacy")) return "pill";
+  if (href.startsWith("/billing")) return "receipt";
+  if (href.startsWith("/leave") || href.startsWith("/hospital/leaves")) return "leave";
+  return "headset";
+}
+
+function NavGlyph({ href }: { href: string }) {
+  const className = "h-[1.05rem] w-[1.05rem] shrink-0";
+  const stroke = {
+    fill: "none" as const,
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  const paths: Record<NavIconKind, ReactNode> = {
+    home: <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />,
+    account: (
+      <>
         <circle cx="12" cy="8" r="3.2" />
         <path d="M5.5 19.5c.8-3.2 3-5 6.5-5s5.7 1.8 6.5 5" />
-      </svg>
-    );
-  }
-  if (href === "/") {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/patients") || href.startsWith("/platform/users") || href.startsWith("/hospital/users")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <circle cx="9" cy="8" r="3" />
-        <path d="M4 19c.6-3 2.6-5 5-5s4.4 2 5 5" />
-        <circle cx="17" cy="9" r="2.2" />
-        <path d="M16.2 14.2c1.8.4 3.2 1.8 3.8 4.8" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/appointments")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
+      </>
+    ),
+    patients: (
+      <>
+        <circle cx="9" cy="8" r="2.6" />
+        <path d="M3.8 19c.7-2.8 2.4-4.4 5.2-4.4s4.5 1.6 5.2 4.4" />
+        <circle cx="17" cy="9" r="2" />
+        <path d="M16 14.4c1.6.4 2.8 1.6 3.4 4.1" />
+      </>
+    ),
+    users: (
+      <>
+        <circle cx="9" cy="9" r="2.4" />
+        <circle cx="16" cy="9" r="2.4" />
+        <path d="M4.5 18.5c.6-2.4 2.2-3.8 4.5-3.8s3.9 1.4 4.5 3.8" />
+        <path d="M13.5 14.8c1.5.2 2.8 1.2 3.5 3.7" />
+      </>
+    ),
+    calendar: (
+      <>
         <rect x="4" y="5" width="16" height="15" rx="2" />
-        <path d="M8 3v4M16 3v4M4 10h16" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/queue") || href.startsWith("/nurse")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M4 7h16M4 12h10M4 17h7" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/staff") || href.startsWith("/platform/helpdesk-team")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <circle cx="12" cy="8" r="3" />
-        <path d="M5 20c1-4 3.5-6 7-6s6 2 7 6" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/wards")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M4 20V8l8-4 8 4v12" />
-        <path d="M9 20v-6h6v6" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/pharmacy") || href.startsWith("/hospital/drug-brands") || href.startsWith("/drug-brands")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <rect x="7" y="3" width="10" height="18" rx="5" />
-        <path d="M12 8v8M8 12h8" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/lab") || href.startsWith("/hospital/lab-prices") || href.startsWith("/billing/lab")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M9 3h6M10 3v6L5 20h14L14 9V3" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/billing") || href.startsWith("/platform/billing-settings") || href.startsWith("/hospital/subscription")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <rect x="3" y="6" width="18" height="13" rx="2" />
-        <path d="M3 10h18M7 15h3" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/leave") || href.startsWith("/hospital/leaves")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M4 12a8 8 0 1 0 8-8" />
-        <path d="M12 8v4l3 2M4 4v6h6" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/helpdesk")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M5 11a7 7 0 1 1 14 0v4a2 2 0 0 1-2 2h-1v-6" />
-        <path d="M8 17v1a4 4 0 0 0 8 0" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/hospital/settings")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
+        <path d="M8 3.5v4M16 3.5v4M4 10h16" />
+      </>
+    ),
+    queue: (
+      <>
+        <path d="M8 6h12M8 12h12M8 18h12" />
+        <path d="M4 6h.01M4 12h.01M4 18h.01" />
+      </>
+    ),
+    pulse: <path d="M3 12h4l2.2-5 3.6 10L15 12h6" />,
+    badge: (
+      <>
+        <rect x="6" y="3" width="12" height="18" rx="2" />
+        <circle cx="12" cy="9" r="2" />
+        <path d="M9 15h6M9 18h4" />
+      </>
+    ),
+    team: (
+      <>
+        <circle cx="8" cy="9" r="2.2" />
+        <circle cx="16" cy="9" r="2.2" />
+        <path d="M4 18c.5-2.2 2-3.5 4-3.5s3.5 1.3 4 3.5M12 18c.5-2.2 2-3.5 4-3.5s3.5 1.3 4 3.5" />
+      </>
+    ),
+    bed: (
+      <>
+        <path d="M3 18V9M3 14h18v4M21 18V11" />
+        <path d="M7 14v-2.5A1.5 1.5 0 0 1 8.5 10h3A1.5 1.5 0 0 1 13 11.5V14" />
+      </>
+    ),
+    pill: (
+      <>
+        <rect x="7.5" y="3" width="9" height="18" rx="4.5" />
+        <path d="M12 8v8M8.5 12h7" />
+      </>
+    ),
+    rx: (
+      <>
+        <path d="M7 4h7.5a3.5 3.5 0 0 1 0 7H7z" />
+        <path d="M7 4v16M12.5 13.5 18 19M18 13.5 12.5 19" />
+      </>
+    ),
+    package: (
+      <>
+        <path d="M12 3 20 7.5v9L12 21 4 16.5v-9z" />
+        <path d="M12 12 20 7.5M12 12v9M12 12 4 7.5" />
+      </>
+    ),
+    flask: <path d="M9 3h6M10 3v6L5.5 20h13L14 9V3" />,
+    receipt: (
+      <>
+        <path d="M7 3h10v18l-2-1.4-2 1.4-2-1.4L9 21l-2-1.4L7 21z" />
+        <path d="M10 8h4M10 12h4" />
+      </>
+    ),
+    chart: (
+      <>
+        <path d="M4 19V10M10 19V5M16 19v-7" />
+        <path d="M3 19h18" />
+      </>
+    ),
+    wallet: (
+      <>
+        <rect x="3" y="7" width="18" height="12" rx="2" />
+        <path d="M3 11h18" />
+        <path d="M16 15h2" />
+      </>
+    ),
+    card: (
+      <>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <path d="M3 10h18" />
+      </>
+    ),
+    certificate: (
+      <>
+        <path d="M7 3h10v13H7z" />
+        <path d="M9.5 7.5h5M9.5 10.5h5" />
+        <path d="M12 16v5l2-1.2 2 1.2v-5" />
+      </>
+    ),
+    leave: (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <path d="M8 3.5v4M16 3.5v4M4 10h16" />
+        <path d="M9 15.5 11 17.5 15.5 13" />
+      </>
+    ),
+    headset: (
+      <>
+        <path d="M4 13a8 8 0 0 1 16 0" />
+        <path d="M4 13v4a2 2 0 0 0 2 2h1v-6H6a2 2 0 0 0-2 2zM20 13v4a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2z" />
+      </>
+    ),
+    settings: (
+      <>
         <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a7.7 7.7 0 0 0 .1-6l2-1.2-2-3.4-2.3.6a7.8 7.8 0 0 0-5.2-2L11 1H9l-.9 2.1a7.8 7.8 0 0 0-5.3 2L1.5 4.4l-2 3.5 2 1.1a7.7 7.7 0 0 0 0 6l-2 1.2 2 3.4 2.3-.6a7.8 7.8 0 0 0 5.2 2L9 23h2l.9-2.1a7.8 7.8 0 0 0 5.3-2l2.3.6 2-3.4z" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/platform/hospitals/new")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-    );
-  }
-  if (href.startsWith("/platform/hospitals") || href.startsWith("/join") || href.includes("join-requests")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M3 21V8l9-5 9 5v13" />
-        <path d="M9 21v-8h6v8" />
-      </svg>
-    );
-  }
-  if (href.includes("audit-log")) {
-    return (
-      <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-        <path d="M7 4h10v16H7z" />
-        <path d="M10 8h4M10 12h4M10 16h2" />
-      </svg>
-    );
-  }
+        <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18" />
+      </>
+    ),
+    plus: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v8M8 12h8" />
+      </>
+    ),
+    hospital: (
+      <>
+        <path d="M4 20V9l8-5 8 5v11" />
+        <path d="M9 20v-6h6v6M12 9v4M10 11h4" />
+      </>
+    ),
+    audit: (
+      <>
+        <path d="M8 4h8l3 3v13H8z" />
+        <path d="M16 4v3h3M11 11h5M11 15h5" />
+      </>
+    ),
+    replies: <path d="M5 6h14v9H8l-3 3z" />,
+    inbox: (
+      <>
+        <path d="M3 13h5l2 3h4l2-3h5" />
+        <path d="M5 6h14l2 7v7H3v-7z" />
+      </>
+    ),
+    tag: (
+      <>
+        <path d="M4 12V5h7l9 9-7 7z" />
+        <circle cx="8.5" cy="8.5" r="1" />
+      </>
+    ),
+    book: (
+      <>
+        <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z" />
+        <path d="M5 4v16" />
+      </>
+    ),
+    share: (
+      <>
+        <circle cx="6.5" cy="12" r="2.2" />
+        <circle cx="17" cy="7" r="2.2" />
+        <circle cx="17" cy="17" r="2.2" />
+        <path d="M8.5 11.2 14.8 8.2M8.5 12.8l6.3 3" />
+      </>
+    ),
+    demo: (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <path d="M8 3.5v4M16 3.5v4M12 12v3l2 1" />
+      </>
+    ),
+  };
+
   return (
     <svg viewBox="0 0 24 24" className={className} {...stroke} aria-hidden>
-      <circle cx="12" cy="12" r="8" />
+      {paths[navIconKind(href)]}
     </svg>
   );
+}
+
+function navItemClass(active: boolean, collapsed: boolean) {
+  return `group relative flex h-11 items-center rounded-xl text-sm font-medium transition-colors ${
+    collapsed ? "gap-2.5 px-2 md:justify-center md:px-0" : "gap-2.5 px-2"
+  } ${active ? "bg-primary-light text-primary-dark" : "text-text-secondary hover:bg-app-bg hover:text-text-primary"}`;
+}
+
+function iconWellClass(active: boolean) {
+  return `flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+    active
+      ? "bg-primary text-white"
+      : "bg-app-bg text-text-secondary group-hover:bg-primary-light group-hover:text-primary"
+  }`;
 }
 
 export function AppShellFrame({
@@ -281,14 +421,19 @@ export function AppShellFrame({
             collapsed ? "md:w-[4.25rem]" : "md:w-[16.5rem]"
           } w-[min(16.5rem,85vw)] ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         >
-          <div className={`shrink-0 border-b border-border ${collapsed ? "px-2 py-3" : "px-4 py-4"}`}>
-            <div className={`flex items-start gap-2 ${collapsed ? "md:justify-center" : "justify-between"}`}>
-              <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">{brand}</p>
-                <h1 className="mt-1 text-lg font-semibold text-text-primary">MedERP</h1>
-                {hospitalLabel ? (
-                  <p className="mt-1 truncate text-xs text-text-secondary">{hospitalLabel}</p>
-                ) : null}
+          <div className={`shrink-0 border-b border-border ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
+            <div className={`flex items-center gap-2 ${collapsed ? "md:flex-col md:justify-center" : "justify-between"}`}>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{brand}</p>
+                  <h1 className="truncate text-base font-semibold leading-tight text-text-primary">MedERP</h1>
+                  {hospitalLabel ? <p className="truncate text-xs text-text-secondary">{hospitalLabel}</p> : null}
+                </div>
               </div>
               <button
                 type="button"
@@ -336,19 +481,18 @@ export function AppShellFrame({
                             persistNavScroll();
                             setMobileOpen(false);
                           }}
-                          className={`flex h-10 items-center rounded-lg text-sm font-medium transition-colors ${
-                            collapsed ? "justify-center px-0 md:px-0" : "gap-2.5 px-3"
-                          } ${
-                            active
-                              ? "bg-primary-light text-primary-dark"
-                              : "text-text-secondary hover:bg-app-bg hover:text-text-primary"
-                          }`}
+                          className={navItemClass(active, collapsed)}
                         >
-                          <span className="hidden md:inline-flex">
+                          {active ? (
+                            <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
+                          ) : null}
+                          <span className={iconWellClass(active)}>
                             <NavGlyph href={item.href} />
                           </span>
-                          <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
-                          <NavPulse />
+                          <span className={`min-w-0 truncate ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
+                          <span className={collapsed ? "md:hidden" : ""}>
+                            <NavPulse />
+                          </span>
                         </Link>
                       </li>
                     );
@@ -363,19 +507,18 @@ export function AppShellFrame({
               href="/account"
               title="Account"
               onClick={() => setMobileOpen(false)}
-              className={`flex h-10 items-center rounded-lg text-sm font-medium transition-colors ${
-                collapsed ? "justify-center px-0" : "gap-2.5 px-3"
-              } ${
-                pathname === "/account" || pathname.startsWith("/account/")
-                  ? "bg-primary-light text-primary-dark"
-                  : "text-text-secondary hover:bg-app-bg hover:text-text-primary"
-              }`}
+              className={navItemClass(pathname === "/account" || pathname.startsWith("/account/"), collapsed)}
             >
-              <span className="hidden md:inline-flex">
+              {pathname === "/account" || pathname.startsWith("/account/") ? (
+                <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
+              ) : null}
+              <span className={iconWellClass(pathname === "/account" || pathname.startsWith("/account/"))}>
                 <NavGlyph href="/account" />
               </span>
-              <span className={collapsed ? "md:hidden" : ""}>Account</span>
-              <NavPulse />
+              <span className={`min-w-0 truncate ${collapsed ? "md:hidden" : ""}`}>Account</span>
+              <span className={collapsed ? "md:hidden" : ""}>
+                <NavPulse />
+              </span>
             </Link>
           </div>
         </aside>

@@ -3,7 +3,6 @@ import { AppointmentForm } from "@/components/appointment-form";
 import {
   doctorName,
   ensureDoctorStaff,
-  hasFrontDeskAccess,
   listBookableDoctors,
   requireHospitalPage,
   staffIdForAppUser,
@@ -20,7 +19,6 @@ export default async function NewAppointmentPage({
 }) {
   const user = await requireHospitalPage();
   const view = await resolveViewContext(user);
-  const canFrontDesk = hasFrontDeskAccess(user) && view.mode !== "doctor";
   const canWalkIn = canAddWalkIn(user);
   if (!canWalkIn) redirect("/appointments");
 
@@ -75,10 +73,10 @@ export default async function NewAppointmentPage({
     <AppShell title={walkin || staffWalkIn ? "Walk-in registration" : "Book appointment"}>
       <p className="mb-4 text-sm text-slate-500">
         {doctorWalkIn
-          ? "Add a walk-in to your OPD queue for today. If you have more than one session, choose the time. Register a new patient first if they are not already in the hospital."
+          ? "Add a walk-in for today, record the consultation fee, then vitals and the consult. If you have more than one session, choose the time."
           : nurseWalkIn
-            ? "Add a walk-in for today and assign them to a doctor. If the doctor has more than one session, choose the time."
-            : "Search an existing patient to book. For a new patient, register them first, then schedule. Walk-ins are today only and join the doctor's available hours."}
+            ? "Add a walk-in for today, record the consultation fee, then record vitals. If the doctor has more than one session, choose the time."
+            : "Search an existing patient to book. For a new patient, register them first. A walk-in continues to record payment."}
       </p>
       {doctorWalkIn && !myStaffId ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -93,7 +91,6 @@ export default async function NewAppointmentPage({
           defaultDoctorId={myStaff?.id}
           lockDoctor={Boolean(doctorWalkIn && myStaff?.id)}
           defaultDepartmentId={myStaff?.departmentId ?? undefined}
-          redirectToVisit={doctorWalkIn || !canFrontDesk}
         />
       )}
     </AppShell>

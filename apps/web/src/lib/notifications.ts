@@ -159,6 +159,7 @@ export async function notifyUser(params: {
     },
   });
   pushNotificationToUser(row.userId, toNotice(row));
+  return row;
 }
 
 export async function notifyWardStaffOfAdmission(params: {

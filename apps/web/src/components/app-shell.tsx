@@ -36,6 +36,7 @@ const staffNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -63,6 +64,7 @@ const doctorNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -93,6 +95,7 @@ const nurseNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -125,6 +128,7 @@ const nurseReceptionistNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -155,6 +159,7 @@ const receptionistNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -182,6 +187,7 @@ const accountantNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -248,6 +254,7 @@ const superAdminNav: NavSection[] = [
       { href: "/hospital/join-requests", label: "Join requests" },
       { href: "/hospital/settings", label: "Hospital settings" },
       { href: "/hospital/leaves", label: "Staff leave" },
+      { href: "/hospital/timesheets", label: "Timesheets" },
       { href: "/hospital/subscription", label: "Subscription" },
       { href: "/drug-brands", label: "Medicine brands" },
       { href: "/hospital/audit-log", label: "Audit log" },
@@ -308,6 +315,7 @@ const pharmacistNav: NavSection[] = [
     title: "Support",
     items: [
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -320,6 +328,7 @@ const labTechNav: NavSection[] = [
       { href: "/staff", label: "Staff" },
       { href: "/lab", label: "Laboratory" },
       { href: "/leave", label: "Leave" },
+      { href: "/timesheet", label: "Timesheet" },
       { href: "/helpdesk", label: "Helpdesk" },
     ],
   },
@@ -437,6 +446,14 @@ export async function AppShell({
 
   if (user?.hospitalId && !isPlatformRole(user.role)) {
     nav = filterNavByModules(nav, modules);
+  }
+  if (user?.role === "SUPER_ADMIN") {
+    nav = nav
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.href !== "/timesheet"),
+      }))
+      .filter((section) => section.items.length > 0);
   }
 
   const accountName = user

@@ -79,6 +79,7 @@ type NavIconKind =
   | "pill"
   | "receipt"
   | "leave"
+  | "clock"
   | "headset";
 
 function navIconKind(href: string): NavIconKind {
@@ -111,6 +112,7 @@ function navIconKind(href: string): NavIconKind {
   if (href.startsWith("/wards")) return "bed";
   if (href.startsWith("/pharmacy")) return "pill";
   if (href.startsWith("/billing")) return "receipt";
+  if (href.startsWith("/timesheet") || href.startsWith("/hospital/timesheets")) return "clock";
   if (href.startsWith("/leave") || href.startsWith("/hospital/leaves")) return "leave";
   return "headset";
 }
@@ -230,6 +232,12 @@ function NavGlyph({ href }: { href: string }) {
         <path d="M7 3h10v13H7z" />
         <path d="M9.5 7.5h5M9.5 10.5h5" />
         <path d="M12 16v5l2-1.2 2 1.2v-5" />
+      </>
+    ),
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v4.5l3 2" />
       </>
     ),
     leave: (

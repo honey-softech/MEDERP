@@ -11,11 +11,14 @@ export function VisitPaymentForm({
   due,
   doctorLabel,
   amountLocked = false,
+  afterPayHref,
 }: {
   appointmentId: string;
   due: number;
   doctorLabel: string;
   amountLocked?: boolean;
+  /** Nurse and doctor continue to the visit for vitals (and consult). */
+  afterPayHref?: string;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<"CASH" | "CARD" | "UPI">("CASH");
@@ -45,7 +48,7 @@ export function VisitPaymentForm({
       setError(data.error ?? "Could not record payment.");
       return;
     }
-    router.push(data.invoice?.id ? `/billing/${data.invoice.id}` : "/billing/collections");
+    router.push(afterPayHref || (data.invoice?.id ? `/billing/${data.invoice.id}` : "/billing/collections"));
     router.refresh();
   }
 
@@ -55,6 +58,7 @@ export function VisitPaymentForm({
         <h3 className="font-semibold">Record payment</h3>
         <p className="mt-1 text-sm text-slate-500">
           Consultation is credited to {doctorLabel}. Collect the full OPD amount — partial payment is not allowed.
+        {afterPayHref ? " After payment, record vitals on the visit." : ""}
         </p>
       </div>
 
@@ -148,7 +152,11 @@ export function VisitPaymentForm({
         <button className={buttonClass} type="submit" disabled={pending}>
           {pending ? "Saving…" : method === "CASH" ? "Record cash payment" : method === "CARD" ? "Record card payment" : "Record UPI payment"}
         </button>
-        <button className={secondaryButtonClass} type="button" onClick={() => router.push("/queue")}>
+        <button
+          className={secondaryButtonClass}
+          type="button"
+          onClick={() => router.push(afterPayHref || "/queue")}
+        >
           Skip for now
         </button>
       </div>

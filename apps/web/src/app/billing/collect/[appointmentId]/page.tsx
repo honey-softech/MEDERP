@@ -21,6 +21,7 @@ import {
 } from "@/lib/front-desk";
 import { invoiceWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
 import { prisma } from "@/lib/prisma";
+import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
 
 export default async function CollectVisitPaymentPage({
   params,
@@ -29,6 +30,8 @@ export default async function CollectVisitPaymentPage({
 }) {
   const user = await requireHospitalPage();
   if (!hasBillingAccess(user)) redirect("/");
+  const view = await resolveViewContext(user);
+  const continueToVisit = user.role === "NURSE" || user.role === "DOCTOR" || isActingAsDoctor(user, view.mode);
   const appointmentId = await routeParam(params, "appointmentId");
 
   const appointment = await prisma.appointment.findFirst({
@@ -67,8 +70,9 @@ export default async function CollectVisitPaymentPage({
         })
       : false;
 
+  const visitHref = `/appointments/${appointment.id}`;
   if (due <= 0) {
-    redirect(invoice ? `/billing/${invoice.id}` : `/appointments/${appointment.id}`);
+    redirect(continueToVisit ? visitHref : invoice ? `/billing/${invoice.id}` : visitHref);
   }
 
   return (
@@ -148,6 +152,7 @@ export default async function CollectVisitPaymentPage({
         due={due}
         doctorLabel={doctorLabel}
         amountLocked={amountLocked}
+        afterPayHref={continueToVisit ? visitHref : undefined}
       />
     </AppShell>
   );

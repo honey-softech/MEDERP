@@ -225,6 +225,31 @@ enum EmploymentStatus {
   ON_LEAVE
 }
 
+enum PayBasis {
+  MONTHLY
+  DAILY
+}
+
+enum MonthDivisor {
+  FIXED_30
+  CALENDAR_DAYS
+}
+
+enum TimesheetDayKind {
+  WORKED
+  HALF_DAY
+  CASUAL_LEAVE
+  SICK_LEAVE
+  ABSENT
+}
+
+enum TimesheetWeekStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+}
+
 enum WardType {
   GENERAL
   PRIVATE
@@ -439,6 +464,12 @@ model Hospital {
   medicalCertificates MedicalCertificate[]
   referralsMade     HospitalReferral[] @relation("ReferralsMade")
   referralReceived  HospitalReferral?  @relation("ReferralReceived")
+  payrollSettings   HospitalPayrollSettings?
+  holidays          HospitalHoliday[]
+  payProfiles       StaffPayProfile[]
+  timesheetDays     TimesheetDay[]
+  timesheetWeeks    TimesheetWeek[]
+  payrollSundayNotices PayrollSundayNotice[]
 }
 
 model HospitalSubscription {
@@ -737,6 +768,9 @@ model Staff {
   admittingAdmissions    Admission[]        @relation("AdmittingDoctor")
   attendingAdmissions    Admission[]        @relation("AttendingDoctor")
   medicalCertificates    MedicalCertificate[]
+  payProfile             StaffPayProfile?
+  timesheetDays          TimesheetDay[]
+  timesheetWeeks         TimesheetWeek[]
 
   @@unique([hospitalId, email])
 }
@@ -1130,6 +1164,93 @@ model StaffLeave {
 
   @@index([hospitalId, status, startAt])
   @@index([staffId, startAt])
+}
+
+/// Per-person pay. Casual and sick allowances default to zero — the clinic does not require them.
+model StaffPayProfile {
+  id              String       @id @default(cuid())
+  hospitalId      String
+  hospital        Hospital     @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  staffId         String       @unique
+  staff           Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  payBasis        PayBasis     @default(MONTHLY)
+  monthlyAmount   Decimal?     @db.Decimal(12, 2)
+  dailyRate       Decimal?     @db.Decimal(12, 2)
+  monthDivisor    MonthDivisor @default(FIXED_30)
+  casualLeaveDays Int          @default(0)
+  sickLeaveDays   Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([hospitalId])
+}
+
+model HospitalPayrollSettings {
+  hospitalId    String   @id
+  hospital      Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  /// Comma-separated weekday numbers, 0 = Sunday. Default is Sunday off.
+  weeklyOffDays String   @default("0")
+  updatedAt     DateTime @updatedAt
+}
+
+model HospitalHoliday {
+  id         String   @id @default(cuid())
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  /// Clinic calendar date stored at UTC midnight.
+  date       DateTime
+  name       String
+  createdAt  DateTime @default(now())
+
+  @@unique([hospitalId, date])
+  @@index([hospitalId, date])
+}
+
+model TimesheetDay {
+  id         String           @id @default(cuid())
+  hospitalId String
+  hospital   Hospital         @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  staffId    String
+  staff      Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date       DateTime
+  kind       TimesheetDayKind @default(WORKED)
+  clockIn    String?
+  clockOut   String?
+  note       String?
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([staffId, date])
+  @@index([hospitalId, date])
+}
+
+model TimesheetWeek {
+  id               String              @id @default(cuid())
+  hospitalId       String
+  hospital         Hospital            @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  staffId          String
+  staff            Staff               @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  weekStart        DateTime
+  status           TimesheetWeekStatus @default(DRAFT)
+  reviewNote       String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([staffId, weekStart])
+  @@index([hospitalId, status, weekStart])
+}
+
+model PayrollSundayNotice {
+  id         String   @id @default(cuid())
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  /// Monday that starts the week being approved.
+  weekStart  DateTime
+  sentAt     DateTime @default(now())
+
+  @@unique([hospitalId, weekStart])
 }
 
 model AppointmentReminder {

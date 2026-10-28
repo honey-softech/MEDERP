@@ -22,7 +22,6 @@ export function AppointmentForm({
   defaultDoctorId,
   lockDoctor = false,
   defaultDepartmentId,
-  redirectToVisit = false,
 }: {
   doctors: DoctorOption[];
   departments: Option[];
@@ -31,7 +30,6 @@ export function AppointmentForm({
   defaultDoctorId?: string;
   lockDoctor?: boolean;
   defaultDepartmentId?: string;
-  redirectToVisit?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -242,7 +240,7 @@ export function AppointmentForm({
       return;
     }
     const appointmentId = data.appointment?.id as string | undefined;
-    if (queueType === "WALK_IN" && appointmentId && !redirectToVisit) {
+    if (queueType === "WALK_IN" && appointmentId) {
       router.push(`/billing/collect/${appointmentId}`);
     } else {
       router.push(appointmentId ? `/appointments/${appointmentId}` : "/appointments");

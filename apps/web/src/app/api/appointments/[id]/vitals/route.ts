@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
-import { NURSE_VITALS_ROLES, canNurseRecordVitals, forbidUnless, patientName, requireHospitalActor, tokenLabel } from "@/lib/front-desk";
+import { NURSE_VITALS_ROLES, canNurseRecordVitals, patientName, requireHospitalActor, tokenLabel } from "@/lib/front-desk";
 import { notifyDoctorVitalsReady } from "@/lib/notifications";
 import { bmiLabel, calculateBmi, parseOptionalNumber, parseRequiredNumber } from "@/lib/vitals";
 
@@ -10,9 +10,6 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, context: Ctx) {
   const scoped = await requireHospitalActor();
   if (scoped.error) return scoped.error;
-  const denied = forbidUnless(scoped.user.role, NURSE_VITALS_ROLES);
-  if (denied) return denied;
-
   try {
     const { id } = await context.params;
     const appointment = await prisma.appointment.findFirst({
@@ -25,6 +22,13 @@ export async function POST(request: Request, context: Ctx) {
     });
     if (!appointment) {
       return NextResponse.json({ error: "Appointment not found." }, { status: 404 });
+    }
+    const isNurse = NURSE_VITALS_ROLES.includes(scoped.user.role);
+    const isConsultingDoctor =
+      scoped.user.role === "DOCTOR" ||
+      (scoped.user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === scoped.user.id);
+    if (!isNurse && !isConsultingDoctor) {
+      return NextResponse.json({ error: "You cannot record vitals for this visit." }, { status: 403 });
     }
     if (["CANCELLED", "NO_SHOW"].includes(appointment.status)) {
       return NextResponse.json({ error: "Vitals cannot be recorded for this visit." }, { status: 409 });
@@ -125,7 +129,7 @@ export async function POST(request: Request, context: Ctx) {
       },
     });
 
-    if (!appointment.vitals) {
+    if (!appointment.vitals && appointment.doctor.appUserId !== scoped.user.id) {
       await notifyDoctorVitalsReady({
         hospitalId: scoped.user.hospitalId,
         doctorAppUserId: appointment.doctor.appUserId,

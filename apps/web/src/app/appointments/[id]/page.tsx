@@ -238,6 +238,7 @@ export default async function AppointmentDetailPage({
   const assessment = appointment.assessment;
   const summaryApproved = assessment?.status === "APPROVED";
   const visitPaid = isConsultationPaid(appointment.invoices[0]);
+  const walkInNeedsPayment = appointment.queueType === "WALK_IN" && !visitPaid;
   const visitClosed =
     appointment.status === "COMPLETED" || appointment.status === "NO_SHOW" || summaryApproved;
   const showEditableAssessment =
@@ -615,6 +616,26 @@ export default async function AppointmentDetailPage({
 
         {showEditableAssessment ? (
           <div className={`min-w-0 space-y-3 ${pinTopNotice ? "lg:col-start-2 lg:row-start-2" : "lg:col-start-2"}`}>
+          {walkInNeedsPayment ? (
+            <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
+              <p className="mb-3 text-sm text-text-secondary">Record the consultation fee before vitals and the consult.</p>
+              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
+                Record payment
+              </Link>
+            </div>
+          ) : null}
+          {!walkInNeedsPayment && canNurseRecordVitals(appointment) ? (
+            <div className="rounded-xl border border-border bg-surface p-3 shadow-card print:hidden">
+              <h3 className="mb-2 text-sm font-semibold">Record vitals</h3>
+              <VitalsForm
+                appointmentId={appointment.id}
+                initial={vitals}
+                returnTo={`/appointments/${appointment.id}`}
+                heading="Vitals"
+              />
+            </div>
+          ) : null}
+          {!walkInNeedsPayment ? (
           <ConsultAssessmentForm
             appointmentId={appointment.id}
             canPreview={Boolean(assessment)}
@@ -686,6 +707,7 @@ export default async function AppointmentDetailPage({
               </div>
             ) : null}
           </ConsultAssessmentForm>
+          ) : null}
           </div>
         ) : canAssess && visitClosed ? (
           <div className="min-w-0 space-y-3 lg:col-start-2 lg:row-start-2">
@@ -735,7 +757,15 @@ export default async function AppointmentDetailPage({
           </div>
         ) : (
         <div className="min-w-0 space-y-4">
-          {vitalsEditable ? (
+          {walkInNeedsPayment ? (
+            <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
+              <p className="mb-3 text-sm text-text-secondary">Record the consultation fee, then record vitals.</p>
+              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
+                Record payment
+              </Link>
+            </div>
+          ) : null}
+          {!walkInNeedsPayment && vitalsEditable ? (
             <div className="rounded-xl border border-border bg-surface p-3 shadow-card print:hidden">
               <h3 className="mb-2 text-sm font-semibold">Record vitals</h3>
               <VitalsForm appointmentId={appointment.id} initial={vitals} />
@@ -770,13 +800,6 @@ export default async function AppointmentDetailPage({
             />
           ) : null}
 
-          {canCollectFee && !visitPaid ? (
-            <div className="print:hidden">
-              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
-                Record payment
-              </Link>
-            </div>
-          ) : null}
           {canManage ? (
             <div className="print:hidden">
               <AppointmentActions

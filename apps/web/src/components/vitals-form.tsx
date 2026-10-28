@@ -19,11 +19,13 @@ export function VitalsForm({
   appointmentId,
   initial,
   returnTo = "/nurse",
+  heading = "Nurse vitals",
 }: {
   appointmentId: string;
   initial?: VitalsValues | null;
   /** After save, return to nurse station (or another list). */
   returnTo?: string;
+  heading?: string;
 }) {
   const router = useRouter();
   const [heightCm, setHeightCm] = useState(initial ? String(initial.heightCm) : "");
@@ -97,7 +99,7 @@ export function VitalsForm({
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
-      <h3 className="md:col-span-2 font-semibold">Nurse vitals</h3>
+      <h3 className="md:col-span-2 font-semibold">{heading}</h3>
       <p className="md:col-span-2 text-sm text-slate-500">
         Height, weight, and temperature are mandatory. Other vitals are optional. Ideal adult ranges are shown on each field; abnormal values are flagged for the doctor.
       </p>

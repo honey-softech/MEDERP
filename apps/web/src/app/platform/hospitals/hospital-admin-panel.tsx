@@ -62,6 +62,7 @@ export function HospitalAdminPanel({
   const [extraStaffSlots, setExtraStaffSlots] = useState(String(initial.extraStaffSlots));
   const [trialEndsAt, setTrialEndsAt] = useState(toDateInput(initial.trialEndsAt));
   const [isActive, setIsActive] = useState(initial.isActive);
+  const [blockPassword, setBlockPassword] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -71,6 +72,7 @@ export function HospitalAdminPanel({
     setError("");
     setMessage("");
     setPending(true);
+    const blocking = initial.isActive && !isActive;
     const response = await fetch(`/api/platform/hospitals/${hospitalId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -83,6 +85,7 @@ export function HospitalAdminPanel({
         extraStaffSlots: Number(extraStaffSlots),
         trialEndsAt: trialEndsAt ? new Date(`${trialEndsAt}T23:59:59.000Z`).toISOString() : null,
         isActive,
+        ...(blocking ? { password: blockPassword } : {}),
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -92,6 +95,7 @@ export function HospitalAdminPanel({
       return;
     }
     if (data.hospital?.code) setCode(data.hospital.code);
+    setBlockPassword("");
     setMessage(isActive ? "Hospital details saved. Access is enabled." : "Hospital details saved. Access is disabled.");
     router.refresh();
   }
@@ -127,14 +131,35 @@ export function HospitalAdminPanel({
             remove the hospital.
           </p>
         </div>
-        <button
-          type="button"
-          className={isActive ? secondaryButtonClass : buttonClass}
-          disabled={pending}
-          onClick={() => void toggleAccess()}
-        >
-          {isActive ? "Stop hospital access" : "Enable hospital access"}
-        </button>
+        {isActive ? (
+          <SoftwareAdminPasswordConfirm
+            openLabel="Stop hospital access"
+            confirmLabel="Stop access"
+            pendingLabel="Stopping…"
+            description="Users at this hospital will not be able to sign in. Enter your software admin password to block it."
+            onConfirm={async (password) => {
+              const response = await fetch(`/api/platform/hospitals/${hospitalId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isActive: false, password }),
+              });
+              const data = (await response.json().catch(() => ({}))) as { error?: string };
+              if (!response.ok) return { ok: false, error: data.error ?? "Could not update hospital access." };
+              setIsActive(false);
+              setMessage("Hospital access stopped. Users cannot sign in.");
+              return { ok: true };
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={pending}
+            onClick={() => void toggleAccess()}
+          >
+            Enable hospital access
+          </button>
+        )}
       </div>
 
       <form onSubmit={save} className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -220,6 +245,22 @@ export function HospitalAdminPanel({
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           Hospital is active (users can sign in)
         </label>
+        {initial.isActive && !isActive ? (
+          <label className="text-sm font-medium text-slate-700">
+            Your software admin password
+            <input
+              className={fieldClass}
+              type="password"
+              autoComplete="current-password"
+              value={blockPassword}
+              onChange={(event) => setBlockPassword(event.target.value)}
+              required
+            />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              Required to block this hospital.
+            </span>
+          </label>
+        ) : null}
         {error ? <p className="sm:col-span-2 text-sm text-red-600">{error}</p> : null}
         {message ? <p className="sm:col-span-2 text-sm text-teal-700">{message}</p> : null}
         <button className={`${buttonClass} sm:col-span-2`} type="submit" disabled={pending}>

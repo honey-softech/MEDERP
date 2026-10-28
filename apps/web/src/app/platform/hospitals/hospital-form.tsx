@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
 import { PasswordStrength } from "@/components/password-strength";
+import { AdminWhatsappOtp } from "@/components/admin-whatsapp-otp";
 import { mobileValidationError } from "@/lib/phone";
 import { passwordValidationError, stripSuperAdminName, superAdminNameError } from "@/lib/password-policy";
 import {
@@ -34,6 +35,7 @@ export function AddHospitalForm() {
   const [phone, setPhone] = useState("");
   const [adminUsername, setAdminUsername] = useState("");
   const [adminMobile, setAdminMobile] = useState("");
+  const [mobileProof, setMobileProof] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -100,6 +102,10 @@ export function AddHospitalForm() {
       setError(adminMobileError);
       return;
     }
+    if (!mobileProof) {
+      setError("Verify the super admin WhatsApp number before registering the hospital.");
+      return;
+    }
     const adminNameError = superAdminNameError(adminUsername);
     if (adminNameError) {
       setError(adminNameError);
@@ -126,6 +132,7 @@ export function AddHospitalForm() {
         phone,
         adminUsername,
         adminMobile,
+        mobileProof,
         adminEmail: adminEmail.trim() || undefined,
         adminPassword,
         tierId,
@@ -191,18 +198,24 @@ export function AddHospitalForm() {
         />
         <span className="mt-1 block text-xs font-normal text-slate-500">Do not use . ! or ,</span>
       </label>
-      <label className="text-sm font-medium text-slate-700">
-        Super admin mobile
-        <input
-          className={fieldClass}
-          inputMode="numeric"
-          maxLength={13}
-          value={adminMobile}
-          onChange={(event) => setAdminMobile(event.target.value.replace(/[^\d+]/g, ""))}
-          placeholder="10-digit mobile — used to sign in"
-          required
-        />
-      </label>
+      <div className="md:col-span-2">
+        <label className="text-sm font-medium text-slate-700">
+          Super admin WhatsApp number
+          <input
+            className={fieldClass}
+            inputMode="numeric"
+            maxLength={13}
+            value={adminMobile}
+            onChange={(event) => {
+              setAdminMobile(event.target.value.replace(/[^\d+]/g, ""));
+              setMobileProof("");
+            }}
+            placeholder="10-digit WhatsApp number — used to sign in"
+            required
+          />
+        </label>
+        <AdminWhatsappOtp mobile={adminMobile} adminIsDoctor={null} proof={mobileProof} onProof={setMobileProof} />
+      </div>
       <label className="text-sm font-medium text-slate-700">
         Super admin email
         <input
@@ -288,7 +301,7 @@ export function AddHospitalForm() {
       {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
       {message ? <p className="md:col-span-2 text-sm text-teal-700">{message}</p> : null}
       <div className="md:col-span-2">
-        <button className={buttonClass} type="submit" disabled={pending}>
+        <button className={buttonClass} type="submit" disabled={pending || !mobileProof}>
           {pending ? "Creating…" : quote ? `Create hospital · ${inr(quote.total)}` : "Create hospital"}
         </button>
       </div>

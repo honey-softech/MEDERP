@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fieldClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
+import { PulseBlock } from "@/components/pulse-loader";
 import { SignatureCapture } from "@/components/signature-capture";
 import { statusBadge, statusBadgeBase } from "@/lib/ui";
 import { suggestedSignatureName } from "@/lib/usernames";
@@ -192,7 +193,7 @@ export function UserSignatureManager({
           </p>
 
           {loading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
+            <PulseBlock />
           ) : (
             <>
               <div className="flex flex-wrap items-start gap-4">

@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 
 /** Purposes whose stored hash includes the action, so one WhatsApp code cannot confirm another. */
-export const BOUND_OTP_PURPOSES = ["close-hospital", "leave-hospital", "delete-account"] as const;
+export const BOUND_OTP_PURPOSES = ["close-hospital", "leave-hospital", "delete-account", "hospital-register"] as const;
 
 export type BoundOtpPurpose = (typeof BOUND_OTP_PURPOSES)[number];
 

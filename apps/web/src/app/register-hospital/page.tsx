@@ -16,6 +16,7 @@ import { ExtraUsersField } from "@/components/extra-users-field";
 import { DoctorProfessionalFields } from "@/components/doctor-professional-fields";
 import { DOCTOR_SPECIALTIES } from "@/lib/doctor-specialties";
 import { PasswordStrength } from "@/components/password-strength";
+import { AdminWhatsappOtp } from "@/components/admin-whatsapp-otp";
 import { passwordValidationError, stripSuperAdminName, superAdminNameError } from "@/lib/password-policy";
 import {
   isOrderCheckoutSuccess,
@@ -56,6 +57,7 @@ export default function RegisterHospitalPage() {
   const [phone, setPhone] = useState("");
   const [adminUsername, setAdminUsername] = useState("");
   const [adminMobile, setAdminMobile] = useState("");
+  const [mobileProof, setMobileProof] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -225,6 +227,7 @@ export default function RegisterHospitalPage() {
       phone,
       adminUsername,
       adminMobile,
+      mobileProof,
       adminEmail,
       adminPassword,
       tierId,
@@ -241,6 +244,7 @@ export default function RegisterHospitalPage() {
       phone,
       adminUsername,
       adminMobile,
+      mobileProof,
       adminEmail,
       adminPassword,
       tierId,
@@ -317,6 +321,10 @@ export default function RegisterHospitalPage() {
     const adminMobileError = mobileValidationError(adminMobile, "Super admin mobile");
     if (adminMobileError) {
       setError(adminMobileError);
+      return false;
+    }
+    if (!mobileProof) {
+      setError("Verify the super admin WhatsApp number before registering the hospital.");
       return false;
     }
     const email = adminEmail.trim();
@@ -452,7 +460,7 @@ export default function RegisterHospitalPage() {
       wide
       doodles
       title="Register hospital"
-      subtitle="A unique hospital code is assigned automatically. Fill the required fields to register. Sign in later with the super admin mobile. Your form draft is kept if you refresh."
+      subtitle="A unique hospital code is assigned automatically. The super admin number must be a WhatsApp number and verified with an OTP before the hospital can be registered. Sign in later with that mobile."
     >
       <form onSubmit={onSubmit} className="space-y-6">
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
@@ -530,19 +538,30 @@ export default function RegisterHospitalPage() {
               />
               <span className="mt-1 block text-xs font-normal text-slate-500">Do not use . ! or ,</span>
             </label>
-            <label className="text-sm font-medium text-slate-700">
-              Super admin mobile
-              <input
-                className={fieldClass}
-                inputMode="numeric"
-                autoComplete="tel"
-                maxLength={13}
-                value={adminMobile}
-                onChange={(event) => setAdminMobile(event.target.value.replace(/[^\d+]/g, ""))}
-                placeholder="10-digit mobile — used to sign in"
-                required
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium text-slate-700">
+                Super admin WhatsApp number
+                <input
+                  className={fieldClass}
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={13}
+                  value={adminMobile}
+                  onChange={(event) => {
+                    setAdminMobile(event.target.value.replace(/[^\d+]/g, ""));
+                    setMobileProof("");
+                  }}
+                  placeholder="10-digit WhatsApp number — used to sign in"
+                  required
+                />
+              </label>
+              <AdminWhatsappOtp
+                mobile={adminMobile}
+                adminIsDoctor={adminAsDoctor}
+                proof={mobileProof}
+                onProof={setMobileProof}
               />
-            </label>
+            </div>
             <label className="text-sm font-medium text-slate-700">
               Super admin email
               <input
@@ -752,7 +771,7 @@ export default function RegisterHospitalPage() {
         {notice ? <p className="text-sm text-amber-800">{notice}</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button className={`${buttonClass} sm:w-auto sm:min-w-56`} type="submit" disabled={pending || !termsAccepted}>
+          <button className={`${buttonClass} sm:w-auto sm:min-w-56`} type="submit" disabled={pending || !termsAccepted || !mobileProof}>
             {pending ? "Opening payment…" : "Continue to payment"}
           </button>
         </div>

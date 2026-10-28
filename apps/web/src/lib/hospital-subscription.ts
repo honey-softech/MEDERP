@@ -20,6 +20,61 @@ const SUBSCRIPTION_TOTAL_COUNT = 12; // 12 monthly charges; cancel anytime
 export function deferredSubscriptionStartAtUnix(now = new Date()) {
   return Math.floor(trialEndsAtFromNow(now).getTime() / 1000);
 }
+
+const CHARGE_LEAD_SECONDS = 15 * 60;
+
+/**
+ * Later first-debit time for a card that is authorised but not yet charged.
+ * Razorpay only accepts a new start_at on an authenticated subscription, and
+ * only when the new time is later than the one already scheduled.
+ */
+export function postponedChargeUnix(params: {
+  status: string;
+  currentStartUnix?: number | null;
+  desiredChargeAt: Date;
+  now?: Date;
+}) {
+  if (params.status.trim().toLowerCase() !== "authenticated") return null;
+  const desired = Math.floor(params.desiredChargeAt.getTime() / 1000);
+  const nowUnix = Math.floor((params.now ?? new Date()).getTime() / 1000);
+  if (!Number.isFinite(desired) || desired < nowUnix + CHARGE_LEAD_SECONDS) return null;
+  const current = params.currentStartUnix ?? 0;
+  if (current && desired <= current) return null;
+  return desired;
+}
+
+export async function postponeAuthenticatedSubscriptionCharge(params: {
+  razorpaySubscriptionId: string;
+  chargeAt: Date;
+}) {
+  if (!razorpayConfigured()) return { updated: false as const, reason: "unconfigured" as const };
+  const razorpay = getRazorpayClient();
+  const remote = await razorpay.subscriptions.fetch(params.razorpaySubscriptionId);
+  const currentStart =
+    typeof remote.start_at === "number"
+      ? remote.start_at
+      : typeof remote.charge_at === "number"
+        ? remote.charge_at
+        : null;
+  const startAt = postponedChargeUnix({
+    status: String(remote.status ?? ""),
+    currentStartUnix: currentStart,
+    desiredChargeAt: params.chargeAt,
+  });
+  if (!startAt) {
+    return { updated: false as const, reason: String(remote.status ?? "unchanged") as string };
+  }
+  const updated = await razorpay.subscriptions.update(params.razorpaySubscriptionId, {
+    start_at: startAt,
+    schedule_change_at: "now",
+    customer_notify: false,
+  });
+  const chargeAt =
+    unixToDate(typeof updated.charge_at === "number" ? updated.charge_at : null) ??
+    unixToDate(typeof updated.start_at === "number" ? updated.start_at : null) ??
+    params.chargeAt;
+  return { updated: true as const, chargeAt };
+}
 export function unixToDate(value?: number | null) {
   if (!value) return null;
   return new Date(value * 1000);
@@ -614,8 +669,13 @@ export function subscriptionCancelCanBeSkipped(message: string) {
   );
 }
 
+/** Cycle-end cancel is only valid once Razorpay has an active billing cycle. */
+export function subscriptionCanEndAtCycle(remoteStatus: string) {
+  return remoteStatus.trim().toLowerCase() === "active";
+}
+
 async function markHospitalSubscriptionCancelled(subscriptionId: string, cancelledAt: Date | null) {
-  await prisma.hospitalSubscription.update({
+  return prisma.hospitalSubscription.update({
     where: { id: subscriptionId },
     data: {
       status: "CANCELLED",
@@ -679,18 +739,68 @@ export async function cancelHospitalSubscription(params: {
   atCycleEnd?: boolean;
 }) {
   const sub = await prisma.hospitalSubscription.findUnique({ where: { hospitalId: params.hospitalId } });
-  if (!sub) throw new Error("No Razorpay subscription found.");
+  if (!sub) throw new Error("No Razorpay subscription is linked for this clinic.");
+  if (!razorpayConfigured()) {
+    throw new Error("Razorpay is not configured, so auto-debit cannot be cancelled from here.");
+  }
   const razorpay = getRazorpayClient();
-  const atCycleEnd = params.atCycleEnd !== false;
-  const remote = await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, atCycleEnd);
-  return prisma.hospitalSubscription.update({
-    where: { id: sub.id },
-    data: {
-      status: mapRazorpaySubscriptionStatus(remote.status),
-      cancelAtPeriodEnd: atCycleEnd && remote.status !== "cancelled",
-      cancelledAt: remote.status === "cancelled" ? new Date() : sub.cancelledAt,
-      currentPeriodEnd: unixToDate(remote.current_end) ?? sub.currentPeriodEnd,
-      nextChargeAt: unixToDate(remote.charge_at) ?? null,
-    },
-  });
+
+  let remoteStatus = "";
+  try {
+    const current = await razorpay.subscriptions.fetch(sub.razorpaySubscriptionId);
+    remoteStatus = String(current.status ?? "").toLowerCase();
+    if (REMOTE_ENDED_STATUSES.has(remoteStatus)) {
+      return markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
+    }
+  } catch (error) {
+    const message = razorpayErrorMessage(error) || (error instanceof Error ? error.message : "");
+    if (subscriptionCancelCanBeSkipped(message)) {
+      return markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
+    }
+    throw new Error(message || "Could not reach Razorpay to cancel auto-debit. Try again in a moment.");
+  }
+
+  // A card linked during trial is often still "authenticated". Razorpay rejects
+  // cancel-at-cycle-end until a cycle is active, so stop the mandate immediately.
+  const atCycleEnd = params.atCycleEnd !== false && subscriptionCanEndAtCycle(remoteStatus);
+  try {
+    const remote = await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, atCycleEnd);
+    return prisma.hospitalSubscription.update({
+      where: { id: sub.id },
+      data: {
+        status: mapRazorpaySubscriptionStatus(remote.status),
+        cancelAtPeriodEnd: atCycleEnd && remote.status !== "cancelled",
+        cancelledAt: remote.status === "cancelled" ? new Date() : sub.cancelledAt,
+        currentPeriodEnd: unixToDate(remote.current_end) ?? sub.currentPeriodEnd,
+        nextChargeAt: atCycleEnd ? unixToDate(remote.charge_at) ?? sub.nextChargeAt : null,
+      },
+    });
+  } catch (error) {
+    const message = razorpayErrorMessage(error) || (error instanceof Error ? error.message : "");
+    if (atCycleEnd) {
+      try {
+        const remote = await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, false);
+        return prisma.hospitalSubscription.update({
+          where: { id: sub.id },
+          data: {
+            status: mapRazorpaySubscriptionStatus(remote.status),
+            cancelAtPeriodEnd: false,
+            cancelledAt: remote.status === "cancelled" ? new Date() : new Date(),
+            currentPeriodEnd: unixToDate(remote.current_end) ?? sub.currentPeriodEnd,
+            nextChargeAt: null,
+          },
+        });
+      } catch (retryError) {
+        const retryMessage = razorpayErrorMessage(retryError) || (retryError instanceof Error ? retryError.message : "");
+        if (subscriptionCancelCanBeSkipped(retryMessage)) {
+          return markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
+        }
+        throw new Error(retryMessage || "Could not cancel auto-debit.");
+      }
+    }
+    if (subscriptionCancelCanBeSkipped(message)) {
+      return markHospitalSubscriptionCancelled(sub.id, sub.cancelledAt);
+    }
+    throw new Error(message || "Could not cancel auto-debit.");
+  }
 }

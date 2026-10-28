@@ -2,8 +2,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mederp_mobile/bill_download.dart';
+import 'package:mederp_mobile/pulse_loader.dart';
 import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
+import 'package:mederp_mobile/viewport_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -43,6 +45,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
   late final WebViewController _controller;
   int _progress = 0;
   bool _failed = false;
+  bool _firstPaintDone = false;
 
   @override
   void initState() {
@@ -74,8 +77,11 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             setState(() => _failed = false);
           },
           onPageFinished: (_) {
+            _controller.runJavaScript(viewportLockScript);
             _controller.runJavaScript(inAppToastGuardScript);
             PushNotifications.registerTokenOnSite();
+            if (!mounted || _firstPaintDone) return;
+            setState(() => _firstPaintDone = true);
           },
           onWebResourceError: (error) {
             if (error.isForMainFrame != true || !mounted) return;
@@ -93,6 +99,8 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
     try {
       final current = await _controller.getUserAgent();
       await _controller.setUserAgent(mobileUserAgent(current));
+      // iOS adds a user script for this; Android turns off the zoom gesture.
+      await _controller.enableZoom(false);
       await _configureAndroid();
       if (!mounted) return;
       await _controller.loadRequest(Uri.parse(medErpSiteUrl));
@@ -116,6 +124,11 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
     final platform = _controller.platform;
     if (platform is! AndroidWebViewController) return;
     await platform.setUseWideViewPort(true);
+    // The system font-size setting otherwise rescales the page text and the
+    // layout reflows as if the user had zoomed in.
+    await platform.setTextZoom(100);
+    // No glow / rubber-band at the edges — browser behaviour, not app behaviour.
+    await platform.setOverScrollMode(WebViewOverScrollMode.never);
     await platform.setOnShowFileSelector(_pickAndroidFiles);
   }
 
@@ -152,10 +165,17 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
           child: Stack(
             children: [
               WebViewWidget(controller: _controller),
-              if (_progress < 100 && !_failed)
+              // The site paints its own pulse loader once it is up. Until then
+              // the WebView is blank, so the app shows the same loader itself.
+              if (!_firstPaintDone && !_failed)
+                const Positioned.fill(child: PulseScreen())
+              else if (_progress < 100 && !_failed)
                 const Align(
                   alignment: Alignment.topCenter,
-                  child: LinearProgressIndicator(minHeight: 2),
+                  child: SizedBox(
+                    height: 36,
+                    child: Center(child: PulseDots(size: 7)),
+                  ),
                 ),
               if (_failed)
                 ColoredBox(

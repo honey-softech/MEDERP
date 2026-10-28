@@ -25,10 +25,14 @@ export const metadata: Metadata = {
 // App pages load hospital data at runtime; skip build-time prerender (no DB in Docker build).
 export const dynamic = "force-dynamic";
 
+// Pinch / double-tap zoom is off so the installed iOS and Android builds fit
+// the screen like an app instead of a zoomable web page.
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

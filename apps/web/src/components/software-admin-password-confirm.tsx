@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { fieldClass, secondaryButtonClass } from "@/lib/ui";
+import { fieldClass, primaryButtonClass, secondaryButtonClass } from "@/lib/ui";
 
 const dangerButtonClass =
   "inline-flex h-10 items-center justify-center rounded-lg bg-critical px-4 text-sm font-medium text-white hover:bg-critical/90 disabled:opacity-60";
@@ -12,12 +12,14 @@ export function SoftwareAdminPasswordConfirm({
   confirmLabel,
   description,
   pendingLabel = "Removing…",
+  tone = "danger",
   onConfirm,
 }: {
   openLabel: string;
   confirmLabel: string;
   description: string;
   pendingLabel?: string;
+  tone?: "danger" | "primary";
   onConfirm: (password: string) => Promise<{ ok: boolean; error?: string; redirectTo?: string }>;
 }) {
   const router = useRouter();
@@ -48,10 +50,12 @@ export function SoftwareAdminPasswordConfirm({
     }
   }
 
+  const actionButtonClass = tone === "primary" ? primaryButtonClass : dangerButtonClass;
+
   if (!open) {
     return (
       <span className="inline-flex flex-col items-start gap-1">
-        <button type="button" className={dangerButtonClass} onClick={() => setOpen(true)}>
+        <button type="button" className={actionButtonClass} onClick={() => setOpen(true)}>
           {openLabel}
         </button>
         {error ? <span className="text-xs text-red-600">{error}</span> : null}
@@ -75,7 +79,7 @@ export function SoftwareAdminPasswordConfirm({
       </label>
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button className={dangerButtonClass} type="submit" disabled={pending || !password}>
+        <button className={actionButtonClass} type="submit" disabled={pending || !password}>
           {pending ? pendingLabel : confirmLabel}
         </button>
         <button

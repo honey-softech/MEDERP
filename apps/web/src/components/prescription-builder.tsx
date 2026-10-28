@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
+import { PulseLoader } from "@/components/pulse-loader";
 import { ensureDrugCatalogCache } from "@/lib/drug-catalog-cache";
 import { DRUG_FORM_FILTERS } from "@/lib/drug-catalog-cache/search";
 import { parseMedications } from "@/lib/prescription-text";
@@ -444,7 +445,11 @@ export function PrescriptionBuilder({
                   </li>
                 ))
               : null}
-              {loading ? <li className="px-3 py-1.5 text-xs text-text-secondary">Searching…</li> : null}
+              {loading ? (
+                <li className="px-3 py-1.5">
+                  <PulseLoader size="sm" label="Searching" />
+                </li>
+              ) : null}
               {searchError ? <li className="px-3 py-1.5 text-xs text-critical">{searchError}</li> : null}
               {!loading && !searchError && query.trim().length >= 2 && suggestions.length === 0 ? (
                 <li className="px-3 py-1.5 text-xs text-text-secondary">No match — add as free text.</li>

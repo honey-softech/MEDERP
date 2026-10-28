@@ -155,7 +155,11 @@ export function HospitalSeatSubscriptionForm({
       setError(data.error ?? "Could not cancel subscription.");
       return;
     }
-    setMessage("Cancellation scheduled for the end of the current billing cycle.");
+    setMessage(
+      data.subscription?.cancelAtPeriodEnd
+        ? "Cancellation scheduled for the end of the current billing cycle."
+        : "Auto-debit is cancelled. No further charge will be taken.",
+    );
     router.refresh();
   }
 

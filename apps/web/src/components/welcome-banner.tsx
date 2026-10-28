@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 function greetingForHour(hour: number) {
-  if (hour < 12) return "Good morning,";
-  if (hour < 17) return "Good afternoon,";
-  return "Good evening,";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 function formatNow(date: Date) {
@@ -18,41 +18,6 @@ function formatNow(date: Date) {
       weekday: "long",
     }),
   };
-}
-
-function DoctorIllustration() {
-  return (
-    <svg viewBox="0 0 280 260" className="h-[200px] w-[200px] sm:h-[240px] sm:w-[240px]" aria-hidden>
-      <ellipse cx="175" cy="210" rx="70" ry="18" fill="#bfdbfe" opacity="0.7" />
-      <circle cx="200" cy="70" r="48" fill="#dbeafe" />
-      <path d="M210 40c18 8 28 28 22 48" stroke="#93c5fd" strokeWidth="3" fill="none" />
-      <circle cx="148" cy="58" r="8" fill="#93c5fd" />
-      <path d="M40 120c30-40 80-20 70 20-8 32-50 40-70 8z" fill="#bfdbfe" opacity="0.5" />
-      <g transform="translate(78 28)">
-        <ellipse cx="62" cy="42" rx="28" ry="32" fill="#f3d2b5" />
-        <path d="M38 38c4-22 48-24 50 2 1 8-4 12-10 14" fill="#1f2937" />
-        <rect x="42" y="48" width="38" height="6" rx="3" fill="#1e3a5f" opacity="0.85" />
-        <circle cx="50" cy="51" r="5" fill="none" stroke="#1e3a5f" strokeWidth="2" />
-        <circle cx="72" cy="51" r="5" fill="none" stroke="#1e3a5f" strokeWidth="2" />
-        <path d="M55 51h12" stroke="#1e3a5f" strokeWidth="2" />
-        <path d="M52 68c6 6 14 6 20 0" stroke="#c2410c" strokeWidth="1.5" fill="none" />
-        <path d="M34 82c8 18 48 18 56 0v38c-6 28-50 28-56 0z" fill="#eff6ff" />
-        <path d="M42 88h40v8H42z" fill="#2563eb" />
-        <path d="M58 88v48" stroke="#bfdbfe" strokeWidth="2" />
-        <circle cx="62" cy="118" r="10" fill="none" stroke="#64748b" strokeWidth="3" />
-        <path d="M62 108v-8" stroke="#64748b" strokeWidth="3" />
-        <path d="M22 100c-2 22 6 40 18 44" fill="#eff6ff" />
-        <path d="M102 100c2 22-6 40-18 44" fill="#eff6ff" />
-        <ellipse cx="28" cy="146" rx="10" ry="8" fill="#f3d2b5" />
-        <ellipse cx="96" cy="146" rx="10" ry="8" fill="#f3d2b5" />
-      </g>
-      <g transform="translate(188 96)">
-        <rect x="0" y="0" width="46" height="36" rx="12" fill="#dbeafe" />
-        <path d="M12 22c6-10 16-10 22 0" stroke="#2563eb" strokeWidth="2" fill="none" />
-        <circle cx="23" cy="14" r="4" fill="#2563eb" />
-      </g>
-    </svg>
-  );
 }
 
 export function WelcomeBanner({
@@ -82,77 +47,32 @@ export function WelcomeBanner({
 
   return (
     <section
-      className={`relative overflow-hidden rounded-xl border border-primary-light bg-gradient-to-r from-surface via-primary-light/40 to-primary-light ${
-        compact ? "px-4 py-3 sm:px-5" : "mb-6 px-5 py-6 sm:mb-8 sm:px-8 sm:py-7"
+      className={`home-hero relative flex overflow-hidden rounded-3xl text-white ${
+        compact ? "h-full min-h-[16rem] px-5 py-5 sm:px-6" : "mb-5 px-6 py-7 sm:mb-6 sm:px-8 sm:py-8"
       } ${className}`}
     >
-      <div className={`pointer-events-none absolute -right-6 top-0 hidden h-full w-[42%] ${compact ? "" : "md:block"}`}>
-        <div className="absolute right-8 top-6 h-40 w-40 rounded-full bg-primary-light/60" />
-        <div className="absolute bottom-6 right-24 h-24 w-24 rounded-full bg-primary/10" />
-      </div>
-      <div
-        className={`relative z-10 flex h-full flex-col items-start lg:flex-row lg:items-center ${
-          compact ? "justify-center gap-3 overflow-y-auto" : "justify-between gap-6"
-        }`}
-      >
-        <div className={compact ? "max-w-lg" : "max-w-xl"}>
+      <div className="home-hero-glow pointer-events-none absolute inset-0" aria-hidden />
+      <div className={`relative z-10 flex h-full w-full flex-col ${compact ? "justify-between gap-6" : ""}`}>
+        <div className={compact ? "max-w-lg" : "max-w-2xl"}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#b9d4f5]">{date}</p>
           <h2
-            className={`font-bold tracking-tight text-text-primary ${
-              compact ? "text-xl sm:text-2xl" : "text-3xl sm:text-4xl"
+            className={`mt-3 font-semibold tracking-[-0.03em] text-white ${
+              compact ? "text-[1.65rem] leading-tight sm:text-3xl" : "text-4xl leading-[1.05] sm:text-5xl"
             }`}
           >
-            {greeting}
-            <span className={`block text-primary ${compact ? "mt-0.5" : "mt-1"}`}>
-              {displayName}! <span aria-hidden>👋</span>
-            </span>
+            <span className="block font-medium text-white/75">{greeting}</span>
+            <span className="mt-1 block">{displayName}</span>
           </h2>
-          <p className={`max-w-md text-text-secondary ${compact ? "mt-1.5 text-xs sm:text-sm" : "mt-3 text-sm sm:text-base"}`}>
-            {tagline}
-          </p>
-          <div
-            className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-center ${
-              compact ? "mt-3 gap-2 sm:gap-4" : "mt-6 gap-4 sm:gap-8"
-            }`}
-          >
-            <div className="flex items-start gap-2.5">
-              <span
-                className={`mt-0.5 inline-flex items-center justify-center rounded-full bg-primary-light text-primary ${
-                  compact ? "h-7 w-7" : "h-9 w-9"
-                }`}
-              >
-                <svg viewBox="0 0 24 24" className={compact ? "h-4 w-4" : "h-5 w-5"} fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="8" />
-                  <path d="M12 8v5l3 2" />
-                </svg>
-              </span>
-              <div>
-                <p className={`font-semibold text-text-primary ${compact ? "text-sm" : ""}`}>{time}</p>
-                <p className={`text-text-secondary ${compact ? "text-xs" : "text-sm"}`}>{date}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2.5">
-              <span
-                className={`mt-0.5 inline-flex items-center justify-center rounded-full bg-primary-light text-primary ${
-                  compact ? "h-7 w-7" : "h-9 w-9"
-                }`}
-              >
-                <svg viewBox="0 0 24 24" className={compact ? "h-4 w-4" : "h-5 w-5"} fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z" />
-                  <circle cx="12" cy="10" r="2.2" />
-                </svg>
-              </span>
-              <div>
-                <p className={`font-semibold text-text-primary ${compact ? "text-sm" : ""}`}>{locationTitle}</p>
-                <p className={`text-text-secondary ${compact ? "text-xs" : "text-sm"}`}>{locationSubtitle}</p>
-              </div>
-            </div>
-          </div>
+          <p className={`max-w-md text-white/70 ${compact ? "mt-2 text-sm" : "mt-4 text-base"}`}>{tagline}</p>
         </div>
-        {compact ? null : (
-          <div className="relative mx-auto lg:mx-0">
-            <DoctorIllustration />
-          </div>
-        )}
+        <div className={`flex flex-wrap gap-2 ${compact ? "" : "mt-8"}`}>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">
+            <span className="home-live-dot" aria-hidden />
+            {time}
+          </span>
+          <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">{locationTitle}</span>
+          <span className="rounded-full border border-white/15 px-3 py-1.5 text-sm text-white/80">{locationSubtitle}</span>
+        </div>
       </div>
     </section>
   );

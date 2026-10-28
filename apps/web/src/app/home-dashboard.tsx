@@ -353,7 +353,7 @@ export async function HomeDashboard({
       <div
         className={
           showBoard
-            ? "mb-6 grid items-stretch gap-4 lg:h-[26rem] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:grid-cols-[minmax(0,1fr)_28rem]"
+            ? "mb-5 grid items-stretch gap-4 lg:h-[26rem] lg:min-h-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,26rem)] xl:grid-cols-[minmax(0,1.15fr)_28rem]"
             : undefined
         }
       >
@@ -377,7 +377,7 @@ export async function HomeDashboard({
       user.hospital?.trialEndsAt &&
       !isPlatformRole(user.role) &&
       !hospitalHasActivePaidSubscription(user.hospital.subscription) ? (
-        <section className="mb-6 rounded-2xl border border-teal-200 bg-teal-50 p-5">
+        <section className="home-panel mb-4 p-5">
           <h3 className="font-semibold text-teal-950">
             {trialDaysRemaining(user.hospital.trialEndsAt) === 0
               ? "Free trial ended"
@@ -397,7 +397,7 @@ export async function HomeDashboard({
       ) : null}
 
       {escalatedHelpdeskTickets.length > 0 && user?.role === "SOFTWARE_ADMIN" ? (
-        <section className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+        <section className="home-panel mb-4 border-[#f0c9c9] p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-semibold text-red-950">
@@ -417,7 +417,7 @@ export async function HomeDashboard({
               <li key={ticket.id}>
                 <Link
                   href={`/helpdesk/${ticket.id}`}
-                  className="block rounded-xl border border-red-100 bg-white px-4 py-3 hover:border-teal-300"
+                  className="block rounded-2xl border border-[#f3d4d4] bg-[#fff8f8] px-4 py-3 hover:border-[#d32f2f]"
                 >
                   <p className="font-medium text-slate-900">
                     {ticket.number} · {ticket.subject}
@@ -436,7 +436,7 @@ export async function HomeDashboard({
       ) : null}
 
       {openHelpdeskTickets.length > 0 && (user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK") ? (
-        <section className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
+        <section className="home-panel mb-4 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-semibold text-violet-950">
@@ -455,7 +455,7 @@ export async function HomeDashboard({
               <li key={ticket.id}>
                 <Link
                   href={`/helpdesk/${ticket.id}`}
-                  className="block rounded-xl border border-violet-100 bg-white px-4 py-3 hover:border-teal-300"
+                  className="block rounded-2xl border border-[#e3eaf2] bg-[#f7fafc] px-4 py-3 hover:border-[#1976d2]"
                 >
                   <p className="font-medium text-slate-900">
                     {ticket.number} · {ticket.subject}
@@ -473,7 +473,7 @@ export async function HomeDashboard({
       ) : null}
 
       {pendingJoins > 0 ? (
-        <section className="mb-6 rounded-2xl border border-teal-200 bg-teal-50 p-5">
+        <section className="home-panel mb-4 p-5">
           <h3 className="font-semibold text-teal-950">
             {pendingJoins} staff join request{pendingJoins === 1 ? "" : "s"} waiting
           </h3>
@@ -487,7 +487,7 @@ export async function HomeDashboard({
       ) : null}
 
       {pendingLeaves > 0 ? (
-        <section className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+        <section className="home-panel mb-4 border-[#ead7a4] bg-[#fffaf0] p-5">
           <h3 className="font-semibold text-amber-950">
             {pendingLeaves} leave request{pendingLeaves === 1 ? "" : "s"} waiting
           </h3>
@@ -501,7 +501,7 @@ export async function HomeDashboard({
       ) : null}
 
       {user && !user.hospitalId && !isPlatformRole(user.role) ? (
-        <section className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+        <section className="home-panel mb-4 border-[#ead7a4] bg-[#fffaf0] p-5">
           <h3 className="font-semibold text-amber-950">Join a listed hospital</h3>
           <p className="mt-1 text-sm text-amber-900">
             Your account is ready, but you are not on a hospital yet. Pick a listed hospital and wait for the
@@ -513,28 +513,24 @@ export async function HomeDashboard({
         </section>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {(platformStats ?? hospitalStats ?? []).map((stat) => {
           const card = (
             <>
-              <p className="text-sm text-slate-500">{stat.label}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{stat.value}</p>
+              <p className="home-stat-kicker">{stat.label}</p>
+              <p className="home-stat-value">{stat.value}</p>
               {"yesterday" in stat && stat.yesterday ? (
-                <p className="mt-1 text-[11px] leading-tight text-slate-400">{stat.yesterday}</p>
+                <p className="mt-3 text-xs text-[#7b8ba0]">{stat.yesterday}</p>
               ) : null}
             </>
           );
           const href = "href" in stat ? stat.href : undefined;
           return href ? (
-            <Link
-              key={stat.label}
-              href={href}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-600 hover:shadow-md"
-            >
+            <Link key={stat.label} href={href} className="home-stat transition hover:border-[#1976d2]">
               {card}
             </Link>
           ) : (
-            <article key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <article key={stat.label} className="home-stat">
               {card}
             </article>
           );
@@ -549,7 +545,7 @@ export async function HomeDashboard({
               View all
             </Link>
           </div>
-          <div className="[&>div]:rounded-2xl [&>div]:border [&>div]:border-slate-200 [&>div]:bg-white [&>div]:shadow-sm">
+          <div className="[&>div]:rounded-3xl [&>div]:border [&>div]:border-[#e6eaf0] [&>div]:bg-white [&>div]:shadow-[0_16px_40px_-32px_rgb(11_28_51_/_0.55)]">
             <FilterableTable
               empty="No open tickets."
               rows={openHelpdeskTickets.map((ticket) => ({
@@ -576,7 +572,7 @@ export async function HomeDashboard({
       ) : null}
 
       {user?.role === "LAB_TECH" ? (
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:mt-8">
+        <section className="home-panel mt-6 p-5 sm:mt-8">
           <h3 className="font-semibold">Laboratory</h3>
           <p className="mt-1 text-sm text-slate-500">
             Paid requests wait here. Upload the report and mark done. The doctor is notified on the patient record.
@@ -604,12 +600,12 @@ export async function HomeDashboard({
             <OpdDayNav action="/" dateValue={dateValue} />
           </div>
           {doctorQueues.length === 0 ? (
-            <p className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+            <p className="home-panel p-6 text-sm text-slate-500">
               {isToday ? "No doctor queues to show yet." : `No OPD visits on ${dayLabel}.`}
             </p>
           ) : (
             doctorQueues.map((group) => (
-              <div key={group.doctorId} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div key={group.doctorId} className="home-panel overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
                   <div>
                     <p className="font-semibold">{doctorName(group.doctor)}</p>

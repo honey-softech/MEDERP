@@ -1,16 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeHospitalCode } from "@/lib/auth";
-import { TRIAL_MONTHS } from "@/lib/hospital-access";
 import { notifyUser } from "@/lib/notifications";
 import { writeAuditLog } from "@/lib/audit";
+import { postponeAuthenticatedSubscriptionCharge } from "@/lib/hospital-subscription";
+import {
+  MAX_REFERRAL_BONUS_MONTHS,
+  MAX_REFERRALS_PER_HOSPITAL,
+  MAX_TOTAL_FREE_MONTHS,
+  REFERRAL_REWARD_MONTHS,
+} from "@/lib/referral-limits";
 
-/** Extra free months granted to the referrer for one approved referral. */
-export const REFERRAL_REWARD_MONTHS = 1;
-/** How many clinics one hospital may refer (pending + approved). */
-export const MAX_REFERRALS_PER_HOSPITAL = 3;
-/** Base trial plus referral bonus. Referral rewards stop once this total is reached. */
-export const MAX_TOTAL_FREE_MONTHS = 3;
-export const MAX_REFERRAL_BONUS_MONTHS = MAX_TOTAL_FREE_MONTHS - TRIAL_MONTHS;
+export {
+  MAX_REFERRAL_BONUS_MONTHS,
+  MAX_REFERRALS_PER_HOSPITAL,
+  MAX_TOTAL_FREE_MONTHS,
+  REFERRAL_REWARD_MONTHS,
+} from "@/lib/referral-limits";
 
 export class ReferralReviewError extends Error {
   constructor(
@@ -251,9 +256,34 @@ export async function approveReferral(params: {
 
   const { referral, rewardMonths, trialEndsAt } = result;
   const referredLabel = `${referral.referredHospital.name} (${referral.referredHospital.code})`;
+  let nextChargeAt: Date | null = null;
+  if (rewardMonths > 0 && trialEndsAt) {
+    const subscription = await prisma.hospitalSubscription.findUnique({
+      where: { hospitalId: referral.referrerHospitalId },
+    });
+    if (subscription?.razorpaySubscriptionId) {
+      try {
+        const moved = await postponeAuthenticatedSubscriptionCharge({
+          razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+          chargeAt: trialEndsAt,
+        });
+        if (moved.updated) {
+          nextChargeAt = moved.chargeAt;
+          await prisma.hospitalSubscription.update({
+            where: { id: subscription.id },
+            data: { nextChargeAt: moved.chargeAt },
+          });
+        }
+      } catch (error) {
+        console.error("Failed to postpone the first Razorpay auto-debit", error);
+      }
+    }
+  }
   const body =
     rewardMonths > 0
-      ? `${referredLabel} was approved as your referral. ${rewardMonths} free month was added. Trial now ends ${formatTrialDate(trialEndsAt)}.`
+      ? nextChargeAt
+        ? `${referredLabel} was approved as your referral. ${rewardMonths} free month was added. The first auto-debit is now ${formatTrialDate(nextChargeAt)}.`
+        : `${referredLabel} was approved as your referral. ${rewardMonths} free month was added. Trial now ends ${formatTrialDate(trialEndsAt)}.`
       : `${referredLabel} was approved, but this clinic has already reached the ${MAX_TOTAL_FREE_MONTHS}-month free limit, so no extra month was added.`;
 
   try {
@@ -280,11 +310,12 @@ export async function approveReferral(params: {
       referredHospitalId: referral.referredHospitalId,
       rewardMonths,
       trialEndsAt: trialEndsAt?.toISOString() ?? null,
+      nextChargeAt: nextChargeAt?.toISOString() ?? null,
       reviewNote: params.note?.trim() || null,
     },
   });
 
-  return { rewardMonths, trialEndsAt };
+  return { rewardMonths, trialEndsAt, nextChargeAt };
 }
 
 export async function rejectReferral(params: {

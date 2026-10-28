@@ -1,8 +1,10 @@
 import { AppShell } from "@/components/app-shell";
-import { FilterableTable } from "@/components/filterable-table";
 import { ReferralReviewActions } from "@/components/referral-review-actions";
+import { ReferralTrackingBoard } from "@/components/referral-tracking-board";
 import { prisma } from "@/lib/prisma";
 import { MAX_REFERRAL_BONUS_MONTHS } from "@/lib/hospital-referrals";
+import { loadLocalReferralSamples } from "@/lib/referral-tracking-samples";
+import type { ReferralTrackRow } from "@/lib/referral-tracking";
 
 function formatDate(value: Date | null | undefined) {
   if (!value) return "—";
@@ -24,26 +26,39 @@ const hospitalSelect = {
   },
 };
 
+const PAYING_SUBSCRIPTION = new Set(["ACTIVE", "AUTHENTICATED"]);
+
 export default async function PlatformReferralsPage() {
-  const [pending, decided] = await Promise.all([
+  const [live, samples] = await Promise.all([
     prisma.hospitalReferral.findMany({
-      where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
       include: {
         referrerHospital: { select: hospitalSelect },
-        referredHospital: { select: hospitalSelect },
+        referredHospital: {
+          select: { ...hospitalSelect, subscription: { select: { status: true } } },
+        },
       },
     }),
-    prisma.hospitalReferral.findMany({
-      where: { status: { in: ["APPROVED", "REJECTED"] } },
-      orderBy: { reviewedAt: "desc" },
-      take: 100,
-      include: {
-        referrerHospital: { select: { name: true, code: true } },
-        referredHospital: { select: { name: true, code: true } },
-      },
-    }),
+    loadLocalReferralSamples(),
   ]);
+
+  const liveRows: ReferralTrackRow[] = live.map((row) => ({
+    id: row.id,
+    sample: false,
+    createdAt: row.createdAt.toISOString(),
+    reviewedAt: row.reviewedAt?.toISOString() ?? null,
+    status: row.status,
+    referralCode: row.referralCode,
+    rewardMonths: row.rewardMonths,
+    reviewNote: row.reviewNote,
+    referrerName: row.referrerHospital.name,
+    referrerCode: row.referrerHospital.code,
+    referredName: row.referredHospital.name,
+    referredCode: row.referredHospital.code,
+    paying: PAYING_SUBSCRIPTION.has(row.referredHospital.subscription?.status ?? ""),
+  }));
+  const tracked = [...liveRows, ...samples].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const pending = live.filter((row) => row.status === "PENDING");
 
   const earnedByReferrer = new Map<string, number>();
   if (pending.length > 0) {
@@ -61,12 +76,14 @@ export default async function PlatformReferralsPage() {
   }
 
   return (
-    <AppShell title="Referrals">
+    <AppShell title="Referral tracking">
       <p className="mb-6 text-sm text-slate-500">
-        A new clinic that enters another hospital&apos;s code at signup appears here. Check both hospitals, then
-        approve to add one free month for the referrer. Free usage is capped at 3 months total (the first month plus
-        up to {MAX_REFERRAL_BONUS_MONTHS} referral months).
+        Every clinic that signed up with another hospital&apos;s code. The board shows how many are still in review,
+        how long decisions take, which referrers have used their free months, and which new clinics are paying.
+        Approving a waiting referral still adds one free month, up to {MAX_REFERRAL_BONUS_MONTHS} referral months.
       </p>
+      <ReferralTrackingBoard rows={tracked} includesSamples={samples.length > 0} nowIso={new Date().toISOString()} />
+      <h3 className="mb-3 font-semibold">Waiting for a decision</h3>
       {pending.length === 0 ? (
         <p className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
           No referrals waiting for review.
@@ -118,28 +135,6 @@ export default async function PlatformReferralsPage() {
         </div>
       )}
 
-      <h3 className="mb-3 font-semibold">Past decisions</h3>
-      <FilterableTable
-        minWidthClass="min-w-[52rem]"
-        empty="No reviewed referrals yet."
-        rows={decided.map((row) => ({
-          id: row.id,
-          when: formatDate(row.reviewedAt ?? row.createdAt),
-          referrer: `${row.referrerHospital.name} (${row.referrerHospital.code})`,
-          referred: `${row.referredHospital.name} (${row.referredHospital.code})`,
-          status: row.status === "APPROVED" ? "Approved" : "Rejected",
-          months: row.status === "APPROVED" ? String(row.rewardMonths) : "0",
-          note: row.reviewNote || "—",
-        }))}
-        columns={[
-          { key: "when", header: "Reviewed" },
-          { key: "referrer", header: "Referrer" },
-          { key: "referred", header: "New clinic" },
-          { key: "status", header: "Decision" },
-          { key: "months", header: "Months added" },
-          { key: "note", header: "Note" },
-        ]}
-      />
     </AppShell>
   );
 }

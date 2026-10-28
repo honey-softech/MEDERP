@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
@@ -40,6 +40,12 @@ function linkActive(pathname: string, href: string, allHrefs: string[]) {
   if (matches.length === 0) return false;
   const best = matches.reduce((a, b) => (a.length >= b.length ? a : b));
   return best === href;
+}
+
+/** Pulses inside the clicked nav link until the next page is ready. */
+function NavPulse() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className={`nav-pulse ml-auto ${pending ? "is-pending" : ""}`} />;
 }
 
 function NavGlyph({ href }: { href: string }) {
@@ -342,6 +348,7 @@ export function AppShellFrame({
                             <NavGlyph href={item.href} />
                           </span>
                           <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+                          <NavPulse />
                         </Link>
                       </li>
                     );
@@ -368,6 +375,7 @@ export function AppShellFrame({
                 <NavGlyph href="/account" />
               </span>
               <span className={collapsed ? "md:hidden" : ""}>Account</span>
+              <NavPulse />
             </Link>
           </div>
         </aside>

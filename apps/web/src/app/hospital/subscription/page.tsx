@@ -12,6 +12,16 @@ import { hospitalAccessBlocked } from "@/lib/hospital-access";
 import { MAX_REFERRALS_PER_HOSPITAL, MAX_TOTAL_FREE_MONTHS, referralSummary } from "@/lib/hospital-referrals";
 import { ReferralCodeCopy } from "@/components/referral-code-copy";
 import { OtpDangerAction } from "@/components/otp-danger-action";
+import { OpenOnWeb } from "@/components/open-on-web";
+import { isMobileAppRequest, mederpWebUrl } from "@/lib/mobile-app";
+
+function inr(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
 export default async function HospitalSubscriptionPage() {
   const user = await getCurrentUser();
@@ -19,13 +29,14 @@ export default async function HospitalSubscriptionPage() {
     redirect("/login");
   }
 
-  const [hospital, usedSeats, referrals] = await Promise.all([
+  const [hospital, usedSeats, referrals, isMobileApp] = await Promise.all([
     prisma.hospital.findUnique({
       where: { id: user.hospitalId },
       include: { subscription: true },
     }),
     countHospitalStaffSeats(user.hospitalId),
     referralSummary(user.hospitalId),
+    isMobileAppRequest(),
   ]);
 
   if (!hospital) {
@@ -41,8 +52,9 @@ export default async function HospitalSubscriptionPage() {
   return (
     <AppShell title="Subscription">
       <p className="mb-6 text-sm text-slate-500">
-        Manage the monthly MedERP plan for {hospital.name} ({hospital.code}). Auto-debit runs every billing cycle until
-        you cancel. Plan changes you schedule here apply from the next cycle.
+        {isMobileApp
+          ? `The monthly MedERP plan for ${hospital.name} (${hospital.code}). Billing changes are made on the website.`
+          : `Manage the monthly MedERP plan for ${hospital.name} (${hospital.code}). Auto-debit runs every billing cycle until you cancel. Plan changes you schedule here apply from the next cycle.`}
       </p>
       {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && hasSubscription ? (
         <p className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
@@ -56,13 +68,18 @@ export default async function HospitalSubscriptionPage() {
       ) : null}
       {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && !hasSubscription ? (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Link a card below
-          so auto-debit can keep the clinic open after that date.
+          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}.{" "}
+          {isMobileApp
+            ? "Continue the plan from the MedERP website so the clinic stays open after that date."
+            : "Link a card below so auto-debit can keep the clinic open after that date."}
         </p>
       ) : null}
       {hospitalAccessBlocked(hospital) ? (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          The free trial has ended. Start a paid subscription below to restore access for your staff.
+          The free trial has ended.{" "}
+          {isMobileApp
+            ? "Continue the plan from the MedERP website to restore access for your staff."
+            : "Start a paid subscription below to restore access for your staff."}
         </p>
       ) : null}
       <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -112,23 +129,64 @@ export default async function HospitalSubscriptionPage() {
           admin; admin-as-doctor means 3 accounts.
         </p>
       ) : null}
-      <HospitalSeatSubscriptionForm
-        currentUsed={usedSeats}
-        currentLimit={seatLimit}
-        currentExtraUsers={hospital.extraStaffSlots}
-        currentMonthly={quote.total}
-        currentTierId={tier?.id ?? hospital.subscriptionTier}
-        currentTierName={tier?.name ?? hospital.subscriptionTier}
-        tiers={publicSubscriptionTiers()}
-        hasSubscription={hasSubscription}
-        pendingSubscriptionTier={sub?.pendingSubscriptionTier ?? null}
-        pendingExtraUsers={sub?.pendingSubscriptionTier ? sub.pendingExtraStaffSlots : null}
-        pendingMonthlyAmount={sub?.pendingMonthlyAmount != null ? Number(sub.pendingMonthlyAmount) : null}
-        nextChargeAt={sub?.nextChargeAt?.toISOString() ?? null}
-        cancelAtPeriodEnd={sub?.cancelAtPeriodEnd ?? false}
-        subscriptionStatus={sub?.status ?? null}
-        razorpayEnabled={razorpayConfigured()}
-      />
+      {isMobileApp ? (
+        <div className="mb-8 space-y-4">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <h3 className="font-semibold">Current plan</h3>
+            <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-slate-500">Plan</dt>
+                <dd className="font-medium">{tier?.name ?? hospital.subscriptionTier}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Staff usage</dt>
+                <dd className="font-medium">
+                  {usedSeats}/{seatLimit == null ? "∞" : seatLimit}
+                  {hospital.extraStaffSlots > 0 ? ` · ${hospital.extraStaffSlots} extra` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Monthly amount</dt>
+                <dd className="font-medium">{inr(quote.total)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Auto-debit</dt>
+                <dd className="font-medium">{hasSubscription ? sub?.status ?? "Linked" : "Not linked"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Next charge</dt>
+                <dd className="font-medium">
+                  {sub?.nextChargeAt
+                    ? sub.nextChargeAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+          </section>
+          <OpenOnWeb
+            message="Subscription and billing are managed on the MedERP website. Open this address in a web browser and sign in to reach the subscription page."
+            url={mederpWebUrl("/hospital/subscription")}
+          />
+        </div>
+      ) : (
+        <HospitalSeatSubscriptionForm
+          currentUsed={usedSeats}
+          currentLimit={seatLimit}
+          currentExtraUsers={hospital.extraStaffSlots}
+          currentMonthly={quote.total}
+          currentTierId={tier?.id ?? hospital.subscriptionTier}
+          currentTierName={tier?.name ?? hospital.subscriptionTier}
+          tiers={publicSubscriptionTiers()}
+          hasSubscription={hasSubscription}
+          pendingSubscriptionTier={sub?.pendingSubscriptionTier ?? null}
+          pendingExtraUsers={sub?.pendingSubscriptionTier ? sub.pendingExtraStaffSlots : null}
+          pendingMonthlyAmount={sub?.pendingMonthlyAmount != null ? Number(sub.pendingMonthlyAmount) : null}
+          nextChargeAt={sub?.nextChargeAt?.toISOString() ?? null}
+          cancelAtPeriodEnd={sub?.cancelAtPeriodEnd ?? false}
+          subscriptionStatus={sub?.status ?? null}
+          razorpayEnabled={razorpayConfigured()}
+        />
+      )}
       <OtpDangerAction
         title="Close hospital"
         description="Clinical records stay on file. The hospital phone and every staff login number, including this super admin, are released so they can be used again. The monthly subscription is cancelled so no further charges are taken. Confirm with the login OTP sent on WhatsApp."

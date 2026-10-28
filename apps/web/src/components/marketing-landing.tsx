@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 import { DeveloperCredit, ManagedByCredit } from "@/components/auth-branding";
+import { OpenOnWeb } from "@/components/open-on-web";
+import { mederpWebUrl } from "@/lib/mobile-app";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -161,82 +163,88 @@ function FeatureIconSvg({ name }: { name: FeatureIcon }) {
   }
 }
 
-function HeroDoodles() {
+const daySteps = [
+  {
+    n: "01",
+    title: "Front desk",
+    body: "Register the patient, book the slot, and issue the token. Walk-ins and appointments share one queue.",
+  },
+  {
+    n: "02",
+    title: "Nurse station",
+    body: "Vitals are recorded before the consult starts, so the doctor opens a visit that is already prepared.",
+  },
+  {
+    n: "03",
+    title: "Doctor consult",
+    body: "Assessment, diagnosis, prescription, investigations, and a printable visit summary on the same chart.",
+  },
+  {
+    n: "04",
+    title: "Close the visit",
+    body: "Bill, collect, issue a certificate, and send the summary on WhatsApp before the patient leaves.",
+  },
+];
+
+function ClinicStage() {
+  const rows = [
+    { token: "T-014", name: "Meera S.", meta: "With doctor", tone: "live" },
+    { token: "T-015", name: "Arjun P.", meta: "Vitals in", tone: "ready" },
+    { token: "T-016", name: "Fatima K.", meta: "Waiting", tone: "wait" },
+    { token: "T-017", name: "Rohan D.", meta: "Just arrived", tone: "wait" },
+  ] as const;
+
   return (
-    <div className="landing-doodles pointer-events-none absolute inset-0 z-[1] overflow-hidden" aria-hidden>
-      <svg className="landing-doodle landing-doodle-pulse absolute left-[6%] top-[20%] h-14 w-24 text-[#1a5c5c]/40 sm:left-[10%] sm:top-[26%] sm:h-16 sm:w-28" viewBox="0 0 120 40" fill="none">
-        <path
-          d="M2 22h18l6-14 10 28 8-18 6 8h52"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float absolute right-[8%] top-[16%] h-12 w-12 text-[#c45c4a]/50 sm:right-[12%] sm:top-[20%] sm:h-14 sm:w-14" viewBox="0 0 48 48" fill="none">
-        <path
-          d="M24 42s-14-9.2-14-20a8 8 0 0 1 14-5.2A8 8 0 0 1 38 22c0 10.8-14 20-14 20Z"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        <path d="M24 16v12M18 22h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float-slow absolute bottom-[16%] left-[5%] h-16 w-12 text-[#1a5c5c]/45 sm:bottom-[20%] sm:left-[8%] sm:h-20 sm:w-14" viewBox="0 0 40 56" fill="none">
-        <rect x="4" y="2" width="32" height="48" rx="4" stroke="currentColor" strokeWidth="2" />
-        <rect x="8" y="8" width="24" height="34" rx="2" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
-        <circle cx="20" cy="48" r="1.8" fill="currentColor" />
-        <path d="M12 16h16M12 22h12M12 28h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float absolute right-[5%] top-[42%] h-14 w-14 text-[#1a5c5c]/40 sm:right-[7%] sm:h-16 sm:w-16" viewBox="0 0 56 56" fill="none">
-        <path d="M16 8v10a12 12 0 0 0 24 0V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M16 8c0-2 2-4 4-4h2M40 8c0-2-2-4-4-4h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M28 30v8a8 8 0 1 0 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="40" cy="38" r="5" stroke="currentColor" strokeWidth="2" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float-slow absolute left-[42%] top-[14%] hidden h-12 w-12 text-[#1a5c5c]/35 sm:block" viewBox="0 0 48 48" fill="none">
-        <rect x="6" y="10" width="36" height="30" rx="4" stroke="currentColor" strokeWidth="2" />
-        <path d="M6 18h36M16 6v8M32 6v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="18" cy="28" r="2" fill="currentColor" />
-        <circle cx="30" cy="28" r="2" fill="currentColor" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float absolute bottom-[28%] right-[28%] hidden h-11 w-12 text-[#c45c4a]/40 lg:block" viewBox="0 0 48 44" fill="none">
-        <path
-          d="M8 6h32a6 6 0 0 1 6 6v14a6 6 0 0 1-6 6H22l-10 8v-8H8a6 6 0 0 1-6-6V12a6 6 0 0 1 6-6Z"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        <path d="M14 18h20M14 24h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float-slow absolute bottom-[12%] right-[14%] h-14 w-8 text-[#1a5c5c]/40 sm:bottom-[14%] sm:right-[18%]" viewBox="0 0 28 56" fill="none">
-        <path d="M14 6v28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <rect x="10" y="4" width="8" height="30" rx="4" stroke="currentColor" strokeWidth="2" />
-        <circle cx="14" cy="42" r="8" stroke="currentColor" strokeWidth="2" />
-        <circle cx="14" cy="42" r="3.5" fill="currentColor" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float absolute left-[18%] top-[48%] hidden h-12 w-12 text-[#1a5c5c]/35 md:block" viewBox="0 0 48 48" fill="none">
-        <circle cx="24" cy="24" r="16" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" />
-        <path d="M24 14v10l6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float-slow absolute right-[36%] bottom-[14%] hidden h-10 w-14 text-[#c45c4a]/35 lg:block" viewBox="0 0 56 40" fill="none">
-        <rect x="4" y="8" width="48" height="28" rx="4" stroke="currentColor" strokeWidth="2" />
-        <path d="M4 16h48M14 8V4M42 8V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M16 26h8M28 26h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <svg className="landing-doodle absolute left-[28%] bottom-[20%] h-10 w-16 text-[#1a5c5c]/30" viewBox="0 0 80 40" fill="none">
-        <path d="M12 20l2.2-6 2.2 6 6 2.2-6 2.2-2.2 6-2.2-6-6-2.2 6-2.2Z" fill="currentColor" />
-        <path d="M48 12l1.5-4 1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5Z" fill="currentColor" />
-        <circle cx="68" cy="24" r="2" fill="currentColor" />
-      </svg>
-      <svg className="landing-doodle absolute right-[22%] top-[32%] h-8 w-14 text-[#c45c4a]/25" viewBox="0 0 80 40" fill="none">
-        <path d="M8 28c8-16 16-16 24 0s16 16 24 0 16-16 24 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <svg className="landing-doodle landing-doodle-float absolute left-[52%] top-[58%] hidden h-11 w-11 text-[#1a5c5c]/30 xl:block" viewBox="0 0 44 44" fill="none">
-        <path d="M8 14h28v18H8z" stroke="currentColor" strokeWidth="2" />
-        <path d="M14 14V10a8 8 0 0 1 16 0v4" stroke="currentColor" strokeWidth="2" />
-        <circle cx="22" cy="23" r="3" stroke="currentColor" strokeWidth="2" />
-      </svg>
+    <div className="landing-stage" aria-hidden>
+      <div className="landing-stage-glow" />
+      <div className="landing-board">
+        <div className="flex items-center justify-between gap-3 border-b border-[#10211e]/8 px-4 py-3.5 sm:px-5">
+          <div className="flex items-center gap-2.5">
+            <span className="landing-live-dot" />
+            <p className="text-[13px] font-semibold tracking-tight text-[#10211e]">Today&apos;s OPD</p>
+          </div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#5c726c]">Sample day</p>
+        </div>
+        <div className="flex flex-wrap items-end justify-between gap-3 px-4 py-4 sm:px-5">
+          <div>
+            <p className="landing-brand text-xl font-semibold tracking-tight text-[#10211e]">Dr. Mehta</p>
+            <p className="mt-0.5 text-xs text-[#5c726c]">General medicine · Room 2</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-[#e7f5f2] px-2.5 py-1 text-[11px] font-semibold text-[#0c5c54]">Waiting 6</span>
+            <span className="rounded-full bg-[#10211e] px-2.5 py-1 text-[11px] font-semibold text-[#f6f3ec]">In consult 1</span>
+          </div>
+        </div>
+        <ul className="space-y-1.5 px-3 pb-3 sm:px-4 sm:pb-4">
+          {rows.map((row) => (
+            <li
+              key={row.token}
+              className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${
+                row.tone === "live" ? "bg-[#10211e] text-[#f6f3ec]" : "bg-[#f7f5f0] text-[#10211e]"
+              }`}
+            >
+              <span className={`w-12 font-mono text-xs font-semibold ${row.tone === "live" ? "text-[#9ddecf]" : "text-[#0c5c54]"}`}>
+                {row.token}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.name}</span>
+              <span className={`text-[11px] font-medium ${row.tone === "live" ? "text-[#d7ebe4]" : "text-[#5c726c]"}`}>
+                {row.meta}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="landing-floaters">
+        <div className="landing-floater landing-floater-bill">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5c726c]">Collections</p>
+          <p className="landing-brand mt-1 text-lg font-semibold text-[#10211e]">₹12,480</p>
+          <p className="text-[11px] text-[#5c726c]">4 receipts · today</p>
+        </div>
+        <div className="landing-floater landing-floater-note">
+          <span className="landing-live-dot landing-live-dot-coral" />
+          <p className="text-sm font-medium text-[#10211e]">Visit summary sent on WhatsApp</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -260,7 +268,7 @@ function BrandMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
         className="rounded-md shadow-sm"
         priority={size === "lg"}
       />
-      <span className={`landing-brand font-semibold tracking-tight text-[#0c2f2c] ${text}`}>MedERP</span>
+      <span className={`landing-brand font-semibold tracking-tight text-[#10211e] ${text}`}>MedERP</span>
     </span>
   );
 }
@@ -320,148 +328,229 @@ function AppDownloadBadges({ className = "" }: { className?: string }) {
   );
 }
 
-export function MarketingLanding() {
+export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolean }) {
   return (
-    <div className={`landing text-[#0c1f2e] ${display.variable} ${body.variable}`}>
-      <header className="landing-nav absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
-        <Link href="/" className="inline-flex items-center">
-          <BrandMark size="sm" />
-        </Link>
-        <Link href="/privacy" className="text-sm font-semibold text-[#1f4a46] hover:text-[#0c1f2e]">
-          Privacy
-        </Link>
+    <div className={`landing text-[#10211e] ${display.variable} ${body.variable}`}>
+      <header className="landing-nav">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
+          <Link href="/" className="inline-flex min-w-0 items-center">
+            <BrandMark size="sm" />
+          </Link>
+          <nav className="hidden items-center gap-7 text-sm font-medium text-[#3e5550] md:flex" aria-label="Page">
+            <a href="#workflow" className="hover:text-[#10211e]">
+              The day
+            </a>
+            <a href="#features" className="hover:text-[#10211e]">
+              Features
+            </a>
+            {isMobileApp ? null : (
+              <a href="#mobile" className="hover:text-[#10211e]">
+                Mobile
+              </a>
+            )}
+          </nav>
+          <div className="flex shrink-0 items-center gap-2">
+            <a href="/login" className="landing-quiet hidden h-10 items-center px-3 text-sm font-semibold sm:inline-flex">
+              Sign in
+            </a>
+            <Link href="/demo" className="landing-cta inline-flex h-10 items-center rounded-full px-4 text-sm font-semibold">
+              Book a demo
+            </Link>
+          </div>
+        </div>
       </header>
 
-      <section className="landing-hero relative flex items-end overflow-hidden px-5 pb-16 pt-28 sm:items-center sm:px-8 sm:pb-20 lg:px-12">
-        <div className="landing-hero-bg absolute inset-0" aria-hidden />
-        <div className="landing-hero-mesh absolute inset-0" aria-hidden />
-        <HeroDoodles />
-        <div className="relative z-10 max-w-2xl">
-            <div className="landing-fade landing-delay-1">
-              <BrandMark size="lg" />
-            </div>
-            <h1 className="landing-fade landing-delay-2 mt-5 max-w-xl text-2xl font-medium leading-snug text-[#0c2f2c] sm:text-3xl lg:text-[2.15rem]">
-              Clinic ERP for OPD, nursing, billing, and day-to-day clinic operations.
+      <section className="relative px-5 pb-8 pt-6 sm:px-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-14">
+        <div className="landing-hero-wash pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative mx-auto grid min-w-0 max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12">
+          <div className="landing-hero-copy min-w-0 max-w-xl">
+            <p className="landing-kicker">Clinic ERP · India</p>
+            <h1 className="landing-display mt-4 text-[#10211e]">
+              From the first token
+              <span className="landing-display-em"> to the last bill.</span>
             </h1>
-            <p className="landing-fade landing-delay-3 mt-4 max-w-lg text-base leading-relaxed text-[#1f4a46]/85 sm:text-lg">
-              Built for Indian clinics and polyclinics — reception, nurses, and doctors on one record, on web and mobile.
+            <p className="mt-5 max-w-md text-base leading-relaxed text-[#3e5550] sm:text-lg">
+              Reception, nurses, and doctors work one patient record — queue, vitals, consult, billing, and WhatsApp — on the web and in the staff app.
             </p>
-            <div className="landing-fade landing-delay-4 mt-8 flex flex-wrap gap-3">
-              <Link href="/demo" className="landing-cta inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold">
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/demo" className="landing-cta inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold">
                 Book a demo
               </Link>
-              <Link
-                href="/register-hospital"
-                className="landing-ghost inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
-              >
-                Register clinic
-              </Link>
-              <a
-                href="/login"
-                className="landing-link-btn inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
-              >
+              {isMobileApp ? null : (
+                <Link
+                  href="/register-hospital"
+                  className="landing-ghost inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold"
+                >
+                  Register clinic
+                </Link>
+              )}
+              <a href="/login" className="landing-link-btn inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold sm:hidden">
                 Sign in
               </a>
             </div>
-            <div className="landing-fade landing-delay-4 mt-5">
-              <p className="mb-2.5 text-xs font-medium uppercase tracking-[0.14em] text-[#1f4a46]/65">
-                Mobile app
-              </p>
-              <AppDownloadBadges />
-            </div>
+            {isMobileApp ? (
+              <div className="mt-6 max-w-lg">
+                <OpenOnWeb
+                  message="Clinic registration is managed on the MedERP website from a web browser."
+                  url={mederpWebUrl("/register-hospital")}
+                />
+              </div>
+            ) : null}
+            <dl className="mt-8 grid gap-3 border-t border-[#10211e]/10 pt-5 min-[480px]:grid-cols-3 min-[480px]:gap-x-3">
+              {[
+                ["One chart", "OPD through billing"],
+                ["Every role", "Desk, nurse, doctor"],
+                ["Two surfaces", "Web and staff app"],
+              ].map(([label, detail]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-[13px] font-semibold text-[#10211e] sm:text-sm">{label}</dt>
+                  <dd className="mt-1 text-[11px] leading-snug text-[#5c726c] sm:text-xs">{detail}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <ClinicStage />
         </div>
       </section>
 
-      <section id="features" className="landing-section px-5 py-16 sm:px-8 lg:px-12">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="landing-brand text-2xl font-semibold tracking-tight text-[#0c1f2e] sm:text-3xl">
-            Everything your clinic needs
+      <section id="workflow" className="landing-day px-4 py-16 sm:px-8 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="landing-kicker landing-kicker-light">How a clinic day runs</p>
+              <h2 className="landing-brand mt-3 max-w-lg text-3xl font-semibold tracking-tight text-[#f6f3ec] sm:text-4xl">
+                Four desks. One visit.
+              </h2>
+            </div>
+            <p className="max-w-sm text-sm leading-relaxed text-[#c9ddd6]">
+              The token started at reception is the same visit the nurse, the doctor, and the bill all close.
+            </p>
+          </div>
+          <ol className="mt-12 grid gap-px overflow-hidden rounded-[1.75rem] bg-[#f6f3ec]/10 sm:grid-cols-2 lg:grid-cols-4">
+            {daySteps.map((step) => (
+              <li key={step.n} className="bg-[#0e1c19] px-5 py-6 sm:px-6 sm:py-7">
+                <p className="landing-brand text-3xl font-medium text-[#7dcec0]">{step.n}</p>
+                <h3 className="mt-6 text-lg font-semibold text-[#f6f3ec]">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#c9ddd6]">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section id="features" className="px-4 py-16 sm:px-8 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="landing-kicker">What the clinic gets</p>
+          <h2 className="landing-brand mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-[#10211e] sm:text-4xl">
+            The work of the day, already laid out.
           </h2>
-          <p className="mt-3 max-w-2xl text-base text-[#3d5668]">
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#3e5550]">
             OPD, nurse vitals, doctor consult, billing, certificates, WhatsApp, and staff tools — in one clinic ERP.
           </p>
-          <div className="mt-10 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div key={feature.title} className="flex gap-3">
-                <span className="landing-feature-icon mt-0.5">
+          <div className="landing-bento mt-10">
+            {features.map((feature, index) => (
+              <article key={feature.title} className={`landing-card ${index === 0 ? "landing-card-lead" : ""}`}>
+                <span className="landing-feature-icon">
                   <FeatureIconSvg name={feature.icon} />
                 </span>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#0c1f2e]">{feature.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-[#3d5668]">{feature.body}</p>
-                </div>
-              </div>
+                <h3 className="mt-5 text-lg font-semibold tracking-tight text-[#10211e]">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#3e5550]">{feature.body}</p>
+                {index === 0 ? (
+                  <div className="mt-6 flex flex-wrap gap-2" aria-hidden>
+                    {["T-001", "Walk-in", "Appointment", "Department"].map((chip) => (
+                      <span key={chip} className="rounded-full border border-[#10211e]/10 bg-white/80 px-3 py-1 text-xs font-medium text-[#3e5550]">
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-t border-[#d5e2ea] bg-white px-5 py-14 sm:px-8 lg:px-12">
-        <div className="mx-auto flex max-w-5xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="landing-brand text-xl font-semibold text-[#0c1f2e] sm:text-2xl">See MedERP in your clinic</h2>
-            <p className="mt-2 text-sm text-[#3d5668]">
-              Book a walkthrough, or register and start a trial with your team.
-            </p>
+      {isMobileApp ? null : (
+        <section id="mobile" className="px-4 pb-6 sm:px-8">
+          <div className="mx-auto grid max-w-6xl items-center gap-8 overflow-hidden rounded-[1.75rem] bg-white px-6 py-8 shadow-[0_20px_50px_-32px_rgb(16_33_30_/_0.45)] sm:px-10 sm:py-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <p className="landing-kicker">Staff app</p>
+              <h2 className="landing-brand mt-3 text-3xl font-semibold tracking-tight text-[#10211e] sm:text-4xl">
+                The same clinic, in a pocket.
+              </h2>
+              <p className="mt-3 max-w-lg text-sm leading-relaxed text-[#3e5550] sm:text-base">
+                Doctors, nurses, and reception use the MedERP app for the queue, vitals, and visit — the record stays the one on the web.
+              </p>
+            </div>
+            <AppDownloadBadges className="lg:justify-end" />
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/demo"
-              className="landing-cta inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
-            >
+        </section>
+      )}
+
+      <section className="px-4 py-16 sm:px-8 sm:py-20">
+        <div className="landing-close mx-auto max-w-6xl px-6 py-12 sm:px-12 sm:py-16">
+          <p className="landing-kicker landing-kicker-light">Next step</p>
+          <h2 className="landing-brand mt-3 max-w-xl text-3xl font-semibold tracking-tight text-[#f6f3ec] sm:text-5xl">
+            See MedERP on your own OPD.
+          </h2>
+          <p className="mt-4 max-w-lg text-sm leading-relaxed text-[#c9ddd6] sm:text-base">
+            {isMobileApp
+              ? "Book a walkthrough with your team."
+              : "Book a walkthrough, or register and start a trial with your team."}
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/demo" className="landing-cta-light inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold">
               Book a demo
             </Link>
-            <Link
-              href="/register-hospital"
-              className="landing-ghost inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
-            >
-              Register clinic
-            </Link>
-            <a
-              href="/login"
-              className="landing-link-btn inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
-            >
+            {isMobileApp ? null : (
+              <Link href="/register-hospital" className="landing-ghost-light inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold">
+                Register clinic
+              </Link>
+            )}
+            <a href="/login" className="landing-ghost-light inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold">
               Sign in
             </a>
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-[#c5e0da] bg-[#eaf6f3] px-5 py-10 sm:px-8 lg:px-12">
-        <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
+      <footer className="border-t border-[#10211e]/10 px-4 py-10 sm:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
-            <Image src="/mederp-icon.png" alt="" width={36} height={36} className="h-9 w-9 rounded-md" />
+            <Image src="/mederp-icon.png" alt="" width={36} height={36} className="h-9 w-9 rounded-xl" />
             <div>
-              <p className="landing-brand font-semibold text-[#0c1f2e]">MedERP</p>
-              <p className="text-xs text-[#5a7385]">Clinic ERP for web and mobile</p>
+              <p className="landing-brand font-semibold text-[#10211e]">MedERP</p>
+              <p className="text-xs text-[#5c726c]">Clinic ERP for web and mobile</p>
             </div>
           </div>
-          <AppDownloadBadges />
+          {isMobileApp ? null : <AppDownloadBadges />}
         </div>
-        <div className="mx-auto mt-8 flex max-w-5xl flex-wrap gap-4 text-sm text-[#3d5668]">
-          <Link href="/#features" className="hover:text-[#0c1f2e]">
+        <div className="mx-auto mt-8 flex max-w-6xl flex-wrap gap-x-5 gap-y-2 text-sm text-[#3e5550]">
+          <Link href="/#features" className="hover:text-[#10211e]">
             Features
           </Link>
-          <a href="/login" className="hover:text-[#0c1f2e]">
+          <a href="/login" className="hover:text-[#10211e]">
             Sign in
           </a>
-          <Link href="/register-hospital" className="hover:text-[#0c1f2e]">
-            Register
-          </Link>
-          <Link href="/signup" className="hover:text-[#0c1f2e]">
+          {isMobileApp ? null : (
+            <Link href="/register-hospital" className="hover:text-[#10211e]">
+              Register
+            </Link>
+          )}
+          <Link href="/signup" className="hover:text-[#10211e]">
             Staff signup
           </Link>
-          <Link href="/help" className="hover:text-[#0c1f2e]">
+          <Link href="/help" className="hover:text-[#10211e]">
             Help
           </Link>
-          <Link href="/terms" className="hover:text-[#0c1f2e]">
+          <Link href="/terms" className="hover:text-[#10211e]">
             Terms
           </Link>
-          <Link href="/privacy" className="hover:text-[#0c1f2e]">
+          <Link href="/privacy" className="hover:text-[#10211e]">
             Privacy
           </Link>
         </div>
-        <div className="mx-auto mt-8 max-w-5xl">
+        <div className="landing-credits mx-auto mt-8 max-w-6xl">
           <DeveloperCredit />
           <div className="mt-3 text-center">
             <ManagedByCredit />

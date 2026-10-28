@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { approveReferral, ReferralReviewError, rejectReferral } from "@/lib/hospital-referrals";
+import { assertSoftwareAdminPassword } from "@/lib/software-admin-password";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -11,7 +12,15 @@ export async function PATCH(request: Request, context: Ctx) {
   }
 
   const { id } = await context.params;
-  const body = (await request.json().catch(() => null)) as { action?: string; reviewNote?: string } | null;
+  const body = (await request.json().catch(() => null)) as {
+    action?: string;
+    reviewNote?: string;
+    password?: unknown;
+  } | null;
+  const verified = await assertSoftwareAdminPassword(actor.id, body?.password);
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.error }, { status: verified.status });
+  }
   const action = String(body?.action ?? "");
   const note = body?.reviewNote != null ? String(body.reviewNote) : null;
 
@@ -27,6 +36,7 @@ export async function PATCH(request: Request, context: Ctx) {
         ok: true,
         rewardMonths: result.rewardMonths,
         trialEndsAt: result.trialEndsAt?.toISOString() ?? null,
+        nextChargeAt: result.nextChargeAt?.toISOString() ?? null,
       });
     }
     if (action === "reject") {

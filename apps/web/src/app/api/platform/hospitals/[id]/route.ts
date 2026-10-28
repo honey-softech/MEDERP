@@ -137,6 +137,13 @@ export async function PATCH(request: Request, context: Ctx) {
     return NextResponse.json({ error: "No changes provided." }, { status: 400 });
   }
 
+  if (existing.isActive && data.isActive === false) {
+    const verified = await assertSoftwareAdminPassword(actor.id, body.password);
+    if (!verified.ok) {
+      return NextResponse.json({ error: verified.error }, { status: verified.status });
+    }
+  }
+
   const changed = new Set<string>();
   if (data.name !== undefined && data.name !== existing.name) changed.add("name");
   if (data.code !== undefined && data.code !== existing.code) changed.add("code");

@@ -486,6 +486,23 @@ model HospitalReferral {
   @@index([status, createdAt])
 }
 
+/// WhatsApp OTP for a super-admin mobile before that number has an account.
+model RegistrationMobileOtp {
+  id             String    @id @default(cuid())
+  mobile         String
+  purpose        String
+  codeHash       String
+  expiresAt      DateTime
+  attempts       Int       @default(0)
+  verifiedAt     DateTime?
+  proofToken     String?   @unique
+  proofExpiresAt DateTime?
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([mobile, purpose, createdAt])
+}
+
 model AppUser {
   id                 String           @id @default(cuid())
   username           String           @unique

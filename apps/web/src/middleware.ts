@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isMedErpMobileUserAgent } from "@/lib/drug-catalog-cache/platform";
 
 const SESSION_COOKIE = "mederp_session";
 
@@ -21,6 +22,15 @@ export function middleware(request: NextRequest) {
   // Socket.IO is handled by the custom Node server — never redirect or rewrite it.
   if (pathname.startsWith("/socket.io")) {
     return NextResponse.next();
+  }
+
+  // Clinic registration (and its Razorpay checkout) stays in the browser. The
+  // installed apps only sign staff in.
+  if (
+    isMedErpMobileUserAgent(request.headers.get("user-agent") ?? "") &&
+    (pathname === "/register-hospital" || pathname.startsWith("/register-hospital/"))
+  ) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   const isRoot = pathname === "/";

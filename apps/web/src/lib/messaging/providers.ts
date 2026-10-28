@@ -108,6 +108,7 @@ function reminderParamFormat(): "named" | "positional" {
 export function otpStatusText(purpose: string) {
   const key = purpose.trim().toLowerCase();
   if (key === "signup") return "Sign up";
+  if (key === "hospital-register") return "Hospital registration";
   if (key === "password-reset") return "Password reset";
   if (key === "public-help") return "Support request";
   if (key === "public-help-status") return "Support status";

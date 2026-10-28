@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { fieldClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { fieldClass } from "@/components/auth-shell";
+import { SoftwareAdminPasswordConfirm } from "@/components/software-admin-password-confirm";
 
 export function ReferralReviewActions({
   referralId,
@@ -11,26 +11,17 @@ export function ReferralReviewActions({
   referralId: string;
   capReached: boolean;
 }) {
-  const router = useRouter();
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState<"approve" | "reject" | null>(null);
 
-  async function submit(action: "approve" | "reject") {
-    setError("");
-    setPending(action);
+  async function review(action: "approve" | "reject", password: string) {
     const response = await fetch(`/api/platform/referrals/${referralId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, reviewNote: note }),
+      body: JSON.stringify({ action, reviewNote: note, password }),
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setPending(null);
-      setError(data.error ?? "Could not update referral.");
-      return;
-    }
-    router.refresh();
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) return { ok: false, error: data.error ?? "Could not update referral." };
+    return { ok: true };
   }
 
   return (
@@ -44,14 +35,22 @@ export function ReferralReviewActions({
           Cap reached. Approving records the referral but does not add a free month.
         </p>
       ) : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <button className={primaryButtonClass} type="button" disabled={Boolean(pending)} onClick={() => void submit("approve")}>
-          {pending === "approve" ? "Approving…" : capReached ? "Approve without extra month" : "Approve free month"}
-        </button>
-        <button className={secondaryButtonClass} type="button" disabled={Boolean(pending)} onClick={() => void submit("reject")}>
-          {pending === "reject" ? "Rejecting…" : "Reject"}
-        </button>
+      <div className="flex flex-wrap items-start gap-3">
+        <SoftwareAdminPasswordConfirm
+          tone="primary"
+          openLabel={capReached ? "Approve without extra month" : "Approve free month"}
+          confirmLabel="Approve referral"
+          pendingLabel="Approving…"
+          description="Enter your software admin password to approve this referral."
+          onConfirm={(password) => review("approve", password)}
+        />
+        <SoftwareAdminPasswordConfirm
+          openLabel="Reject"
+          confirmLabel="Reject referral"
+          pendingLabel="Rejecting…"
+          description="Enter your software admin password to decline this referral."
+          onConfirm={(password) => review("reject", password)}
+        />
       </div>
     </div>
   );

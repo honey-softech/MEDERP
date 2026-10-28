@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { MarketingLanding } from "@/components/marketing-landing";
+import { isMobileAppRequest } from "@/lib/mobile-app";
 import { HomeDashboard } from "./home-dashboard";
 
 export default async function Home({
@@ -8,6 +9,6 @@ export default async function Home({
   searchParams: Promise<{ date?: string }>;
 }) {
   const user = await getCurrentUser();
-  if (!user) return <MarketingLanding />;
+  if (!user) return <MarketingLanding isMobileApp={await isMobileAppRequest()} />;
   return <HomeDashboard searchParams={searchParams} />;
 }

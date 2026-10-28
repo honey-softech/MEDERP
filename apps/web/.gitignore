@@ -49,3 +49,6 @@ next-env.d.ts
 # Temporary WhatsApp PDFs served to AskEva
 /.data/
 
+# Local referral tracking samples. Never commit clinic stand-ins.
+/src/lib/referral-tracking.local.json
+

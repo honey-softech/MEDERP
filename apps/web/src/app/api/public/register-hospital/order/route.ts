@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       phone: body.phone != null ? String(body.phone) : null,
       adminUsername: String(body.adminUsername ?? ""),
       adminMobile: String(body.adminMobile ?? ""),
+      mobileProof: body.mobileProof != null ? String(body.mobileProof) : "",
       adminEmail: body.adminEmail != null ? String(body.adminEmail) : null,
       adminPassword: String(body.adminPassword ?? ""),
       tierId: body.tierId != null ? String(body.tierId) : undefined,

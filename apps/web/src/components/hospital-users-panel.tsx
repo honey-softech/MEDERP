@@ -5,6 +5,7 @@ import { FilterableTable } from "@/components/filterable-table";
 import HospitalUserForm, { type HospitalUserFormInitial } from "@/components/hospital-user-form";
 import { UserSignatureManager } from "@/components/user-signature-manager";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { PulseBlock } from "@/components/pulse-loader";
 
 type UserRow = {
   id: string;
@@ -167,7 +168,7 @@ function UserFormDialog({
             </button>
           </div>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {!initial && !error ? <p className="text-sm text-slate-500">Loading user…</p> : null}
+          {!initial && !error ? <PulseBlock label="Loading user" /> : null}
           {initial ? (
             <>
               <HospitalUserForm

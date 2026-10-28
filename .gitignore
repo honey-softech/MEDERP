@@ -53,6 +53,9 @@ credentials.json
 # Local demo seed (do not deploy sample hospital data scripts)
 apps/web/prisma/seed-demo-data.ts
 
+# Local referral tracking samples. Never commit clinic stand-ins.
+apps/web/src/lib/referral-tracking.local.json
+
 # Test suite local artifacts
 docs/test-suite/__pycache__/
 docs/test-suite/~$*

@@ -24,6 +24,11 @@ import {
   MAX_REFERRALS_PER_HOSPITAL,
   openReferralCount,
 } from "@/lib/hospital-referrals";
+import {
+  assertRegistrationMobileProof,
+  consumeRegistrationMobileProof,
+  RegistrationMobileOtpError,
+} from "@/lib/registration-mobile-otp";
 
 export class HospitalRegistrationError extends Error {
   constructor(
@@ -56,6 +61,8 @@ export type RegisterHospitalInput = {
   phone?: string | null;
   adminUsername: string;
   adminMobile: string;
+  /** Proof from WhatsApp OTP on the super admin mobile. Required before the hospital is created. */
+  mobileProof?: string | null;
   adminEmail?: string | null;
   adminPassword: string;
   tierId?: string;
@@ -203,6 +210,14 @@ export async function prepareHospitalRegistration(
   if (adminMobileError) {
     throw new HospitalRegistrationError(adminMobileError, 400);
   }
+  try {
+    await assertRegistrationMobileProof(adminMobile, input.mobileProof);
+  } catch (error) {
+    if (error instanceof RegistrationMobileOtpError) {
+      throw new HospitalRegistrationError(error.message, error.status);
+    }
+    throw error;
+  }
   if (!isValidEmail(adminEmail)) {
     throw new HospitalRegistrationError("Enter a valid super admin email.", 400);
   }
@@ -332,6 +347,14 @@ export async function registerHospital(input: RegisterHospitalInput) {
   }
 
   const prepared = await prepareHospitalRegistration(input);
+  try {
+    await consumeRegistrationMobileProof(prepared.adminMobile, input.mobileProof);
+  } catch (error) {
+    if (error instanceof RegistrationMobileOtpError) {
+      throw new HospitalRegistrationError(error.message, error.status);
+    }
+    throw error;
+  }
   const skipInvoice = Boolean(input.skipInvoice);
   const invoiceStatus = input.invoiceStatus ?? "ISSUED";
   const tier = prepared.quote.tier;

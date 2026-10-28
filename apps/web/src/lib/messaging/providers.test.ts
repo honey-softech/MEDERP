@@ -120,6 +120,7 @@ describe("WhatsApp template builder", () => {
       ["close-hospital", "Close hospital"],
       ["leave-hospital", "Leave hospital"],
       ["delete-account", "Delete account"],
+      ["hospital-register", "Hospital registration"],
     ] as const;
 
     for (const [purpose, status] of cases) {

@@ -24,12 +24,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Clinic registration (and its Razorpay checkout) stays in the browser. The
-  // installed apps only sign staff in.
-  if (
-    isMedErpMobileUserAgent(request.headers.get("user-agent") ?? "") &&
-    (pathname === "/register-hospital" || pathname.startsWith("/register-hospital/"))
-  ) {
+  const isMobileApp = isMedErpMobileUserAgent(request.headers.get("user-agent") ?? "");
+  const isLoggedIn =
+    Boolean(request.cookies.get(SESSION_COOKIE)?.value) ||
+    (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ");
+
+  // The installed apps open on sign-in. Registration stays in the browser.
+  if (isMobileApp && !isLoggedIn && (pathname === "/" || pathname === "/register-hospital" || pathname.startsWith("/register-hospital/"))) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -42,10 +43,6 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/api/public/") ||
     pathname === "/api/health" ||
     pathname === "/api/platform/demos/google/callback";
-  const isLoggedIn =
-    Boolean(request.cookies.get(SESSION_COOKIE)?.value) ||
-    (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ");
-
   if ((isPublicPage || isPublicApi) && isLoggedIn && pathname === "/signup") {
     return NextResponse.redirect(new URL("/", request.url));
   }

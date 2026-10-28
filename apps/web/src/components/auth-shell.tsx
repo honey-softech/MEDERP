@@ -40,14 +40,10 @@ export function AuthShell({
     <div
       className={`flex flex-col px-4 py-6 sm:px-6 lg:px-8 ${keyboardSafe ? "min-h-svh" : "min-h-dvh"} ${doodles ? "" : "bg-app-bg"}`}
     >
-      <div
-        className={`flex flex-1 justify-center ${
-          wide ? "items-start lg:py-8" : keyboardSafe ? "items-start pt-4 sm:items-center sm:pt-0" : "items-center"
-        }`}
-      >
+      <div className={`flex w-full flex-1 flex-col items-center ${wide ? "justify-start lg:py-8" : ""}`}>
         <div
           className={`auth-card w-full rounded-xl border border-border bg-surface p-5 shadow-card sm:p-8 ${
-            wide ? "max-w-[90rem]" : "max-w-md"
+            wide ? "max-w-[90rem]" : "my-auto max-w-md"
           }`}
         >
           <div className="mb-5 flex items-center justify-between gap-3">

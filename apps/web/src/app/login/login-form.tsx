@@ -197,17 +197,21 @@ export function LoginForm({ isMobileApp = false }: { isMobileApp?: boolean }) {
           Create an account
         </Link>
       </p>
-      <p className="mt-2 text-center text-sm text-slate-500">
-        Want a walkthrough?{" "}
-        <Link className="font-medium text-teal-700 hover:underline" href="/demo">
-          Book a demo
-        </Link>
-      </p>
-      <p className="mt-2 text-center text-sm text-slate-500">
-        <Link className="font-medium text-teal-700 hover:underline" href="/">
-          Back to MedERP home
-        </Link>
-      </p>
+      {hideRegistration ? null : (
+        <>
+          <p className="mt-2 text-center text-sm text-slate-500">
+            Want a walkthrough?{" "}
+            <Link className="font-medium text-teal-700 hover:underline" href="/demo">
+              Book a demo
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm text-slate-500">
+            <Link className="font-medium text-teal-700 hover:underline" href="/">
+              Back to MedERP home
+            </Link>
+          </p>
+        </>
+      )}
     </AuthShell>
   );
 }

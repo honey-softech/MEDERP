@@ -15,6 +15,14 @@ void main() {
     expect(mobileUserAgent(null), contains(medErpMobileToken));
     expect(mobileUserAgent('Mozilla/5.0'), 'Mozilla/5.0 $medErpMobileToken');
     expect(mobileUserAgent('Mozilla/5.0 $medErpMobileToken'), 'Mozilla/5.0 $medErpMobileToken');
+    expect(mobileUserAgent(iosWebViewUserAgent), contains('iPhone'));
+    expect(mobileUserAgent(iosWebViewUserAgent), contains(medErpMobileToken));
+  });
+
+  test('cancelled iOS navigations are not connection failures', () {
+    expect(isBenignWebViewError(-999), isTrue);
+    expect(isBenignWebViewError(102), isTrue);
+    expect(isBenignWebViewError(-1009), isFalse);
   });
 
   test('parses a bill download posted from the site', () {

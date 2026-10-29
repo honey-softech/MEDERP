@@ -202,6 +202,12 @@ class SystemNotifications {
 /// Appended to the WebView user agent so the site can skip its in-app popup.
 const String medErpMobileToken = 'MedERPMobile';
 
+/// Used on iOS instead of reading `navigator.userAgent`. WKWebView throws if
+/// that is read before the first page loads, and the app was treating the
+/// throw as a lost connection.
+const String iosWebViewUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) '
+    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+
 String mobileUserAgent(String? current) {
   if (current != null && current.contains(medErpMobileToken)) return current;
   if (current != null && current.trim().isNotEmpty) return '$current $medErpMobileToken';

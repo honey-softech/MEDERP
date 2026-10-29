@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { DownloadReportButton } from "@/components/download-report-button";
 import { FilterableTable } from "@/components/filterable-table";
 import { secondaryButtonClass } from "@/components/auth-shell";
 import { hasBillingAccess, inr, prettyEnum, requireHospitalPage } from "@/lib/front-desk";
@@ -46,12 +47,16 @@ export default async function BillingReportsPage({
         <Link href={`/billing/reports?month=${lastMonth}`} className={secondaryButtonClass}>
           Last month
         </Link>
-        <a className={secondaryButtonClass} href={`/api/billing/reports?month=${monthValue}&kind=collections`}>
-          Download collections CSV
-        </a>
-        <a className={secondaryButtonClass} href={`/api/billing/reports?month=${monthValue}&kind=dues`}>
-          Download dues CSV
-        </a>
+        <DownloadReportButton
+          href={`/api/billing/reports?month=${monthValue}&kind=collections`}
+          filename={`mederp-collections-${monthValue}.csv`}
+          label="Download collections CSV"
+        />
+        <DownloadReportButton
+          href={`/api/billing/reports?month=${monthValue}&kind=dues`}
+          filename={`mederp-dues-${monthValue}.csv`}
+          label="Download dues CSV"
+        />
       </form>
 
       <section className="grid gap-4 sm:grid-cols-4">

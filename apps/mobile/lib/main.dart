@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +11,12 @@ import 'package:mederp_mobile/system_notifications.dart';
 import 'package:mederp_mobile/viewport_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+
+/// iOS sends these when a redirect, or a second load, stops the navigation
+/// already in flight. The page that replaces it still opens.
+bool isBenignWebViewError(int errorCode) {
+  return errorCode == -999 || errorCode == 102;
+}
 
 /// The installed app opens the same MedERP site used in the browser.
 const String medErpSiteUrl = 'https://mederp.co.in';
@@ -46,6 +55,8 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
   int _progress = 0;
   bool _failed = false;
   bool _firstPaintDone = false;
+  int _openAttempts = 0;
+  Timer? _retryTimer;
 
   @override
   void initState() {
@@ -86,27 +97,43 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             setState(() => _failed = false);
           },
           onPageFinished: (_) {
+            _retryTimer?.cancel();
             _controller.runJavaScript(viewportLockScript);
             _controller.runJavaScript(inAppToastGuardScript);
             PushNotifications.registerTokenOnSite();
-            if (!mounted || _firstPaintDone) return;
-            setState(() => _firstPaintDone = true);
+            if (!mounted || (_firstPaintDone && !_failed)) return;
+            setState(() {
+              _firstPaintDone = true;
+              _failed = false;
+            });
           },
           onWebResourceError: (error) {
             if (error.isForMainFrame != true || !mounted) return;
-            setState(() => _failed = true);
+            if (isBenignWebViewError(error.errorCode)) return;
+            _handleOpenFailure();
           },
         ),
       );
-    // Show the site first. Notification / FCM setup must never block the WebView load.
-    _openSite();
+    // The iOS view has to be on screen before the first load. Reading the
+    // user agent earlier throws, which was shown as a connection error.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openSite();
+    });
     SystemNotifications.ensureReady().catchError((_) {});
     PushNotifications.start(webView: _controller).catchError((_) {});
   }
 
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _openSite() async {
+    _openAttempts += 1;
     try {
-      final current = await _controller.getUserAgent();
+      final current = Platform.isIOS ? iosWebViewUserAgent : await _controller.getUserAgent();
       await _controller.setUserAgent(mobileUserAgent(current));
       // iOS adds a user script for this; Android turns off the zoom gesture.
       await _controller.enableZoom(false);
@@ -114,9 +141,23 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       if (!mounted) return;
       await _controller.loadRequest(Uri.parse(medErpSiteUrl));
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _failed = true);
+      _handleOpenFailure();
     }
+  }
+
+  /// The first iOS navigation often fails once while the WebView process
+  /// starts, then succeeds. Retry that once before asking the user.
+  void _handleOpenFailure() {
+    if (!mounted) return;
+    if (!_firstPaintDone && _openAttempts < 2) {
+      _retryTimer?.cancel();
+      _retryTimer = Timer(const Duration(milliseconds: 400), () {
+        if (!mounted || _firstPaintDone) return;
+        _openSite();
+      });
+      return;
+    }
+    setState(() => _failed = true);
   }
 
   void _openNotice(String href) {
@@ -200,6 +241,7 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
                           FilledButton(
                             onPressed: () {
                               setState(() => _failed = false);
+                              _openAttempts = 0;
                               _openSite();
                             },
                             child: const Text('Try again'),

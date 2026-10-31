@@ -354,6 +354,8 @@ const structuredData = {
       logo: `${MEDERP_PUBLIC_ORIGIN}/mederp-icon.png`,
       description:
         "Clinic and hospital ERP for India: OPD management, billing, pharmacy, lab, and WhatsApp on the web and in the staff app.",
+      areaServed: "IN",
+      slogan: "Clinic and hospital ERP for India",
     },
     {
       "@type": "SoftwareApplication",

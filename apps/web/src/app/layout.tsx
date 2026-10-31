@@ -46,6 +46,9 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  verification: {
+    google: "6iti9iTP9D8-2SfejfQy-ElG0U2Mr66Ile1GnR2-B7k",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -67,11 +70,12 @@ export const viewport = {
   minimumScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#10211e",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="en-IN" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full bg-app-bg font-sans text-text-primary">{children}</body>
     </html>
   );

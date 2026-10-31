@@ -24,6 +24,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Search engines and browsers fetch these without a session.
+  if (
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/opengraph-image"
+  ) {
+    return NextResponse.next();
+  }
+
   const isMobileApp = isMedErpMobileUserAgent(request.headers.get("user-agent") ?? "");
   const isLoggedIn =
     Boolean(request.cookies.get(SESSION_COOKIE)?.value) ||

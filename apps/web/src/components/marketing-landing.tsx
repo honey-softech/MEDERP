@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 import { DeveloperCredit, ManagedByCredit } from "@/components/auth-branding";
 import { OpenOnWeb } from "@/components/open-on-web";
-import { mederpWebUrl } from "@/lib/mobile-app";
+import { MEDERP_PUBLIC_ORIGIN, mederpWebUrl } from "@/lib/mobile-app";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -273,37 +273,33 @@ function BrandMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   );
 }
 
-/** Swap these when App Store / Play Store listings are live. */
-const APP_STORE_URL = "#";
-const PLAY_STORE_URL = "#";
-
 const storeBadgeClass =
-  "inline-flex h-12 items-center gap-3 rounded-xl border px-4 text-white shadow-[0_8px_20px_rgb(0_0_0_/_0.2)] transition";
+  "inline-flex h-12 cursor-default items-center gap-3 rounded-xl border px-4 text-white shadow-[0_8px_20px_rgb(0_0_0_/_0.2)]";
 
-function AppStoreBadge({ href = APP_STORE_URL }: { href?: string }) {
+function AppStoreBadge() {
   return (
-    <a
-      href={href}
-      className={`${storeBadgeClass} border-[#5b9dff]/40 bg-gradient-to-br from-[#1a2744] to-[#0b1220] hover:from-[#243456] hover:to-[#121a2e]`}
-      aria-label="Download on the App Store"
+    <div
+      className={`${storeBadgeClass} border-[#5b9dff]/40 bg-gradient-to-br from-[#1a2744] to-[#0b1220]`}
+      aria-label="iOS app is under construction and coming soon on the App Store"
+      role="note"
     >
       <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0 text-[#8ec5ff]" fill="currentColor" aria-hidden>
         <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
       </svg>
       <span className="flex flex-col leading-none">
-        <span className="text-[10px] font-medium text-white/85">Download on the</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f3c96b]">Coming soon</span>
         <span className="mt-0.5 text-[15px] font-semibold tracking-tight text-white">App Store</span>
       </span>
-    </a>
+    </div>
   );
 }
 
-function PlayStoreBadge({ href = PLAY_STORE_URL }: { href?: string }) {
+function PlayStoreBadge() {
   return (
-    <a
-      href={href}
-      className={`${storeBadgeClass} border-[#34a853]/35 bg-gradient-to-br from-[#1a2e24] to-[#0b1410] hover:from-[#243d30] hover:to-[#121c16]`}
-      aria-label="Get it on Google Play"
+    <div
+      className={`${storeBadgeClass} border-[#34a853]/35 bg-gradient-to-br from-[#1a2e24] to-[#0b1410]`}
+      aria-label="Android app is under construction and coming soon on Google Play"
+      role="note"
     >
       <svg viewBox="0 0 24 24" className="h-6 w-6 shrink-0 drop-shadow-sm" aria-hidden>
         <path fill="#EA4335" d="M3.2 2.4c-.5.3-.8.8-.8 1.4v16.4c0 .6.3 1.1.8 1.4L14.5 12 3.2 2.4Z" />
@@ -312,25 +308,84 @@ function PlayStoreBadge({ href = PLAY_STORE_URL }: { href?: string }) {
         <path fill="#34A853" d="M16.8 8.4 19.3 7c.4-.2.8-.1 1.1.2L3.9 2.2c.3-.2.7-.2 1.1.1l11.8 6.1Z" />
       </svg>
       <span className="flex flex-col leading-none">
-        <span className="text-[10px] font-medium text-white/85">Get it on</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f3c96b]">Coming soon</span>
         <span className="mt-0.5 text-[15px] font-semibold tracking-tight text-white">Google Play</span>
       </span>
-    </a>
+    </div>
   );
 }
 
 function AppDownloadBadges({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      <AppStoreBadge />
-      <PlayStoreBadge />
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a2f]">Under construction</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <AppStoreBadge />
+        <PlayStoreBadge />
+      </div>
     </div>
   );
 }
 
+const faqs = [
+  {
+    question: "What is MedERP?",
+    answer:
+      "MedERP is clinic and hospital ERP for India. It is OPD management software for the queue, nurse vitals, doctor consult, billing, pharmacy, lab, and WhatsApp.",
+  },
+  {
+    question: "Who is MedERP for?",
+    answer:
+      "Clinics and hospitals in India that want reception, nurses, and doctors working one patient record, on the web and in the staff app.",
+  },
+  {
+    question: "Does MedERP send updates on WhatsApp?",
+    answer: "Yes. Staff can send visit summaries, bills, and reminders on WhatsApp before the patient leaves.",
+  },
+];
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      name: "MedERP",
+      url: MEDERP_PUBLIC_ORIGIN,
+      logo: `${MEDERP_PUBLIC_ORIGIN}/mederp-icon.png`,
+      description:
+        "Clinic and hospital ERP for India: OPD management, billing, pharmacy, lab, and WhatsApp on the web and in the staff app.",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "MedERP",
+      url: MEDERP_PUBLIC_ORIGIN,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web, iOS, Android",
+      description:
+        "OPD management software for Indian clinics and hospitals. Queue, nurse vitals, doctor consult, clinic billing, pharmacy, lab, and WhatsApp in one record.",
+      offers: {
+        "@type": "Offer",
+        url: `${MEDERP_PUBLIC_ORIGIN}/register-hospital`,
+      },
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: faqs.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      })),
+    },
+  ],
+};
+
 export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolean }) {
   return (
     <div className={`landing text-[#10211e] ${display.variable} ${body.variable}`}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <header className="landing-nav">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
           <Link href="/" className="inline-flex min-w-0 items-center">
@@ -342,6 +397,9 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
             </a>
             <a href="#features" className="hover:text-[#10211e]">
               Features
+            </a>
+            <a href="#faq" className="hover:text-[#10211e]">
+              FAQ
             </a>
             {isMobileApp ? null : (
               <a href="#mobile" className="hover:text-[#10211e]">
@@ -370,7 +428,7 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
               <span className="landing-display-em"> to the last bill.</span>
             </h1>
             <p className="mt-5 max-w-md text-base leading-relaxed text-[#3e5550] sm:text-lg">
-              Reception, nurses, and doctors work one patient record — queue, vitals, consult, billing, and WhatsApp — on the web and in the staff app.
+              MedERP is clinic and hospital ERP for India: OPD management software for the queue, nurse vitals, doctor consult, billing, and WhatsApp. Reception, nurses, and doctors share one patient record on the web and in the staff app.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/demo" className="landing-cta inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold">
@@ -470,6 +528,23 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
         </div>
       </section>
 
+      <section id="faq" className="px-4 py-16 sm:px-8 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="landing-kicker">Questions</p>
+          <h2 className="landing-brand mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-[#10211e] sm:text-4xl">
+            Clinic ERP, answered.
+          </h2>
+          <div className="mt-10 grid gap-4 lg:grid-cols-3">
+            {faqs.map((item) => (
+              <article key={item.question} className="landing-card">
+                <h3 className="text-lg font-semibold tracking-tight text-[#10211e]">{item.question}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-[#3e5550]">{item.answer}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {isMobileApp ? null : (
         <section id="mobile" className="px-4 pb-6 sm:px-8">
           <div className="mx-auto grid max-w-6xl items-center gap-8 overflow-hidden rounded-[1.75rem] bg-white px-6 py-8 shadow-[0_20px_50px_-32px_rgb(16_33_30_/_0.45)] sm:px-10 sm:py-10 lg:grid-cols-[1.1fr_0.9fr]">
@@ -479,10 +554,10 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
                 The same clinic, in a pocket.
               </h2>
               <p className="mt-3 max-w-lg text-sm leading-relaxed text-[#3e5550] sm:text-base">
-                Doctors, nurses, and reception use the MedERP app for the queue, vitals, and visit — the record stays the one on the web.
+                Doctors, nurses, and reception will use the MedERP app for the queue, vitals, and visit — the record stays the one on the web. The iOS and Android apps are under construction and coming soon.
               </p>
             </div>
-            <AppDownloadBadges className="lg:justify-end" />
+            <AppDownloadBadges className="lg:items-end" />
           </div>
         </section>
       )}

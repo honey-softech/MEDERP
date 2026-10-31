@@ -5,9 +5,17 @@ import { AuthBack } from "@/components/auth-back";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · MedERP",
+  title: { absolute: "Privacy Policy · MedERP" },
   description:
     "How the MedERP website, Android app, and iOS app collect, use, and share staff and patient information.",
+  alternates: { canonical: "/privacy" },
+  openGraph: {
+    url: "/privacy",
+    title: "Privacy Policy · MedERP",
+    description:
+      "How the MedERP website, Android app, and iOS app collect, use, and share staff and patient information.",
+  },
+  robots: { index: true, follow: true },
 };
 
 const display = Fraunces({

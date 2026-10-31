@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { MEDERP_PUBLIC_ORIGIN } from "@/lib/mobile-app";
 import "./globals.css";
+
+const siteTitle = "MedERP — Clinic & Hospital ERP for India";
+const siteDescription =
+  "Clinic and hospital ERP for India: OPD management software for the queue, nurse vitals, doctor consult, clinic billing, pharmacy, lab, and WhatsApp — on the web and in the staff app.";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -8,10 +13,39 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "MedERP — Clinic ERP",
-  description:
-    "Clinic ERP for Indian clinics: OPD queue, nurse vitals, doctor consult, billing, pharmacy, lab, WhatsApp, and mobile.",
-
+  metadataBase: new URL(MEDERP_PUBLIC_ORIGIN),
+  title: {
+    default: siteTitle,
+    template: "%s · MedERP",
+  },
+  description: siteDescription,
+  keywords: [
+    "MedERP",
+    "clinic ERP India",
+    "hospital ERP India",
+    "OPD management software",
+    "clinic OPD software",
+    "clinic billing software",
+    "pharmacy software",
+    "lab software",
+    "clinic software with WhatsApp",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "MedERP",
+    title: siteTitle,
+    description: siteDescription,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

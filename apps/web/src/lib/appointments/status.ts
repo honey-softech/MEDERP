@@ -1,7 +1,7 @@
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { canCheckoutVisit, DOCTOR_VISIT_ROLES, hasFrontDeskAccess } from "@/lib/authz/hospital";
 import { doctorName, patientName, tokenLabel } from "@/lib/display";
-import { nextToken } from "@/lib/ids";
+import { resequenceDoctorDayTokens } from "@/lib/appointments/day-tokens";
 import { notifyNursesOfConsult } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { doctorOwnsVisit } from "@/lib/appointments/access";
@@ -23,6 +23,11 @@ export async function cancelAppointment(
     data: { status: "CANCELLED", cancelledAt: new Date() },
   });
   await cancelPendingRemindersForAppointment(appointment.id);
+  await resequenceDoctorDayTokens({
+    hospitalId: user.hospitalId,
+    doctorId: appointment.doctorId,
+    at: appointment.scheduledAt,
+  });
   await writeAuditLog({
     request,
     hospitalId: user.hospitalId,
@@ -52,9 +57,18 @@ export async function checkInAppointment(
   if (["CANCELLED", "COMPLETED"].includes(appointment.status)) {
     return { ok: false, error: "This appointment cannot be checked in.", status: 409 };
   }
-  const tokenNumber =
-    appointment.tokenNumber ??
-    (await nextToken(user.hospitalId, appointment.doctorId, appointment.scheduledAt));
+  let tokenNumber = appointment.tokenNumber;
+  if (tokenNumber == null) {
+    const dayTokens = await resequenceDoctorDayTokens({
+      hospitalId: user.hospitalId,
+      doctorId: appointment.doctorId,
+      at: appointment.scheduledAt,
+    });
+    tokenNumber = dayTokens.find((row) => row.id === appointment.id)?.tokenNumber ?? null;
+  }
+  if (tokenNumber == null) {
+    return { ok: false, error: "This appointment cannot be checked in.", status: 409 };
+  }
   const updated = await prisma.appointment.update({
     where: { id: appointment.id },
     data: {
@@ -180,6 +194,11 @@ export async function markNoShow(
   const updated = await prisma.appointment.update({
     where: { id: appointment.id },
     data: { status: "NO_SHOW" },
+  });
+  await resequenceDoctorDayTokens({
+    hospitalId: user.hospitalId,
+    doctorId: appointment.doctorId,
+    at: appointment.scheduledAt,
   });
   return { ok: true, body: { ok: true, appointment: updated } };
 }

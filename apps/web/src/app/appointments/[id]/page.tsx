@@ -24,6 +24,7 @@ import {
   canNurseRecordVitals,
   dayRange,
   doctorName,
+  isSameCalendarDay,
   canCheckoutVisit,
   canCollectOpdFee,
   hasBillingAccess,
@@ -55,7 +56,7 @@ export default async function AppointmentDetailPage({
   const user = await requireHospitalPage();
   const { id } = await params;
   const { edit, from, view: calendarView, date: calendarDate } = await searchParams;
-  const scheduleView = from === "calendar";
+  const fromCalendar = from === "calendar";
   const editing = edit === "1" || edit === "true";
   const view = await resolveViewContext(user);
   const actingAsDoctor = isActingAsDoctor(user, view.mode);
@@ -208,8 +209,11 @@ export default async function AppointmentDetailPage({
   const previousId = queueIndex > 0 ? dayQueue[queueIndex - 1]?.id ?? null : null;
   const nextId = queueIndex >= 0 && queueIndex < dayQueue.length - 1 ? dayQueue[queueIndex + 1]?.id ?? null : null;
 
+  const appointmentIsToday = isSameCalendarDay(appointment.scheduledAt);
+  const scheduleView = fromCalendar && appointment.scheduledAt.getTime() >= dayRange(new Date()).end.getTime();
   const canManage = hasFrontDeskAccess(user) && (!actingAsDoctor || scheduleView);
-  const canCollectFee = canCollectOpdFee(user) && !actingAsDoctor;
+  // Same rule as the OPD queue: doctors and nurses can collect. Super Admin collects in Admin view.
+  const canCollectFee = canCollectOpdFee(user) && !(actingAsDoctor && user.role === "SUPER_ADMIN");
   const canCheckout = canCheckoutVisit(user) && !actingAsDoctor;
   const canAdmit =
     hospitalHasWardsModule(user.hospital) && hasRoleAccess(user, WARD_ADMIT_ROLES);
@@ -249,7 +253,7 @@ export default async function AppointmentDetailPage({
   const calendarBackDate = /^\d{4}-\d{2}-\d{2}$/.test(calendarDate ?? "")
     ? calendarDate
     : localDayKey(appointment.scheduledAt);
-  const calendarBack = scheduleView ? `/appointments?view=${calendarBackView}&date=${calendarBackDate}` : null;
+  const calendarBack = fromCalendar ? `/appointments?view=${calendarBackView}&date=${calendarBackDate}` : null;
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
@@ -766,6 +770,18 @@ export default async function AppointmentDetailPage({
               </Link>
             </div>
           ) : null}
+          {!scheduleView && !walkInNeedsPayment && canCollectFee && !visitPaid ? (
+            <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
+              <p className="mb-3 text-sm text-text-secondary">
+                {appointmentIsToday
+                  ? "Record the consultation fee for today's visit. Check-in and vitals can follow."
+                  : "This visit still has a consultation fee to record."}
+              </p>
+              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
+                Record payment
+              </Link>
+            </div>
+          ) : null}
           {!walkInNeedsPayment && vitalsEditable ? (
             <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
               <h3 className="text-sm font-semibold">Vitals</h3>
@@ -789,7 +805,7 @@ export default async function AppointmentDetailPage({
           {summaryApproved ? null : scheduleView && appointment.status === "SCHEDULED" ? (
             <p className="rounded-xl border border-border bg-app-bg px-3 py-2 text-sm text-text-secondary">
               This visit is booked
-              {appointment.reason ? ` · ${appointment.reason}` : ""}. Open it from the OPD queue on the day to record the assessment.
+              {appointment.reason ? ` · ${appointment.reason}` : ""}. On the day, open it here or from the OPD queue to record payment, check the patient in, record vitals, and write the assessment.
             </p>
           ) : (
             <p className="rounded-xl border border-border bg-app-bg px-3 py-2 text-sm text-text-secondary">

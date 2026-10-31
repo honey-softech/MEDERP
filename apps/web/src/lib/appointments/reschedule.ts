@@ -6,6 +6,7 @@ import { assertDoctorBookableAt } from "@/lib/doctor-availability";
 import { prisma } from "@/lib/prisma";
 import type { AppointmentActionContext, AppointmentActionResult } from "@/lib/appointments/types";
 import { scheduleFollowUpReminder } from "@/lib/appointments/follow-up-reminder-queue";
+import { onDifferentTokenDay, resequenceDoctorDayTokens } from "@/lib/appointments/day-tokens";
 
 export async function rescheduleAppointment(
   ctx: AppointmentActionContext,
@@ -40,6 +41,19 @@ export async function rescheduleAppointment(
     where: { id: appointment.id },
     data: { scheduledAt, status: appointment.status === "NO_SHOW" ? "SCHEDULED" : appointment.status },
   });
+  const dayTokens = await resequenceDoctorDayTokens({
+    hospitalId: user.hospitalId,
+    doctorId: appointment.doctorId,
+    at: updated.scheduledAt,
+  });
+  if (onDifferentTokenDay(appointment.scheduledAt, updated.scheduledAt)) {
+    await resequenceDoctorDayTokens({
+      hospitalId: user.hospitalId,
+      doctorId: appointment.doctorId,
+      at: appointment.scheduledAt,
+    });
+  }
+  updated.tokenNumber = dayTokens.find((row) => row.id === updated.id)?.tokenNumber ?? updated.tokenNumber;
   await writeAuditLog({
     request,
     hospitalId: user.hospitalId,

@@ -8,7 +8,6 @@ import {
   doctorName,
   forbidUnless,
   hasFrontDeskAccess,
-  nextToken,
   patientName,
   requireHospitalActor,
   sanitizePhotoData,
@@ -16,6 +15,7 @@ import {
   tokenLabel,
 } from "@/lib/front-desk";
 import { staffIdsOnApprovedLeave } from "@/lib/staff-leave";
+import { resequenceDoctorDayTokens } from "@/lib/appointments/day-tokens";
 import { notifyNursesOfConsult } from "@/lib/notifications";
 import { createAppointmentSchema } from "@/lib/validation/appointment";
 import { parseJsonBody } from "@/lib/validation/parse";
@@ -194,7 +194,6 @@ export async function POST(request: Request) {
   }
 
   const shouldCheckIn = walkIn || checkInNow;
-  const tokenNumber = await nextToken(scoped.user.hospitalId, doctor.id, scheduledAt);
 
   const appointment = await prisma.appointment.create({
     data: {
@@ -210,12 +209,19 @@ export async function POST(request: Request) {
       reason,
       notes,
       photoData,
-      tokenNumber,
       status: shouldCheckIn ? "CHECKED_IN" : "SCHEDULED",
       checkInAt: shouldCheckIn ? new Date() : null,
     },
     include: { patient: true, doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } }, department: true },
   });
+
+  const dayTokens = await resequenceDoctorDayTokens({
+    hospitalId: scoped.user.hospitalId,
+    doctorId: doctor.id,
+    at: appointment.scheduledAt,
+  });
+  const tokenNumber = dayTokens.find((row) => row.id === appointment.id)?.tokenNumber ?? 1;
+  appointment.tokenNumber = tokenNumber;
 
   if (photoData && !patient.photoData) {
     await prisma.patient.update({ where: { id: patient.id }, data: { photoData } });

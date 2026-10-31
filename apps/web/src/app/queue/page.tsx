@@ -347,7 +347,7 @@ export default async function QueuePage({
 
                       {!canDoctorVisit && canRecordVitals && isToday ? (
                         <Link
-                          href={`/appointments/${row.id}`}
+                          href={`/appointments/${row.id}/vitals`}
                           className="mt-2.5 inline-block text-[13px] font-medium text-primary hover:underline"
                         >
                           {row.vitals ? "Update vitals" : "Record vitals"}

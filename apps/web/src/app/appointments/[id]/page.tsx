@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { DoctorVisitActions } from "@/components/doctor-visit-actions";
-import { VitalsForm } from "@/components/vitals-form";
 import { ConsultAssessmentForm } from "@/components/consult-assessment-form";
 import { ConsultQueueNav } from "@/components/consult-queue-nav";
 import { PatientContextPanel } from "@/components/patient-context-panel";
@@ -244,11 +243,15 @@ export default async function AppointmentDetailPage({
   const showEditableAssessment =
     canAssess && appointment.status !== "CANCELLED" && (!visitClosed || editing);
   const useCockpit = showEditableAssessment || (canAssess && visitClosed && !editing);
-  const pinTopNotice =
-    (editing && visitClosed && showEditableAssessment) || (!showEditableAssessment && canAssess && visitClosed);
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
+  const doctorCanEditVitals =
+    user.role === "DOCTOR" ||
+    (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id);
+  const canEditVitals =
+    !walkInNeedsPayment && visitIsToday && (canRecordVitals || doctorCanEditVitals);
+  const vitalsHref = `/appointments/${appointment.id}/vitals`;
   const photo = appointment.patient.photoData || "";
   const testsLiveInPopup = canAssess && (showEditableAssessment || summaryApproved);
   function labOrdersPanel() {
@@ -271,7 +274,7 @@ export default async function AppointmentDetailPage({
 
   return (
     <AppShell title="Visit details" dense={useCockpit}>
-      <div className={useCockpit ? "flex min-w-0 flex-col gap-2 overflow-x-hidden" : undefined}>
+      <div className={useCockpit ? "flex min-w-0 flex-col gap-2 overflow-x-hidden lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden" : undefined}>
       <div className="mb-0 flex shrink-0 flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-start gap-2 sm:items-center">
           <ConsultQueueNav previousId={previousId} nextId={nextId} />
@@ -517,23 +520,24 @@ export default async function AppointmentDetailPage({
         </div>
       </div>
 
-      <div className={`print:hidden ${useCockpit ? "grid min-w-0 gap-3 overflow-x-hidden lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,220px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)] 2xl:gap-4" : "mx-auto max-w-5xl space-y-4"}`}>
-        {editing && visitClosed && showEditableAssessment ? (
-          <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 lg:col-start-2 lg:row-start-1">
-            <p className="text-xs text-amber-900">Editing approved visit — publish again when finished.</p>
-            <Link href={`/appointments/${appointment.id}`} className={compactButtonClass}>
-              Cancel edit
-            </Link>
-          </div>
-        ) : null}
-        {!showEditableAssessment && canAssess && visitClosed ? (
-          <div className="lg:col-span-2">
-            <VisitSummaryBanner
-              statusLabel={prettyEnum(appointment.status)}
-              summaryApproved={summaryApproved}
-            />
-          </div>
-        ) : null}
+      {editing && visitClosed && showEditableAssessment ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 print:hidden">
+          <p className="text-xs text-amber-900">Editing approved visit — publish again when finished.</p>
+          <Link href={`/appointments/${appointment.id}`} className={compactButtonClass}>
+            Cancel edit
+          </Link>
+        </div>
+      ) : null}
+      {!showEditableAssessment && canAssess && visitClosed ? (
+        <div className="shrink-0 print:hidden">
+          <VisitSummaryBanner
+            statusLabel={prettyEnum(appointment.status)}
+            summaryApproved={summaryApproved}
+          />
+        </div>
+      ) : null}
+
+      <div className={`print:hidden ${useCockpit ? "flex min-w-0 flex-col gap-3 overflow-x-hidden lg:min-h-0 lg:flex-1 lg:flex-row lg:items-stretch lg:gap-4" : "mx-auto max-w-5xl space-y-4"}`}>
         {!useCockpit && summaryApproved ? (
           <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50 p-4">
             <p className="text-sm text-teal-900">
@@ -562,13 +566,7 @@ export default async function AppointmentDetailPage({
             ) : null}
           </div>
         ) : null}
-        <div className={useCockpit ? `min-w-0 space-y-2 lg:sticky lg:top-3 lg:col-start-1 ${
-          !showEditableAssessment && canAssess && visitClosed
-            ? "lg:row-start-2"
-            : pinTopNotice
-              ? "lg:row-start-1 lg:row-span-2"
-              : "lg:row-start-1"
-        }` : undefined}>
+        <div className={useCockpit ? "min-w-0 space-y-2 lg:min-h-0 lg:w-[clamp(12rem,18vw,20rem)] lg:shrink-0 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]" : undefined}>
         <PatientContextPanel
           patient={{
             id: appointment.patient.id,
@@ -587,6 +585,7 @@ export default async function AppointmentDetailPage({
           }}
           vitals={vitals}
           canEditHistory={canAssess || canManage}
+          recordVitalsHref={canEditVitals ? vitalsHref : null}
           priorVisit={
             appointment.visitType === "FOLLOW_UP" && priorVisit
               ? {
@@ -615,24 +614,13 @@ export default async function AppointmentDetailPage({
         </div>
 
         {showEditableAssessment ? (
-          <div className={`min-w-0 space-y-3 ${pinTopNotice ? "lg:col-start-2 lg:row-start-2" : "lg:col-start-2"}`}>
+          <div className="flex min-w-0 flex-col space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-hidden">
           {walkInNeedsPayment ? (
             <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
               <p className="mb-3 text-sm text-text-secondary">Record the consultation fee before vitals and the consult.</p>
               <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
                 Record payment
               </Link>
-            </div>
-          ) : null}
-          {!walkInNeedsPayment && canNurseRecordVitals(appointment) ? (
-            <div className="rounded-xl border border-border bg-surface p-3 shadow-card print:hidden">
-              <h3 className="mb-2 text-sm font-semibold">Record vitals</h3>
-              <VitalsForm
-                appointmentId={appointment.id}
-                initial={vitals}
-                returnTo={`/appointments/${appointment.id}`}
-                heading="Vitals"
-              />
             </div>
           ) : null}
           {!walkInNeedsPayment ? (
@@ -658,6 +646,9 @@ export default async function AppointmentDetailPage({
                 : null
             }
             cockpit
+            allergies={appointment.patient.allergies}
+            currentMedications={appointment.patient.currentMedications}
+            nextAppointmentId={nextId}
             testsMountId={useCockpit && showEditableAssessment ? "visit-tests-mount" : null}
             ordersPanel={labOrdersPanel()}
             followUpReminderNote={followUpReminderHint(user.hospital)}
@@ -674,12 +665,6 @@ export default async function AppointmentDetailPage({
                 : "",
             }}
           >
-            {vitalsEditable ? (
-              <div className="rounded-xl border border-border bg-surface p-3 shadow-card print:hidden">
-                <h3 className="mb-2 text-sm font-semibold">Record vitals</h3>
-                <VitalsForm appointmentId={appointment.id} initial={vitals} />
-              </div>
-            ) : null}
             {canCollectFee && !visitPaid ? (
               <div className="print:hidden">
                 <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
@@ -710,7 +695,7 @@ export default async function AppointmentDetailPage({
           ) : null}
           </div>
         ) : canAssess && visitClosed ? (
-          <div className="min-w-0 space-y-3 lg:col-start-2 lg:row-start-2">
+          <div className="min-w-0 space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
             <VisitAssessmentReadonly
               omitBanner
               appointmentId={appointment.id}
@@ -766,9 +751,14 @@ export default async function AppointmentDetailPage({
             </div>
           ) : null}
           {!walkInNeedsPayment && vitalsEditable ? (
-            <div className="rounded-xl border border-border bg-surface p-3 shadow-card print:hidden">
-              <h3 className="mb-2 text-sm font-semibold">Record vitals</h3>
-              <VitalsForm appointmentId={appointment.id} initial={vitals} />
+            <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
+              <h3 className="text-sm font-semibold">Vitals</h3>
+              <p className="mt-1 text-sm text-text-secondary">
+                Record or update vitals on their own screen. Saving opens this visit for the doctor.
+              </p>
+              <Link href={vitalsHref} className={`${primaryButtonClass} mt-3 inline-flex`}>
+                {vitals ? "Update vitals" : "Record vitals"}
+              </Link>
             </div>
           ) : null}
 

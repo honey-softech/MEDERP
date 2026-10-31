@@ -288,6 +288,43 @@ function formBonus(drug: RankableDrug, form: string | null) {
   return drugMatchesForm(drug, form) ? 0 : 2;
 }
 
+function identityPart(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Same brand + strength + composition. Pack quantity (10-tab vs 15-tab strip) is ignored. */
+export function drugIdentityKey(drug: {
+  name: string;
+  salt?: string | null;
+  manufacturer?: string | null;
+}) {
+  return `${identityPart(drug.name)}|${identityPart(drug.manufacturer)}|${identityPart(drug.salt)}`;
+}
+
+function packQuantity(pack: string | null | undefined) {
+  const match = (pack ?? "").match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * One row per medicine. Catalog rows that differ only by pack size
+ * (strip of 10 vs strip of 15) collapse so search can show more distinct drugs.
+ * The smaller pack is kept as the label.
+ */
+export function uniqueDrugs<
+  T extends { name: string; salt?: string | null; pack?: string | null; manufacturer: string | null },
+>(items: T[]) {
+  const best = new Map<string, T>();
+  for (const item of items) {
+    const key = drugIdentityKey(item);
+    const current = best.get(key);
+    if (!current || packQuantity(item.pack) < packQuantity(current.pack)) {
+      best.set(key, item);
+    }
+  }
+  return [...best.values()];
+}
+
 function preferredPriority(
   manufacturer: string | null,
   preferredManufacturers: readonly string[],
@@ -351,7 +388,7 @@ export function sectionDrugSuggestions<T extends RankableDrug>(
   const preferred = new Set(preferredManufacturers.map((name) => name.toLowerCase()));
   const preferredHits: T[] = [];
   const otherHits: T[] = [];
-  for (const item of items) {
+  for (const item of uniqueDrugs(items)) {
     const manufacturer = item.manufacturer?.toLowerCase() ?? "";
     if (preferred.size > 0 && preferred.has(manufacturer)) preferredHits.push(item);
     else otherHits.push(item);

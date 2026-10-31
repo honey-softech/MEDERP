@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compactButtonClass, compactPrimaryButtonClass } from "@/components/auth-shell";
 import { PulseLoader } from "@/components/pulse-loader";
+import { checkAllergy, type AllergyHit } from "@/lib/appointments/allergy-check";
 import { ensureDrugCatalogCache } from "@/lib/drug-catalog-cache";
 import { DRUG_FORM_FILTERS } from "@/lib/drug-catalog-cache/search";
 import { parseMedications } from "@/lib/prescription-text";
@@ -40,7 +41,7 @@ const MAX_RECENT = 12;
 const rxInputClass =
   "h-8 min-w-0 rounded-lg border border-border px-2.5 text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary-light sm:h-9";
 const filterClass =
-  "h-6 w-full min-w-0 rounded-md border border-border bg-surface px-1 py-0 text-[10px] leading-none text-text-primary outline-none focus:border-primary sm:h-7 sm:px-1.5 sm:text-[11px]";
+  "h-6 w-full min-w-0 rounded-md border border-border bg-surface px-1 py-0 text-[11px] leading-none text-text-primary outline-none focus:border-primary sm:h-7 sm:px-1.5";
 
 type Timing = { m: boolean; a: boolean; n: boolean };
 type ManufacturerFilter = "boost" | "preferred" | "all" | string;
@@ -142,9 +143,13 @@ function SuggestRow({
 export function PrescriptionBuilder({
   value,
   onChange,
+  allergies = null,
+  currentMedications = null,
 }: {
   value: string;
   onChange: (value: string) => void;
+  allergies?: string | null;
+  currentMedications?: string | null;
 }) {
   const listId = useId();
   const [rows, setRows] = useState<RxRow[]>(() => rowsFromText(value));
@@ -169,6 +174,8 @@ export function PrescriptionBuilder({
   const [food, setFood] = useState<"BF" | "AF" | "">("");
   const [duration, setDuration] = useState<(typeof DURATION)[number]["value"] | "">("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [selectedSalt, setSelectedSalt] = useState<string | null>(null);
+  const [allergyAlert, setAllergyAlert] = useState<AllergyHit & { drugName: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const suppressSearchRef = useRef(false);
@@ -294,16 +301,27 @@ export function PrescriptionBuilder({
     return parts.join(" ").replace(/\s+/g, " ").trim();
   }, [draftNotes, timing, food, sos, duration]);
 
+  function considerAllergy(name: string, salt?: string | null) {
+    if (!allergies?.trim()) {
+      setAllergyAlert(null);
+      return;
+    }
+    const hit = checkAllergy(allergies, { name, salt });
+    setAllergyAlert(hit ? { ...hit, drugName: name } : null);
+  }
+
   /** Fill search field only — does not add to the prescription list. */
-  function selectMedicine(name: string) {
+  function selectMedicine(name: string, salt?: string | null) {
     const trimmed = name.trim();
     if (!trimmed) return;
     suppressSearchRef.current = true;
     setQuery(trimmed);
+    setSelectedSalt(salt ?? null);
     setPreferredHits([]);
     setOtherHits([]);
     setSearchError("");
     setOpen(false);
+    considerAllergy(trimmed, salt);
   }
 
   function resetDraft() {
@@ -319,12 +337,14 @@ export function PrescriptionBuilder({
     setFood("");
     setDuration("");
     setEditingKey(null);
+    setSelectedSalt(null);
     setStarMessage("");
   }
 
   function addMedicine() {
     const trimmed = query.trim();
     if (!trimmed) return;
+    considerAllergy(trimmed, selectedSalt);
     if (editingKey) {
       setRows((current) =>
         current.map((row) => (row.key === editingKey ? { ...row, name: trimmed, notes: composedNotes } : row)),
@@ -414,16 +434,32 @@ export function PrescriptionBuilder({
 
   return (
     <div className="space-y-2">
+      {allergies?.trim() ? (
+        <p className="rounded-lg border border-critical bg-critical-bg px-2.5 py-1.5 text-[13px] font-medium text-critical">
+          Allergy · {allergies.trim()}
+        </p>
+      ) : null}
+      {currentMedications?.trim() ? (
+        <p className="rounded-lg border border-border bg-app-bg px-2.5 py-1.5 text-[13px] text-text-secondary">
+          <span className="font-medium text-text-primary">Current medicines · </span>
+          {currentMedications.trim()}
+        </p>
+      ) : null}
       <div ref={boxRef} className="relative space-y-2">
         <div className="relative">
           <input
             className={`${rxInputClass} w-full`}
             value={query}
             onChange={(event) => {
-              setQuery(event.target.value);
+              const next = event.target.value;
+              setQuery(next);
+              setSelectedSalt(null);
               setOpen(true);
               setStarMessage("");
               setSearchError("");
+              if (allergyAlert && next.trim().toLowerCase() !== allergyAlert.drugName.toLowerCase()) {
+                setAllergyAlert(null);
+              }
             }}
             onFocus={() => setOpen(true)}
             placeholder="Search medicine… e.g. Paracetamol 500 tablet"
@@ -467,7 +503,7 @@ export function PrescriptionBuilder({
                 <li className="border-b border-border px-3 py-1.5 text-[11px] text-success">{starMessage}</li>
               ) : null}
               {preferredHits.length > 0 ? (
-                <li className="sticky top-0 bg-app-bg px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                <li className="sticky top-0 bg-app-bg px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                   Preferred
                 </li>
               ) : null}
@@ -478,12 +514,12 @@ export function PrescriptionBuilder({
                   preferred
                   canStar={false}
                   starring={false}
-                  onSelect={() => selectMedicine(item.name)}
+                  onSelect={() => selectMedicine(item.name, item.salt)}
                   onStar={() => undefined}
                 />
               ))}
               {otherHits.length > 0 ? (
-                <li className="sticky top-0 bg-app-bg px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                <li className="sticky top-0 bg-app-bg px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                   {preferredHits.length > 0 ? `Other results (${otherHits.length})` : "Results"}
                 </li>
               ) : null}
@@ -493,7 +529,7 @@ export function PrescriptionBuilder({
                   item={item}
                   canStar={canManagePreferred}
                   starring={starringManufacturer === item.manufacturer}
-                  onSelect={() => selectMedicine(item.name)}
+                  onSelect={() => selectMedicine(item.name, item.salt)}
                   onStar={() => {
                     if (item.manufacturer) void starManufacturer(item.manufacturer);
                   }}
@@ -502,6 +538,22 @@ export function PrescriptionBuilder({
             </ul>
           ) : null}
         </div>
+
+        {allergyAlert ? (
+          <div className="rounded-lg border border-critical bg-critical-bg px-2.5 py-2 text-[13px] text-critical">
+            <p>
+              <span className="font-semibold">{allergyAlert.drugName}</span> matches a recorded{" "}
+              {allergyAlert.label} allergy. This does not block the prescription.
+            </p>
+            <button
+              type="button"
+              className="mt-1 font-medium underline"
+              onClick={() => setAllergyAlert(null)}
+            >
+              Acknowledge
+            </button>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-3 gap-1">
           <label className="sr-only" htmlFor={`${listId}-mfr`}>
@@ -574,14 +626,14 @@ export function PrescriptionBuilder({
               title={slot.title}
               aria-pressed={timing[slot.key]}
               onClick={() => toggleTiming(slot.key)}
-              className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-[10px] font-semibold sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-[11px] ${
+              className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-[11px] font-semibold sm:h-7 sm:min-w-7 sm:px-1.5 ${
                 timing[slot.key] ? "bg-primary text-white" : "border border-border bg-surface text-text-secondary"
               }`}
             >
               {slot.label}
             </button>
           ))}
-          <span className="shrink-0 text-[10px] tabular-nums text-text-disabled">{timingLabel(timing)}</span>
+          <span className="shrink-0 text-[11px] tabular-nums text-text-disabled">{timingLabel(timing)}</span>
           {(
             [
               { id: "sos" as const, label: "SOS", active: sos, onClick: toggleSos, title: "As needed" },
@@ -595,7 +647,7 @@ export function PrescriptionBuilder({
               title={chip.title}
               aria-pressed={chip.active}
               onClick={chip.onClick}
-              className={`h-6 shrink-0 rounded-md px-1 text-[10px] font-semibold sm:h-7 sm:px-1.5 sm:text-[11px] ${
+              className={`h-6 shrink-0 rounded-md px-1 text-[11px] font-semibold sm:h-7 sm:px-1.5 ${
                 chip.active ? "bg-primary text-white" : "border border-border bg-surface text-text-secondary"
               }`}
             >
@@ -607,7 +659,7 @@ export function PrescriptionBuilder({
               key={item.value}
               type="button"
               aria-pressed={duration === item.value}
-              className={`h-6 min-w-6 shrink-0 rounded-md px-1 text-[10px] font-medium sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-[11px] ${
+              className={`h-6 min-w-6 shrink-0 rounded-md px-1 text-[11px] font-medium sm:h-7 sm:min-w-7 sm:px-1.5 ${
                 duration === item.value ? "bg-primary text-white" : "border border-border bg-surface text-text-primary"
               }`}
               onClick={() => setDuration((current) => (current === item.value ? "" : item.value))}
@@ -650,7 +702,7 @@ export function PrescriptionBuilder({
             >
               <span className="w-4 shrink-0 text-[11px] font-semibold text-text-disabled">{index + 1}</span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-text-primary">{row.name || "Untitled"}</p>
+                <p className="truncate text-[13px] font-medium text-text-primary">{row.name || "Untitled"}</p>
                 {row.notes ? <p className="truncate text-[11px] text-text-secondary">{row.notes}</p> : null}
               </div>
               <div className="flex shrink-0">

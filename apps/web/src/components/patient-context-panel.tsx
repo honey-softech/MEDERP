@@ -36,10 +36,12 @@ export function PatientContextPanel({
   vitals = null,
   canEditHistory,
   priorVisit = null,
+  recordVitalsHref = null,
 }: {
   patient: PatientContextData;
   vitals?: VitalsValues | null;
   canEditHistory: boolean;
+  recordVitalsHref?: string | null;
   priorVisit?: {
     id: string;
     scheduledAtLabel: string;
@@ -95,7 +97,7 @@ export function PatientContextPanel({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={patient.photo} alt={patient.name} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full items-center justify-center px-1 text-center text-[10px] text-text-disabled">
+              <div className="flex h-full items-center justify-center px-1 text-center text-[11px] text-text-disabled">
                 No photo
               </div>
             )}
@@ -116,7 +118,7 @@ export function PatientContextPanel({
         </div>
       </section>
 
-      <VitalsPanel vitals={vitals} compact />
+      <VitalsPanel vitals={vitals} compact recordHref={recordVitalsHref} />
 
       {priorVisit ? (
         <section className="rounded-xl border border-primary/30 bg-primary-light/40 p-2.5 shadow-card">
@@ -142,13 +144,13 @@ export function PatientContextPanel({
           </div>
           {priorVisit.vitals && !vitals ? (
             <div className="mt-2">
-              <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-text-secondary">
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-text-secondary">
                 Previous vitals
               </p>
               <VitalsPanel vitals={priorVisit.vitals} compact />
             </div>
           ) : priorVisit.vitals && vitals?.notes?.includes("Carried from prior visit") ? (
-            <p className="mt-1.5 text-[10px] text-text-secondary">
+            <p className="mt-1.5 text-[11px] text-text-secondary">
               Today&apos;s vitals were carried from this prior visit. Nurse can re-measure if needed.
             </p>
           ) : null}

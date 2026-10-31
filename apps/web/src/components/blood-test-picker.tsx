@@ -439,7 +439,7 @@ export function BloodTestPicker({
           {locked ? (
             <span className={compactButtonClass}>{label}</span>
           ) : (
-            <button className={compactPrimaryButtonClass} type="button" onClick={() => setOpen(true)}>
+            <button className={compactButtonClass} type="button" onClick={() => setOpen(true)}>
               {label}
             </button>
           )}

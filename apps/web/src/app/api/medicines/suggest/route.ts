@@ -82,17 +82,35 @@ export async function GET(request: NextRequest) {
         medicineCount: number;
       }>
     >`
-      SELECT d."id", d."name", d."saltComposition", d."packSize", d."manufacturer",
-             COALESCE(m."medicineCount", 0)::int AS "medicineCount"
-      FROM "DrugCatalog" d
-      LEFT JOIN "DrugManufacturer" m ON m."name" = d."manufacturer"
-      WHERE d."isDiscontinued" = false
-        AND (d."searchText" ILIKE ${pattern} OR d."name" ILIKE ${pattern})
-        ${manufacturerSql}
+      SELECT id, name, "saltComposition", "packSize", manufacturer, "medicineCount"
+      FROM (
+        SELECT DISTINCT ON (
+          lower(btrim(d."name")),
+          lower(btrim(COALESCE(d."manufacturer", ''))),
+          lower(btrim(COALESCE(d."saltComposition", '')))
+        )
+          d."id" AS id,
+          d."name" AS name,
+          d."saltComposition" AS "saltComposition",
+          d."packSize" AS "packSize",
+          d."manufacturer" AS manufacturer,
+          COALESCE(m."medicineCount", 0)::int AS "medicineCount"
+        FROM "DrugCatalog" d
+        LEFT JOIN "DrugManufacturer" m ON m."name" = d."manufacturer"
+        WHERE d."isDiscontinued" = false
+          AND (d."searchText" ILIKE ${pattern} OR d."name" ILIKE ${pattern})
+          ${manufacturerSql}
+        ORDER BY
+          lower(btrim(d."name")),
+          lower(btrim(COALESCE(d."manufacturer", ''))),
+          lower(btrim(COALESCE(d."saltComposition", ''))),
+          d."packSize" ASC NULLS LAST,
+          d."id" ASC
+      ) unique_drugs
       ORDER BY
-        COALESCE(m."medicineCount", 0) DESC,
-        CASE WHEN d."name" ILIKE ${prefix} THEN 0 ELSE 1 END,
-        d."name" ASC
+        "medicineCount" DESC,
+        CASE WHEN name ILIKE ${prefix} THEN 0 ELSE 1 END,
+        name ASC
       LIMIT ${candidates}
     `;
     return rows.map((row) => ({

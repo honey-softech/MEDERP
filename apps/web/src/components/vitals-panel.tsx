@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { VITAL_RANGES, bmiLabel, formatIdealRange, vitalAlert } from "@/lib/vitals";
 import type { VitalsValues } from "@/lib/vitals";
 
@@ -9,9 +10,12 @@ function num(value: { toString(): string } | number | null | undefined) {
 export function VitalsPanel({
   vitals,
   compact = false,
+  recordHref = null,
 }: {
   vitals: VitalsValues | null;
   compact?: boolean;
+  /** When vitals are missing, a link that jumps to the recording form. */
+  recordHref?: string | null;
 }) {
   const recorded = Boolean(vitals);
   const bmi = vitals != null ? Number(vitals.bmi) : NaN;
@@ -30,25 +34,43 @@ export function VitalsPanel({
       ].filter((row): row is string => Boolean(row))
     : [];
 
+  const actionLabel = recorded ? "Edit vitals" : "Record vitals";
+
+  if (compact && !recorded) {
+    return (
+      <section className="rounded-xl border border-warning-bg bg-warning-bg px-2.5 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[13px] font-medium text-text-primary">Vitals not recorded</p>
+          {recordHref ? (
+            <Link href={recordHref} className="text-[13px] font-medium text-primary hover:underline">
+              {actionLabel}
+            </Link>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
   if (compact) {
     return (
-      <section
-        className={`rounded-xl border p-2.5 ${
-          recorded ? "border-teal-200 bg-teal-50/70" : "border-warning-bg bg-warning-bg"
-        }`}
-      >
+      <section className="rounded-xl border border-teal-200 bg-teal-50/70 p-2.5">
         <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-1">
           <h3 className={`text-sm font-semibold ${recorded ? "text-teal-950" : "text-text-primary"}`}>Vitals</h3>
-          {vitals?.recordedByUsername ? (
-            <p className="text-[10px] text-teal-800">{vitals.recordedByUsername}</p>
-          ) : (
-            <p className="text-[10px] font-medium text-warning">Not recorded</p>
-          )}
+          <div className="flex items-center gap-2">
+            {vitals?.recordedByUsername ? (
+              <p className="text-[11px] text-teal-800">{vitals.recordedByUsername}</p>
+            ) : null}
+            {recordHref ? (
+              <Link href={recordHref} className="text-[13px] font-medium text-primary hover:underline">
+                {actionLabel}
+              </Link>
+            ) : null}
+          </div>
         </div>
         {alerts.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1">
             {alerts.map((row) => (
-              <span key={row} className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+              <span key={row} className="rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-800">
                 {row}
               </span>
             ))}
@@ -102,7 +124,14 @@ export function VitalsPanel({
   if (!vitals) {
     return (
       <section className="rounded-2xl border border-warning-bg bg-warning-bg p-5">
-        <h3 className="font-semibold text-text-primary">Nurse vitals for this consult</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-semibold text-text-primary">Nurse vitals for this consult</h3>
+          {recordHref ? (
+            <Link href={recordHref} className="text-sm font-medium text-primary hover:underline">
+              {actionLabel}
+            </Link>
+          ) : null}
+        </div>
         <p className="mt-1 text-sm text-text-secondary">Not recorded yet</p>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
           <Item label="Height" value="—" />
@@ -127,14 +156,21 @@ export function VitalsPanel({
     <section className="rounded-2xl border border-teal-200 bg-teal-50/70 p-5">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-semibold text-teal-950">Nurse vitals for this consult</h3>
-        {vitals.recordedByUsername ? (
-          <p className="text-xs text-teal-800">
-            Recorded by {vitals.recordedByUsername}
-            {vitals.recordedAt
-              ? ` · ${new Date(vitals.recordedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
-              : ""}
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {vitals.recordedByUsername ? (
+            <p className="text-xs text-teal-800">
+              Recorded by {vitals.recordedByUsername}
+              {vitals.recordedAt
+                ? ` · ${new Date(vitals.recordedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+                : ""}
+            </p>
+          ) : null}
+          {recordHref ? (
+            <Link href={recordHref} className="text-sm font-medium text-primary hover:underline">
+              {actionLabel}
+            </Link>
+          ) : null}
+        </div>
       </div>
       {alerts.length > 0 ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
@@ -210,8 +246,8 @@ function Item({
 }) {
   return (
     <div>
-      <dt className={`uppercase tracking-wide text-teal-800 ${compact ? "text-[10px]" : "text-xs"}`}>{label}</dt>
-      <dd className={`mt-0.5 font-medium ${compact ? "text-xs" : ""} ${alert ? "text-red-700" : "text-slate-900"}`}>
+      <dt className={`uppercase tracking-wide text-teal-800 ${compact ? "text-[11px]" : "text-xs"}`}>{label}</dt>
+      <dd className={`mt-0.5 font-medium ${compact ? "text-[13px]" : ""} ${alert ? "text-red-700" : "text-slate-900"}`}>
         {value}
       </dd>
     </div>

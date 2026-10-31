@@ -217,7 +217,8 @@ export async function searchDrugCatalogCache(query: string, limit = 12): Promise
     const meta = await readCacheMeta(Promise.resolve(db));
     if (!meta?.ready) return null;
 
-    const preferredHits = await collectPreferred(db, q, meta.brands, limit);
+    // Collect extra rows so pack-size copies can collapse without shrinking the list.
+    const preferredHits = await collectPreferred(db, q, meta.brands, COLLECT_CAP);
     const prefixHits = await collectNamePrefix(db, q);
     const seen = new Set([...preferredHits, ...prefixHits].map((drug) => drug.id));
     const tokenHits = await collectTokenPrefix(db, q, seen);

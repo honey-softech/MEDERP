@@ -8,6 +8,8 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { secondaryButtonClass } from "@/components/auth-shell";
 import { canSendIssuedInvoice } from "@/lib/billing/rules";
 import {
+  NURSE_VITALS_ROLES,
+  canNurseRecordVitals,
   consultationFeeForVisit,
   doctorName,
   hasBillingAccess,
@@ -67,8 +69,14 @@ export default async function CollectVisitPaymentPage({
       : false;
 
   const visitHref = `/appointments/${appointment.id}`;
+  const canOpenVitals =
+    canNurseRecordVitals(appointment) &&
+    (NURSE_VITALS_ROLES.includes(user.role) ||
+      user.role === "DOCTOR" ||
+      (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id));
+  const afterVitalsHref = canOpenVitals ? `${visitHref}/vitals` : visitHref;
   if (due <= 0) {
-    redirect(continueToVisit ? visitHref : invoice ? `/billing/${invoice.id}` : visitHref);
+    redirect(continueToVisit ? afterVitalsHref : invoice ? `/billing/${invoice.id}` : visitHref);
   }
 
   return (
@@ -128,7 +136,7 @@ export default async function CollectVisitPaymentPage({
         appointmentId={appointment.id}
         due={due > 0 ? due : defaultFee}
         doctorLabel={doctorLabel}
-        afterPayHref={continueToVisit ? visitHref : undefined}
+        afterPayHref={continueToVisit ? afterVitalsHref : undefined}
       />
     </AppShell>
   );

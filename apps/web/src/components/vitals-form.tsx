@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buttonClass, fieldClass } from "@/components/auth-shell";
+import { buttonClass, fieldClass, textareaClass } from "@/components/auth-shell";
 import {
   VITAL_RANGES,
   bmiLabel,
@@ -10,8 +10,7 @@ import {
   feverFromTemperature,
   formatIdealRange,
   parseVitalNumber,
-  vitalAlertMessage,
-  vitalNamedAlert,
+  vitalAlert,
 } from "@/lib/vitals";
 import type { VitalRange, VitalsValues } from "@/lib/vitals";
 
@@ -28,6 +27,7 @@ export function VitalsForm({
   heading?: string;
 }) {
   const router = useRouter();
+  const baseId = useId();
   const [heightCm, setHeightCm] = useState(initial ? String(initial.heightCm) : "");
   const [weightKg, setWeightKg] = useState(initial ? String(initial.weightKg) : "");
   const [temperatureC, setTemperatureC] = useState(initial ? String(initial.temperatureC) : "");
@@ -46,18 +46,20 @@ export function VitalsForm({
   const bmi = useMemo(() => calculateBmi(Number(heightCm), Number(weightKg)), [heightCm, weightKg]);
   const autoFever = feverFromTemperature(Number(temperatureC));
   const fever = feverTouched ? hasFever : autoFever;
-  const alerts = useMemo(
+  const bmiOutside = bmi != null && (bmi < 18.5 || bmi >= 25);
+  const doctorWillSee = useMemo(
     () =>
+      bmiOutside ||
       [
-        vitalNamedAlert(parseVitalNumber(temperatureC), VITAL_RANGES.temperatureC),
-        vitalNamedAlert(parseVitalNumber(spo2Percent), VITAL_RANGES.spo2Percent),
-        vitalNamedAlert(parseVitalNumber(pulseBpm), VITAL_RANGES.pulseBpm),
-        vitalNamedAlert(parseVitalNumber(respiratoryRate), VITAL_RANGES.respiratoryRate),
-        vitalNamedAlert(parseVitalNumber(bpSystolic), VITAL_RANGES.bpSystolic),
-        vitalNamedAlert(parseVitalNumber(bpDiastolic), VITAL_RANGES.bpDiastolic),
-        vitalNamedAlert(parseVitalNumber(bloodSugarMgDl), VITAL_RANGES.bloodSugarMgDl),
-      ].filter((message): message is string => Boolean(message)),
-    [temperatureC, spo2Percent, pulseBpm, respiratoryRate, bpSystolic, bpDiastolic, bloodSugarMgDl],
+        vitalAlert(parseVitalNumber(temperatureC), VITAL_RANGES.temperatureC),
+        vitalAlert(parseVitalNumber(pulseBpm), VITAL_RANGES.pulseBpm),
+        vitalAlert(parseVitalNumber(spo2Percent), VITAL_RANGES.spo2Percent),
+        vitalAlert(parseVitalNumber(bpSystolic), VITAL_RANGES.bpSystolic),
+        vitalAlert(parseVitalNumber(bpDiastolic), VITAL_RANGES.bpDiastolic),
+        vitalAlert(parseVitalNumber(respiratoryRate), VITAL_RANGES.respiratoryRate),
+        vitalAlert(parseVitalNumber(bloodSugarMgDl), VITAL_RANGES.bloodSugarMgDl),
+      ].some(Boolean),
+    [bmiOutside, temperatureC, pulseBpm, spo2Percent, bpSystolic, bpDiastolic, respiratoryRate, bloodSugarMgDl],
   );
 
   async function onSubmit(event: React.FormEvent) {
@@ -97,72 +99,160 @@ export function VitalsForm({
     router.refresh();
   }
 
+  const temperatureSupport = rangeSupport(temperatureC, VITAL_RANGES.temperatureC);
+  const pulseSupport = rangeSupport(pulseBpm, VITAL_RANGES.pulseBpm);
+  const spo2Support = rangeSupport(spo2Percent, VITAL_RANGES.spo2Percent);
+  const respiratorySupport = rangeSupport(respiratoryRate, VITAL_RANGES.respiratoryRate);
+  const sugarSupport = rangeSupport(bloodSugarMgDl, VITAL_RANGES.bloodSugarMgDl);
+  const pressure = pressureSupport(bpSystolic, bpDiastolic);
+
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
-      <h3 className="md:col-span-2 font-semibold">{heading}</h3>
-      <p className="md:col-span-2 text-sm text-slate-500">
-        Height, weight, and temperature are mandatory. Other vitals are optional. Ideal adult ranges are shown on each field; abnormal values are flagged for the doctor.
-      </p>
-      <Field label="Height (cm)" value={heightCm} onChange={setHeightCm} required />
-      <Field label="Weight (kg)" value={weightKg} onChange={setWeightKg} required />
-      <div className="rounded-xl bg-teal-50 px-3 py-2 text-sm text-teal-900 md:col-span-2">
-        BMI: <span className="font-semibold">{bmi ?? "—"}</span>
-        {bmi != null ? <span className="ml-2">{bmiLabel(bmi)}</span> : <span className="ml-2 text-teal-800">Enter height and weight</span>}
-        <span className="ml-2 text-teal-800">Ideal 18.5–24.9</span>
-      </div>
-      <Field
-        label="Temperature (°C)"
-        value={temperatureC}
-        range={VITAL_RANGES.temperatureC}
-        onChange={(value) => {
-          setTemperatureC(value);
-          if (!feverTouched) setHasFever(feverFromTemperature(Number(value)));
-        }}
-        required
-      />
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-        <input
-          type="checkbox"
-          checked={fever}
-          onChange={(event) => {
-            setFeverTouched(true);
-            setHasFever(event.target.checked);
-          }}
-        />
-        Fever present {autoFever && !feverTouched ? "(auto from temperature ≥ 38°C)" : ""}
-      </label>
-      <Field label="SpO2 (%, optional)" value={spo2Percent} onChange={setSpo2Percent} range={VITAL_RANGES.spo2Percent} />
-      <Field label="Pulse (bpm, optional)" value={pulseBpm} onChange={setPulseBpm} range={VITAL_RANGES.pulseBpm} />
-      <Field
-        label="Respiratory rate (/min, optional)"
-        value={respiratoryRate}
-        onChange={setRespiratoryRate}
-        range={VITAL_RANGES.respiratoryRate}
-      />
-      <Field label="BP systolic (mmHg, optional)" value={bpSystolic} onChange={setBpSystolic} range={VITAL_RANGES.bpSystolic} />
-      <Field label="BP diastolic (mmHg, optional)" value={bpDiastolic} onChange={setBpDiastolic} range={VITAL_RANGES.bpDiastolic} />
-      <Field
-        label="Blood sugar (mg/dL, optional)"
-        value={bloodSugarMgDl}
-        onChange={setBloodSugarMgDl}
-        range={VITAL_RANGES.bloodSugarMgDl}
-      />
-      <label className="md:col-span-2 text-sm font-medium text-slate-700">
-        Nurse notes
-        <textarea className={fieldClass} rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
-      </label>
-      {alerts.length > 0 ? (
-        <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          <p className="font-medium">Abnormal vitals — notify the doctor</p>
-          <ul className="mt-1 list-disc pl-5">
-            {alerts.map((message) => (
-              <li key={message}>{message}</li>
-            ))}
-          </ul>
+    <form onSubmit={onSubmit} aria-label={heading} className="space-y-3">
+
+      <fieldset className="min-w-0 border-0 p-0">
+        <legend className="text-sm font-semibold text-text-primary">Body size</legend>
+        <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+          <Field
+            id={`${baseId}-height`}
+            label="Height"
+            unit="cm"
+            value={heightCm}
+            onChange={setHeightCm}
+            required
+          />
+          <Field
+            id={`${baseId}-weight`}
+            label="Weight"
+            unit="kg"
+            value={weightKg}
+            onChange={setWeightKg}
+            required
+          />
+          <div className="sm:col-span-2">
+            <BmiResult bmi={bmi} outside={bmiOutside} />
+          </div>
         </div>
-      ) : null}
-      {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
-      <div className="md:col-span-2">
+      </fieldset>
+
+      <fieldset className="min-w-0 border-0 p-0">
+        <legend className="text-sm font-semibold text-text-primary">
+          Readings
+          <span className="ml-2 font-normal text-text-secondary">Leave a line blank if it was not taken.</span>
+        </legend>
+        <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+          <div>
+            <Field
+              id={`${baseId}-temperature`}
+              label="Temperature"
+              unit="°C"
+              value={temperatureC}
+              onChange={(value) => {
+                setTemperatureC(value);
+                if (!feverTouched) setHasFever(feverFromTemperature(Number(value)));
+              }}
+              required
+              hint={temperatureSupport.hint}
+              warning={temperatureSupport.warning}
+            />
+            <label className="mt-1 flex items-center gap-2 text-sm text-text-primary">
+              <input
+                type="checkbox"
+                checked={fever}
+                onChange={(event) => {
+                  setFeverTouched(true);
+                  setHasFever(event.target.checked);
+                }}
+              />
+              <span className="font-medium">Fever</span>
+              <span className="text-xs font-normal text-text-secondary">From 38°C. You can change it.</span>
+            </label>
+          </div>
+          <Field
+            id={`${baseId}-pulse`}
+            label="Pulse"
+            unit="bpm"
+            value={pulseBpm}
+            onChange={setPulseBpm}
+            hint={pulseSupport.hint}
+            warning={pulseSupport.warning}
+          />
+          <Field
+            id={`${baseId}-spo2`}
+            label="SpO2"
+            unit="%"
+            value={spo2Percent}
+            onChange={setSpo2Percent}
+            hint={spo2Support.hint}
+            warning={spo2Support.warning}
+          />
+          <Field
+            id={`${baseId}-respiratory`}
+            label="Respiratory rate"
+            unit="/min"
+            value={respiratoryRate}
+            onChange={setRespiratoryRate}
+            hint={respiratorySupport.hint}
+            warning={respiratorySupport.warning}
+          />
+          <fieldset className="min-w-0 border-0 p-0">
+            <legend className="text-sm font-medium text-text-primary">Blood pressure</legend>
+            <div className="mt-1 flex items-center gap-2">
+              <PressureInput
+                id={`${baseId}-bp-systolic`}
+                label="Systolic"
+                value={bpSystolic}
+                onChange={setBpSystolic}
+                describedBy={`${baseId}-bp-support`}
+                warning={pressure.systolicWarning}
+              />
+              <span className="text-sm text-text-secondary" aria-hidden>
+                /
+              </span>
+              <PressureInput
+                id={`${baseId}-bp-diastolic`}
+                label="Diastolic"
+                value={bpDiastolic}
+                onChange={setBpDiastolic}
+                describedBy={`${baseId}-bp-support`}
+                warning={pressure.diastolicWarning}
+              />
+              <span className="shrink-0 text-sm text-text-secondary">mmHg</span>
+            </div>
+            <p
+              id={`${baseId}-bp-support`}
+              className={`mt-1 text-xs ${pressure.warning ? "font-medium text-amber-800" : "text-text-secondary"}`}
+            >
+              {pressure.line}
+            </p>
+          </fieldset>
+          <Field
+            id={`${baseId}-sugar`}
+            label="Blood sugar"
+            unit="mg/dL"
+            value={bloodSugarMgDl}
+            onChange={setBloodSugarMgDl}
+            hint={sugarSupport.hint}
+            warning={sugarSupport.warning}
+          />
+        </div>
+      </fieldset>
+
+      <label htmlFor={`${baseId}-notes`} className="block text-sm font-medium text-text-primary">
+        Nurse notes
+        <textarea
+          id={`${baseId}-notes`}
+          className={`${textareaClass} !min-h-0`}
+          rows={2}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+        />
+      </label>
+
+      <div className="space-y-2">
+        {doctorWillSee ? (
+          <p className="text-sm text-text-secondary">The doctor will see readings outside the ideal range.</p>
+        ) : null}
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <button className={buttonClass} type="submit" disabled={pending}>
           {pending ? "Saving…" : initial ? "Update today's vitals" : "Save vitals for doctor"}
         </button>
@@ -175,33 +265,137 @@ function optionalStr(value: number | null | undefined) {
   return value != null ? String(value) : "";
 }
 
+function rangeSupport(value: string, range: VitalRange) {
+  const alert = vitalAlert(parseVitalNumber(value), range);
+  const ideal = `Ideal ${formatIdealRange(range)}`;
+  if (!alert) return { hint: ideal, warning: null as string | null };
+  const word = alert === "low" ? "Low" : "High";
+  return { hint: null, warning: `${word} · ideal ${formatIdealRange(range)}` };
+}
+
+function pressureSupport(systolic: string, diastolic: string) {
+  const sys = parseVitalNumber(systolic);
+  const dia = parseVitalNumber(diastolic);
+  const ideal = `Ideal ${VITAL_RANGES.bpSystolic.min}–${VITAL_RANGES.bpSystolic.max} / ${VITAL_RANGES.bpDiastolic.min}–${VITAL_RANGES.bpDiastolic.max} mmHg`;
+  const sysAlert = vitalAlert(sys, VITAL_RANGES.bpSystolic);
+  const diaAlert = vitalAlert(dia, VITAL_RANGES.bpDiastolic);
+  const oneSide = (sys == null) !== (dia == null);
+
+  if (oneSide) {
+    return { line: "Enter both numbers", warning: false, systolicWarning: false, diastolicWarning: false };
+  }
+  if (sys != null && dia != null && sys <= dia) {
+    return {
+      line: "Systolic should be above diastolic",
+      warning: false,
+      systolicWarning: false,
+      diastolicWarning: false,
+    };
+  }
+
+  const parts = [
+    sysAlert ? `Systolic ${sysAlert}` : null,
+    diaAlert ? `Diastolic ${diaAlert}` : null,
+  ].filter((part): part is string => Boolean(part));
+  if (parts.length > 0) {
+    const sentence = parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(", ");
+    return {
+      line: `${sentence} · ideal ${VITAL_RANGES.bpSystolic.min}–${VITAL_RANGES.bpSystolic.max} / ${VITAL_RANGES.bpDiastolic.min}–${VITAL_RANGES.bpDiastolic.max} mmHg`,
+      warning: true,
+      systolicWarning: Boolean(sysAlert),
+      diastolicWarning: Boolean(diaAlert),
+    };
+  }
+  return { line: ideal, warning: false, systolicWarning: false, diastolicWarning: false };
+}
+
+function BmiResult({ bmi, outside }: { bmi: number | null; outside: boolean }) {
+  if (bmi == null) {
+    return <p className="text-sm text-text-secondary">Enter height and weight · ideal 18.5–24.9</p>;
+  }
+  return (
+    <p className={`text-sm ${outside ? "font-medium text-amber-800" : "text-text-secondary"}`}>
+      BMI {bmi} · {bmiLabel(bmi)} · ideal 18.5–24.9
+    </p>
+  );
+}
+
 function Field({
+  id,
   label,
+  unit,
   value,
   onChange,
   required,
-  range,
+  hint,
+  warning,
 }: {
+  id: string;
   label: string;
+  unit: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
-  range?: VitalRange;
+  hint?: string | null;
+  warning?: string | null;
 }) {
-  const parsed = parseVitalNumber(value);
-  const warning = range ? vitalAlertMessage(parsed, range) : null;
+  const support = warning ?? hint;
+  const supportId = support ? `${id}-support` : undefined;
   return (
-    <label className="text-sm font-medium text-slate-700">
-      {label}
-      {range ? <span className="ml-1 font-normal text-slate-500">Ideal {formatIdealRange(range)}</span> : null}
-      <input
-        className={`${fieldClass} ${warning ? "border-amber-400 focus:border-amber-600 focus:ring-amber-100" : ""}`}
-        inputMode="decimal"
-        value={value}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {warning ? <p className="mt-1 text-xs font-medium text-amber-800">{warning}</p> : null}
-    </label>
+    <div>
+      <label htmlFor={id} className="text-sm font-medium text-text-primary">
+        {label}
+        {required ? <span className="ml-2 text-xs font-normal text-text-secondary">Required</span> : null}
+      </label>
+      <div className="relative mt-1">
+        <input
+          id={id}
+          className={`${fieldClass} !mt-0 pr-20 ${warning ? "border-amber-400 focus:border-amber-600 focus:ring-amber-100" : ""}`}
+          inputMode="decimal"
+          value={value}
+          required={required}
+          aria-invalid={warning ? true : undefined}
+          aria-describedby={supportId}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-text-secondary">
+          {unit}
+        </span>
+      </div>
+      {support ? (
+        <p id={supportId} className={`mt-1 text-xs ${warning ? "font-medium text-amber-800" : "text-text-secondary"}`}>
+          {support}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PressureInput({
+  id,
+  label,
+  value,
+  onChange,
+  describedBy,
+  warning,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  describedBy: string;
+  warning: boolean;
+}) {
+  return (
+    <input
+      id={id}
+      aria-label={label}
+      aria-describedby={describedBy}
+      aria-invalid={warning ? true : undefined}
+      className={`${fieldClass} !mt-0 min-w-0 ${warning ? "border-amber-400 focus:border-amber-600 focus:ring-amber-100" : ""}`}
+      inputMode="decimal"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
   );
 }

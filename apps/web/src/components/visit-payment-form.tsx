@@ -56,7 +56,11 @@ export function VisitPaymentForm({
         <h3 className="font-semibold">Record payment</h3>
         <p className="mt-1 text-sm text-slate-500">
           Consultation is credited to {doctorLabel}. The amount starts from the visit&apos;s OPD rate. Reception, nursing, or the doctor can change it, then collect that amount.
-        {afterPayHref ? " After payment, record vitals on the visit." : ""}
+        {afterPayHref?.endsWith("/vitals")
+          ? " After payment, record vitals. Saving opens the doctor screen."
+          : afterPayHref
+            ? " After payment, the visit opens."
+            : ""}
         </p>
       </div>
 

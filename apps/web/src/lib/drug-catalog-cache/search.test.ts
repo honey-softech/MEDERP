@@ -11,6 +11,7 @@ import {
   rankDrugSuggestions,
   sectionDrugSuggestions,
   toCachedDrug,
+  uniqueDrugs,
 } from "@/lib/drug-catalog-cache/search";
 
 describe("drug catalog local search", () => {
@@ -152,6 +153,40 @@ describe("drug catalog local search", () => {
       3,
     );
     expect(ranked[0]?.name).toBe("Dolo 500");
+  });
+
+  it("keeps one row when the same drug differs only by pack quantity", () => {
+    const unique = uniqueDrugs([
+      {
+        name: "Dolo 500 Tablet",
+        manufacturer: "Micro Labs",
+        salt: "Paracetamol (500mg)",
+        pack: "strip of 15 tablets",
+      },
+      {
+        name: "Dolo 500 Tablet",
+        manufacturer: "Micro Labs",
+        salt: "Paracetamol (500mg)",
+        pack: "strip of 10 tablets",
+      },
+      {
+        name: "Dolo 650 Tablet",
+        manufacturer: "Micro Labs",
+        salt: "Paracetamol (650mg)",
+        pack: "strip of 15 tablets",
+      },
+      {
+        name: "Calpol 500 Tablet",
+        manufacturer: "GSK",
+        salt: "Paracetamol (500mg)",
+        pack: "strip of 15 tablets",
+      },
+    ]);
+    expect(unique.map((row) => `${row.name} · ${row.pack}`)).toEqual([
+      "Dolo 500 Tablet · strip of 10 tablets",
+      "Dolo 650 Tablet · strip of 15 tablets",
+      "Calpol 500 Tablet · strip of 15 tablets",
+    ]);
   });
 
   it("orders preferred manufacturers by admin priority list order", () => {

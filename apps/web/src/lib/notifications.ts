@@ -201,7 +201,7 @@ export async function notifyNursesOfConsult(params: {
     hospitalId: params.hospitalId,
     role: "NURSE",
     appointmentId: params.appointmentId,
-    href: `/appointments/${params.appointmentId}`,
+    href: `/appointments/${params.appointmentId}/vitals`,
     title: params.arrived ? "Patient arrived — record vitals" : "New consult — vitals needed",
     body: params.arrived
       ? `${params.patientName} has checked in with ${params.doctorName}${token}. Record height, weight, and temperature (other vitals optional) before the doctor consult.`

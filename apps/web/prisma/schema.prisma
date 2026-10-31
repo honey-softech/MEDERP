@@ -470,6 +470,7 @@ model Hospital {
   timesheetDays     TimesheetDay[]
   timesheetWeeks    TimesheetWeek[]
   payrollSundayNotices PayrollSundayNotice[]
+  rxTemplates       RxTemplate[]
 }
 
 model HospitalSubscription {
@@ -771,8 +772,26 @@ model Staff {
   payProfile             StaffPayProfile?
   timesheetDays          TimesheetDay[]
   timesheetWeeks         TimesheetWeek[]
+  rxTemplates            RxTemplate[]
 
   @@unique([hospitalId, email])
+}
+
+/// A doctor's named prescription, offered again when the same diagnosis is picked.
+model RxTemplate {
+  id           String   @id @default(cuid())
+  hospitalId   String
+  hospital     Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  doctorId     String
+  doctor       Staff    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  name         String
+  diagnosis    String
+  prescription String   @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([hospitalId, doctorId])
+  @@index([doctorId, diagnosis])
 }
 
 /** Recurring weekly windows when a doctor can be booked (multiple per day allowed). */

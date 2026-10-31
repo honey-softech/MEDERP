@@ -73,7 +73,7 @@ export default async function NurseStationPage() {
                     {doctorName(row.doctor)} · {row.department.name} · {prettyEnum(row.queueType)} · {prettyEnum(row.status)}
                   </p>
                 </div>
-                <Link href={`/appointments/${row.id}`} className={primaryButtonClass}>
+                <Link href={`/appointments/${row.id}/vitals`} className={primaryButtonClass}>
                   Record vitals
                 </Link>
               </div>
@@ -96,8 +96,8 @@ export default async function NurseStationPage() {
                   </p>
                   <p className="text-sm text-slate-500">{doctorName(row.doctor)} · ready for doctor</p>
                 </div>
-                <Link href={`/appointments/${row.id}`} className={secondaryButtonClass}>
-                  View vitals
+                <Link href={`/appointments/${row.id}/vitals`} className={secondaryButtonClass}>
+                  Update vitals
                 </Link>
               </div>
             </article>

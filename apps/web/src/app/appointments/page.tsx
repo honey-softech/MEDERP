@@ -64,6 +64,14 @@ function buildHref(parts: {
   return `/appointments?${query.toString()}`;
 }
 
+function visitHref(id: string, view: CalendarView, date: string) {
+  const query = new URLSearchParams();
+  query.set("from", "calendar");
+  query.set("view", view);
+  query.set("date", date);
+  return `/appointments/${id}?${query.toString()}`;
+}
+
 export default async function AppointmentsPage({
   searchParams,
 }: {
@@ -320,7 +328,7 @@ export default async function AppointmentsPage({
                   {rows.map((row) => (
                     <div key={row.id} className="rounded-lg bg-slate-50 p-2 text-xs">
                       <p className="font-medium">
-                        <Link className="text-teal-700 hover:underline" href={`/appointments/${row.id}`}>
+                        <Link className="text-teal-700 hover:underline" href={visitHref(row.id, view, dateValue)}>
                           {row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} ·{" "}
                           {patientName(row.patient)}
                         </Link>
@@ -374,7 +382,7 @@ export default async function AppointmentsPage({
                     {rows.slice(0, 3).map((row) => (
                       <Link
                         key={row.id}
-                        href={`/appointments/${row.id}`}
+                        href={visitHref(row.id, view, dateValue)}
                         className="block truncate rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-teal-800 hover:bg-teal-50"
                       >
                         {row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}{" "}
@@ -409,7 +417,7 @@ export default async function AppointmentsPage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">
-                      <Link className="text-teal-700 hover:underline" href={`/appointments/${row.id}`}>
+                      <Link className="text-teal-700 hover:underline" href={visitHref(row.id, view, dateValue)}>
                         {patientName(row.patient)}
                       </Link>
                       <span className="ml-2 font-mono text-xs text-slate-500">{row.patient.mrn}</span>
@@ -432,7 +440,7 @@ export default async function AppointmentsPage({
                     summaryApproved={row.assessment?.status === "APPROVED"}
                   />
                 ) : (
-                  <Link href={`/appointments/${row.id}`} className="mt-3 inline-block text-sm text-teal-700 hover:underline">
+                  <Link href={visitHref(row.id, view, dateValue)} className="mt-3 inline-block text-sm text-teal-700 hover:underline">
                     View visit details
                   </Link>
                 )}

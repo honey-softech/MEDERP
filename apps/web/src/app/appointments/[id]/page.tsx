@@ -32,6 +32,7 @@ import {
   patientName,
   prettyEnum,
   requireHospitalPage,
+  localDayKey,
   tokenLabel,
 } from "@/lib/front-desk";
 import { siteFromSnapshot } from "@/lib/lab-catalog";
@@ -49,11 +50,12 @@ export default async function AppointmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; from?: string; view?: string; date?: string }>;
 }) {
   const user = await requireHospitalPage();
   const { id } = await params;
-  const { edit } = await searchParams;
+  const { edit, from, view: calendarView, date: calendarDate } = await searchParams;
+  const scheduleView = from === "calendar";
   const editing = edit === "1" || edit === "true";
   const view = await resolveViewContext(user);
   const actingAsDoctor = isActingAsDoctor(user, view.mode);
@@ -206,14 +208,14 @@ export default async function AppointmentDetailPage({
   const previousId = queueIndex > 0 ? dayQueue[queueIndex - 1]?.id ?? null : null;
   const nextId = queueIndex >= 0 && queueIndex < dayQueue.length - 1 ? dayQueue[queueIndex + 1]?.id ?? null : null;
 
-  const canManage = hasFrontDeskAccess(user) && !actingAsDoctor;
+  const canManage = hasFrontDeskAccess(user) && (!actingAsDoctor || scheduleView);
   const canCollectFee = canCollectOpdFee(user) && !actingAsDoctor;
   const canCheckout = canCheckoutVisit(user) && !actingAsDoctor;
   const canAdmit =
     hospitalHasWardsModule(user.hospital) && hasRoleAccess(user, WARD_ADMIT_ROLES);
   const canRecordVitals = NURSE_VITALS_ROLES.includes(user.role);
-  const canDoctorVisit = actingAsDoctor;
-  const canAssess = actingAsDoctor;
+  const canDoctorVisit = actingAsDoctor && !scheduleView;
+  const canAssess = actingAsDoctor && !scheduleView;
   const canPrintSummary = PRINT_SUMMARY_ROLES.includes(user.role);
   const canCollectLab = hasBillingAccess(user);
   const canWorkLab = LAB_WORK_ROLES.includes(user.role);
@@ -243,6 +245,11 @@ export default async function AppointmentDetailPage({
   const showEditableAssessment =
     canAssess && appointment.status !== "CANCELLED" && (!visitClosed || editing);
   const useCockpit = showEditableAssessment || (canAssess && visitClosed && !editing);
+  const calendarBackView = calendarView === "week" || calendarView === "list" || calendarView === "month" ? calendarView : "month";
+  const calendarBackDate = /^\d{4}-\d{2}-\d{2}$/.test(calendarDate ?? "")
+    ? calendarDate
+    : localDayKey(appointment.scheduledAt);
+  const calendarBack = scheduleView ? `/appointments?view=${calendarBackView}&date=${calendarBackDate}` : null;
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
@@ -273,11 +280,16 @@ export default async function AppointmentDetailPage({
   }
 
   return (
-    <AppShell title="Visit details" dense={useCockpit}>
+    <AppShell title={scheduleView ? "Appointment" : "Visit details"} dense={useCockpit}>
       <div className={useCockpit ? "flex min-w-0 flex-col gap-2 overflow-x-hidden lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden" : undefined}>
+      {calendarBack ? (
+        <Link href={calendarBack} className="inline-flex text-sm text-teal-700 hover:underline print:hidden">
+          ← Appointments
+        </Link>
+      ) : null}
       <div className="mb-0 flex shrink-0 flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-start gap-2 sm:items-center">
-          <ConsultQueueNav previousId={previousId} nextId={nextId} />
+          <ConsultQueueNav previousId={scheduleView ? null : previousId} nextId={scheduleView ? null : nextId} />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
               {prettyEnum(appointment.queueType)} · Token {tokenLabel(appointment.tokenNumber)}
@@ -367,9 +379,11 @@ export default async function AppointmentDetailPage({
               Preview
             </Link>
           ) : null}
-          <Link href="/queue" className={compactButtonClass}>
-            Queue
-          </Link>
+          {scheduleView ? null : (
+            <Link href="/queue" className={compactButtonClass}>
+              Queue
+            </Link>
+          )}
           <VisitHistorySheet
             visits={pastVisits}
             patientHref={`/patients/${appointment.patientId}`}
@@ -476,9 +490,11 @@ export default async function AppointmentDetailPage({
               Preview
             </Link>
           ) : null}
-          <Link href="/queue" className={compactButtonClass}>
-            Queue
-          </Link>
+          {scheduleView ? null : (
+            <Link href="/queue" className={compactButtonClass}>
+              Queue
+            </Link>
+          )}
           <VisitHistorySheet
             visits={pastVisits}
             patientHref={`/patients/${appointment.patientId}`}
@@ -770,7 +786,12 @@ export default async function AppointmentDetailPage({
             </p>
           ) : null}
 
-          {summaryApproved ? null : (
+          {summaryApproved ? null : scheduleView && appointment.status === "SCHEDULED" ? (
+            <p className="rounded-xl border border-border bg-app-bg px-3 py-2 text-sm text-text-secondary">
+              This visit is booked
+              {appointment.reason ? ` · ${appointment.reason}` : ""}. Open it from the OPD queue on the day to record the assessment.
+            </p>
+          ) : (
             <p className="rounded-xl border border-border bg-app-bg px-3 py-2 text-sm text-text-secondary">
               The doctor has not approved a visit summary yet.
             </p>

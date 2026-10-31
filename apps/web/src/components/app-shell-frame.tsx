@@ -1,7 +1,7 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
@@ -22,14 +22,14 @@ function normalizeNav(nav: NavLink[] | NavSection[]): NavSection[] {
   return [{ items: nav as NavLink[] }];
 }
 
-function linkActive(pathname: string, href: string, allHrefs: string[]) {
+function linkActive(pathname: string, href: string, allHrefs: string[], openedFromCalendar: boolean) {
   if (href === "/") return pathname === "/";
 
-  // Visit workspace (/appointments/:id…) is opened from OPD queue for doctors/nurses —
-  // keep Queue highlighted instead of Appointments.
+  // The consult workspace is opened from the OPD queue. A visit opened from the
+  // appointments calendar should keep Appointments highlighted.
   const isVisitWorkspace =
     /^\/appointments\/[^/]+/.test(pathname) && !pathname.startsWith("/appointments/new");
-  if (isVisitWorkspace && allHrefs.includes("/queue")) {
+  if (isVisitWorkspace && !openedFromCalendar && allHrefs.includes("/queue")) {
     if (href === "/queue") return true;
     if (href === "/appointments") return false;
   }
@@ -355,6 +355,7 @@ export function AppShellFrame({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const openedFromCalendar = useSearchParams().get("from") === "calendar";
   const sections = normalizeNav(nav);
   const allHrefs = sections.flatMap((section) => section.items.map((item) => item.href));
   const navRef = useRef<HTMLElement>(null);
@@ -479,7 +480,7 @@ export function AppShellFrame({
                 {section.title && collapsed ? <div className="mx-2 mb-1 hidden border-t border-border md:block" /> : null}
                 <ul className="space-y-0.5">
                   {section.items.map((item) => {
-                    const active = linkActive(pathname, item.href, allHrefs);
+                    const active = linkActive(pathname, item.href, allHrefs, openedFromCalendar);
                     return (
                       <li key={item.href}>
                         <Link

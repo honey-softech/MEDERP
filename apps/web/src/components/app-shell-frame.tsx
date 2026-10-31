@@ -319,10 +319,18 @@ function NavGlyph({ href }: { href: string }) {
   );
 }
 
-function navItemClass(active: boolean, collapsed: boolean) {
-  return `group relative flex h-11 items-center rounded-xl text-sm font-medium transition-colors ${
-    collapsed ? "gap-2.5 px-2 md:justify-center md:px-0" : "gap-2.5 px-2"
-  } ${active ? "bg-primary-light text-primary-dark" : "text-text-secondary hover:bg-app-bg hover:text-text-primary"}`;
+const NAV_EASE = "duration-300 ease-in-out motion-reduce:transition-none";
+
+function navItemClass(active: boolean) {
+  return `group relative flex h-11 items-center gap-2.5 rounded-xl px-2 text-sm font-medium transition-colors ${
+    active ? "bg-primary-light text-primary-dark" : "text-text-secondary hover:bg-app-bg hover:text-text-primary"
+  }`;
+}
+
+function navLabelClass(collapsed: boolean) {
+  return `min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity] ${NAV_EASE} ${
+    collapsed ? "md:max-w-0 md:opacity-0" : "max-w-[12rem] opacity-100"
+  }`;
 }
 
 function iconWellClass(active: boolean) {
@@ -426,58 +434,57 @@ export function AppShellFrame({
         ) : null}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-surface transition-[transform,width] duration-200 print:hidden ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-[min(16.5rem,85vw)] flex-col border-r border-border bg-surface transition-[transform,width] ${NAV_EASE} print:hidden ${
             collapsed ? "md:w-[4.25rem]" : "md:w-[16.5rem]"
-          } w-[min(16.5rem,85vw)] ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+          } ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         >
-          <div className={`shrink-0 border-b border-border ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
-            <div className={`flex items-center gap-2 ${collapsed ? "md:flex-col md:justify-center" : "justify-between"}`}>
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{brand}</p>
-                  <h1 className="truncate text-base font-semibold leading-tight text-text-primary">MedERP</h1>
-                  {hospitalLabel ? <p className="truncate text-xs text-text-secondary">{hospitalLabel}</p> : null}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-text-secondary hover:bg-app-bg hover:text-text-primary md:inline-flex"
-                aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-                title={collapsed ? "Expand menu" : "Collapse menu"}
-                onClick={toggleCollapsed}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden
-                >
-                  <path d="M15 6l-6 6 6 6" />
-                </svg>
-              </button>
+          <div className="relative h-[4.75rem] shrink-0 overflow-hidden border-b border-border">
+            <span className="absolute top-4 left-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div
+              className={`absolute top-3.5 right-12 left-14 overflow-hidden whitespace-nowrap transition-opacity ${NAV_EASE} ${
+                collapsed ? "md:pointer-events-none md:opacity-0" : "opacity-100"
+              }`}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">{brand}</p>
+              <h1 className="truncate text-base font-semibold leading-tight text-text-primary">MedERP</h1>
+              {hospitalLabel ? <p className="truncate text-xs text-text-secondary">{hospitalLabel}</p> : null}
             </div>
           </div>
+          <button
+            type="button"
+            className="absolute top-[1.15rem] -right-3 z-10 hidden h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-text-secondary shadow-sm hover:bg-app-bg hover:text-text-primary md:inline-flex"
+            aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+            title={collapsed ? "Expand menu" : "Collapse menu"}
+            onClick={toggleCollapsed}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-3.5 w-3.5 transition-transform ${NAV_EASE} ${collapsed ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
 
-          <nav ref={navRef} className={`flex-1 space-y-5 overflow-y-auto py-4 ${collapsed ? "px-2" : "px-3"}`}>
+          <nav ref={navRef} className="flex-1 space-y-5 overflow-y-auto px-2 py-4">
             {sections.map((section, index) => (
               <div key={section.title ?? `section-${index}`}>
                 {section.title ? (
                   <p
-                    className={`mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-disabled ${
-                      collapsed ? "md:hidden" : ""
+                    className={`mb-1.5 overflow-hidden px-3 text-[10px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap text-text-disabled transition-[max-height,opacity,margin] ${NAV_EASE} ${
+                      collapsed ? "md:mb-0 md:max-h-0 md:opacity-0" : "max-h-6 opacity-100"
                     }`}
                   >
                     {section.title}
                   </p>
                 ) : null}
-                {section.title && collapsed ? <div className="mx-2 mb-1 hidden border-t border-border md:block" /> : null}
                 <ul className="space-y-0.5">
                   {section.items.map((item) => {
                     const active = linkActive(pathname, item.href, allHrefs, openedFromCalendar);
@@ -490,7 +497,7 @@ export function AppShellFrame({
                             persistNavScroll();
                             setMobileOpen(false);
                           }}
-                          className={navItemClass(active, collapsed)}
+                          className={navItemClass(active)}
                         >
                           {active ? (
                             <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
@@ -498,8 +505,8 @@ export function AppShellFrame({
                           <span className={iconWellClass(active)}>
                             <NavGlyph href={item.href} />
                           </span>
-                          <span className={`min-w-0 truncate ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
-                          <span className={collapsed ? "md:hidden" : ""}>
+                          <span className={navLabelClass(collapsed)}>{item.label}</span>
+                          <span className={navLabelClass(collapsed)}>
                             <NavPulse />
                           </span>
                         </Link>
@@ -511,12 +518,12 @@ export function AppShellFrame({
             ))}
           </nav>
 
-          <div className={`shrink-0 border-t border-border ${collapsed ? "p-2" : "p-3"}`}>
+          <div className="shrink-0 border-t border-border p-2">
             <Link
               href="/account"
               title="Account"
               onClick={() => setMobileOpen(false)}
-              className={navItemClass(pathname === "/account" || pathname.startsWith("/account/"), collapsed)}
+              className={navItemClass(pathname === "/account" || pathname.startsWith("/account/"))}
             >
               {pathname === "/account" || pathname.startsWith("/account/") ? (
                 <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
@@ -524,15 +531,19 @@ export function AppShellFrame({
               <span className={iconWellClass(pathname === "/account" || pathname.startsWith("/account/"))}>
                 <NavGlyph href="/account" />
               </span>
-              <span className={`min-w-0 truncate ${collapsed ? "md:hidden" : ""}`}>Account</span>
-              <span className={collapsed ? "md:hidden" : ""}>
+              <span className={navLabelClass(collapsed)}>Account</span>
+              <span className={navLabelClass(collapsed)}>
                 <NavPulse />
               </span>
             </Link>
           </div>
         </aside>
 
-        <main className={`min-h-dvh overflow-x-hidden print:ml-0 ${collapsed ? "md:ml-[4.25rem]" : "md:ml-[16.5rem]"}`}>
+        <main
+          className={`min-h-dvh overflow-x-hidden print:ml-0 transition-[margin] ${NAV_EASE} ${
+            collapsed ? "md:ml-[4.25rem]" : "md:ml-[16.5rem]"
+          }`}
+        >
           <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-surface/95 px-3 backdrop-blur print:hidden sm:gap-3 sm:px-6 lg:px-8">
             <button
               type="button"

@@ -11,12 +11,15 @@ export function VisitPaymentForm({
   due,
   doctorLabel,
   afterPayHref,
+  skipHref,
 }: {
   appointmentId: string;
   due: number;
   doctorLabel: string;
-  /** Nurse and doctor continue to the visit for vitals (and consult). */
+  /** Where a saved payment continues. Doctors open the consult; nurses open vitals. */
   afterPayHref?: string;
+  /** Leave payment for later. Doctors return to the walk-in choices. */
+  skipHref?: string;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<"CASH" | "CARD" | "UPI">("CASH");
@@ -56,11 +59,13 @@ export function VisitPaymentForm({
         <h3 className="font-semibold">Record payment</h3>
         <p className="mt-1 text-sm text-slate-500">
           Consultation is credited to {doctorLabel}. The amount starts from the visit&apos;s OPD rate. Reception, nursing, or the doctor can change it, then collect that amount.
-        {afterPayHref?.endsWith("/vitals")
-          ? " After payment, record vitals. Saving opens the doctor screen."
-          : afterPayHref
-            ? " After payment, the visit opens."
-            : ""}
+        {afterPayHref?.includes("skipVitals")
+          ? " After payment, the consult opens. Vitals can be recorded later, or skipped."
+          : afterPayHref?.endsWith("/vitals")
+            ? " After payment, record vitals. Saving opens the doctor screen."
+            : afterPayHref
+              ? " After payment, the visit opens."
+              : ""}
         </p>
       </div>
 
@@ -154,7 +159,7 @@ export function VisitPaymentForm({
         <button
           className={secondaryButtonClass}
           type="button"
-          onClick={() => router.push(afterPayHref || "/queue")}
+          onClick={() => router.push(skipHref || afterPayHref || "/queue")}
         >
           Skip for now
         </button>

@@ -9,7 +9,7 @@ import { PatientContextPanel } from "@/components/patient-context-panel";
 import { LabOrderPanel } from "@/components/lab-order-panel";
 import { VisitAssessmentReadonly, VisitSummaryBanner } from "@/components/visit-assessment-readonly";
 import { VisitLabTestsForm } from "@/components/visit-lab-tests-form";
-import { compactButtonClass, primaryButtonClass } from "@/components/auth-shell";
+import { compactButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
 import {
@@ -51,11 +51,11 @@ export default async function AppointmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string; from?: string; view?: string; date?: string }>;
+  searchParams: Promise<{ edit?: string; from?: string; view?: string; date?: string; skipVitals?: string }>;
 }) {
   const user = await requireHospitalPage();
   const { id } = await params;
-  const { edit, from, view: calendarView, date: calendarDate } = await searchParams;
+  const { edit, from, view: calendarView, date: calendarDate, skipVitals: skipVitalsQuery } = await searchParams;
   const fromCalendar = from === "calendar";
   const editing = edit === "1" || edit === "true";
   const view = await resolveViewContext(user);
@@ -244,6 +244,7 @@ export default async function AppointmentDetailPage({
   const summaryApproved = assessment?.status === "APPROVED";
   const visitPaid = isConsultationPaid(appointment.invoices[0]);
   const walkInNeedsPayment = appointment.queueType === "WALK_IN" && !visitPaid;
+  const skipVitals = skipVitalsQuery === "1" || skipVitalsQuery === "true";
   const visitClosed =
     appointment.status === "COMPLETED" || appointment.status === "NO_SHOW" || summaryApproved;
   const showEditableAssessment =
@@ -261,8 +262,19 @@ export default async function AppointmentDetailPage({
     user.role === "DOCTOR" ||
     (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id);
   const canEditVitals =
-    !walkInNeedsPayment && visitIsToday && (canRecordVitals || doctorCanEditVitals);
+    visitIsToday &&
+    (canRecordVitals || doctorCanEditVitals) &&
+    (!walkInNeedsPayment || doctorCanEditVitals);
   const vitalsHref = `/appointments/${appointment.id}/vitals`;
+  const skipVitalsHref = `/appointments/${appointment.id}?skipVitals=1`;
+  const showDoctorWalkInChoice =
+    showEditableAssessment &&
+    appointment.queueType === "WALK_IN" &&
+    !vitals &&
+    !assessment &&
+    !skipVitals;
+  const showDoctorWalkInPayment =
+    canAssess && appointment.queueType === "WALK_IN" && !visitPaid && canCollectOpdFee(user);
   const photo = appointment.patient.photoData || "";
   const testsLiveInPopup = canAssess && (showEditableAssessment || summaryApproved);
   function labOrdersPanel() {
@@ -635,15 +647,28 @@ export default async function AppointmentDetailPage({
 
         {showEditableAssessment ? (
           <div className="flex min-w-0 flex-col space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-hidden">
-          {walkInNeedsPayment ? (
+          {showDoctorWalkInChoice ? (
             <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
-              <p className="mb-3 text-sm text-text-secondary">Record the consultation fee before vitals and the consult.</p>
-              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
-                Record payment
-              </Link>
+              <p className="text-sm text-text-secondary">
+                {visitPaid
+                  ? "This walk-in has no vitals yet. Record them, or skip vitals and start the consult."
+                  : "This walk-in has no vitals yet. Record the consultation fee, record vitals, or skip vitals and start the consult."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {showDoctorWalkInPayment ? (
+                  <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
+                    Record payment
+                  </Link>
+                ) : null}
+                <Link href={vitalsHref} className={`${secondaryButtonClass} inline-flex`}>
+                  Record vitals
+                </Link>
+                <Link href={skipVitalsHref} className={`${secondaryButtonClass} inline-flex`}>
+                  Skip vitals
+                </Link>
+              </div>
             </div>
-          ) : null}
-          {!walkInNeedsPayment ? (
+          ) : (
           <ConsultAssessmentForm
             appointmentId={appointment.id}
             canPreview={Boolean(assessment)}
@@ -685,7 +710,7 @@ export default async function AppointmentDetailPage({
                 : "",
             }}
           >
-            {canCollectFee && !visitPaid ? (
+            {(showDoctorWalkInPayment || (canCollectFee && !visitPaid)) ? (
               <div className="print:hidden">
                 <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
                   Record payment
@@ -712,7 +737,7 @@ export default async function AppointmentDetailPage({
               </div>
             ) : null}
           </ConsultAssessmentForm>
-          ) : null}
+          )}
           </div>
         ) : canAssess && visitClosed ? (
           <div className="min-w-0 space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]">

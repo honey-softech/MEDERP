@@ -31,7 +31,6 @@ export default async function CollectVisitPaymentPage({
   const user = await requireHospitalPage();
   if (!hasBillingAccess(user)) redirect("/");
   const view = await resolveViewContext(user);
-  const continueToVisit = user.role === "NURSE" || user.role === "DOCTOR" || isActingAsDoctor(user, view.mode);
   const appointmentId = await routeParam(params, "appointmentId");
 
   const appointment = await prisma.appointment.findFirst({
@@ -69,14 +68,17 @@ export default async function CollectVisitPaymentPage({
       : false;
 
   const visitHref = `/appointments/${appointment.id}`;
+  const actingDoctor = user.role === "DOCTOR" || isActingAsDoctor(user, view.mode);
   const canOpenVitals =
     canNurseRecordVitals(appointment) &&
     (NURSE_VITALS_ROLES.includes(user.role) ||
       user.role === "DOCTOR" ||
       (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id));
   const afterVitalsHref = canOpenVitals ? `${visitHref}/vitals` : visitHref;
+  const doctorConsultHref = `${visitHref}?skipVitals=1`;
+  const afterPayHref = user.role === "NURSE" ? afterVitalsHref : actingDoctor ? doctorConsultHref : undefined;
   if (due <= 0) {
-    redirect(continueToVisit ? afterVitalsHref : invoice ? `/billing/${invoice.id}` : visitHref);
+    redirect(user.role === "NURSE" ? afterVitalsHref : actingDoctor ? doctorConsultHref : invoice ? `/billing/${invoice.id}` : visitHref);
   }
 
   return (
@@ -136,7 +138,8 @@ export default async function CollectVisitPaymentPage({
         appointmentId={appointment.id}
         due={due > 0 ? due : defaultFee}
         doctorLabel={doctorLabel}
-        afterPayHref={continueToVisit ? afterVitalsHref : undefined}
+        afterPayHref={afterPayHref}
+        skipHref={actingDoctor ? visitHref : user.role === "NURSE" ? afterVitalsHref : undefined}
       />
     </AppShell>
   );

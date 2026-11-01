@@ -805,19 +805,19 @@ html {
 }
 
 /* -- Signed-in homepage -- */
-.home-hero {
+.home-greeting {
   background:
-    radial-gradient(ellipse 55% 80% at 100% 0%, rgb(66 165 245 / 0.45), transparent 55%),
-    radial-gradient(ellipse 40% 70% at 0% 100%, rgb(0 137 123 / 0.28), transparent 50%),
+    radial-gradient(ellipse 55% 140% at 100% 0%, rgb(66 165 245 / 0.45), transparent 58%),
+    radial-gradient(ellipse 42% 160% at 0% 100%, rgb(0 137 123 / 0.34), transparent 55%),
     #0b1c33;
 }
 
-.home-hero-glow {
+.home-greeting-grid {
   background-image:
-    linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+    linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
-  mask-image: linear-gradient(to bottom, black, transparent 85%);
+  mask-image: linear-gradient(to right, transparent, black 18%, black 70%, transparent);
 }
 
 .home-live-dot {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { fieldClass } from "@/components/auth-shell";
 
@@ -18,13 +18,16 @@ export function PatientPicker({
   required = true,
   initial,
   registerHref,
+  labelAction,
 }: {
   name?: string;
   label?: string;
   required?: boolean;
   initial?: PatientOption | null;
   registerHref?: string;
+  labelAction?: ReactNode;
 }) {
+  const inputId = useId();
   const [query, setQuery] = useState(
     initial ? `${initial.firstName} ${initial.lastName} · ${initial.mrn}` : "",
   );
@@ -59,10 +62,15 @@ export function PatientPicker({
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium text-slate-700">
-        {label}
-        <input type="hidden" name={name} value={selectedId} required={required} />
-        <input
+      <div className="mb-0 flex items-center justify-between gap-3">
+        <label htmlFor={inputId} className="text-sm font-medium text-slate-700">
+          {label}
+        </label>
+        {labelAction}
+      </div>
+      <input type="hidden" name={name} value={selectedId} required={required} />
+      <input
+          id={inputId}
           className={fieldClass}
           value={query}
           placeholder="Search name, phone, or UHID"
@@ -73,7 +81,6 @@ export function PatientPicker({
           }}
           onFocus={() => (results.length > 0 || searched) && setOpen(true)}
         />
-      </label>
       {open && results.length > 0 ? (
         <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
           {results.map((patient) => (

@@ -358,6 +358,20 @@ const structuredData = {
       slogan: "Clinic and hospital ERP for India",
     },
     {
+      "@type": "WebSite",
+      name: "MedERP",
+      url: MEDERP_PUBLIC_ORIGIN,
+      description: "Clinic and hospital ERP for India.",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${MEDERP_PUBLIC_ORIGIN}/features?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
       "@type": "SoftwareApplication",
       name: "MedERP",
       url: MEDERP_PUBLIC_ORIGIN,
@@ -367,7 +381,10 @@ const structuredData = {
         "OPD management software for Indian clinics and hospitals. Queue, nurse vitals, doctor consult, clinic billing, pharmacy, lab, and WhatsApp in one record.",
       offers: {
         "@type": "Offer",
-        url: `${MEDERP_PUBLIC_ORIGIN}/register-hospital`,
+        url: `${MEDERP_PUBLIC_ORIGIN}/pricing`,
+        price: "1200",
+        priceCurrency: "INR",
+        description: "Plan 1 starts at ₹1,200 per month before GST, after a 1-month free trial.",
       },
     },
     {
@@ -397,9 +414,12 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
             <a href="#workflow" className="hover:text-[#10211e]">
               The day
             </a>
-            <a href="#features" className="hover:text-[#10211e]">
+            <Link href="/features" className="hover:text-[#10211e]">
               Features
-            </a>
+            </Link>
+            <Link href="/pricing" className="hover:text-[#10211e]">
+              Pricing
+            </Link>
             <a href="#faq" className="hover:text-[#10211e]">
               FAQ
             </a>
@@ -508,12 +528,29 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
             OPD, nurse vitals, doctor consult, billing, certificates, WhatsApp, and staff tools — in one clinic ERP.
           </p>
           <div className="landing-bento mt-10">
-            {features.map((feature, index) => (
+            {features.map((feature, index) => {
+              const href =
+                feature.icon === "opd"
+                  ? "/features/opd"
+                  : feature.icon === "billing"
+                    ? "/features/billing"
+                    : feature.icon === "whatsapp"
+                      ? "/features/whatsapp"
+                      : null;
+              return (
               <article key={feature.title} className={`landing-card ${index === 0 ? "landing-card-lead" : ""}`}>
                 <span className="landing-feature-icon">
                   <FeatureIconSvg name={feature.icon} />
                 </span>
-                <h3 className="mt-5 text-lg font-semibold tracking-tight text-[#10211e]">{feature.title}</h3>
+                <h3 className="mt-5 text-lg font-semibold tracking-tight text-[#10211e]">
+                  {href ? (
+                    <Link href={href} className="hover:text-[#1f6f62]">
+                      {feature.title}
+                    </Link>
+                  ) : (
+                    feature.title
+                  )}
+                </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#3e5550]">{feature.body}</p>
                 {index === 0 ? (
                   <div className="mt-6 flex flex-wrap gap-2" aria-hidden>
@@ -525,7 +562,8 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
                   </div>
                 ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -603,8 +641,11 @@ export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolea
           {isMobileApp ? null : <AppDownloadBadges />}
         </div>
         <div className="mx-auto mt-8 flex max-w-6xl flex-wrap gap-x-5 gap-y-2 text-sm text-[#3e5550]">
-          <Link href="/#features" className="hover:text-[#10211e]">
+          <Link href="/features" className="hover:text-[#10211e]">
             Features
+          </Link>
+          <Link href="/pricing" className="hover:text-[#10211e]">
+            Pricing
           </Link>
           <a href="/login" className="hover:text-[#10211e]">
             Sign in

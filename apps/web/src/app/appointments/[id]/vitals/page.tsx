@@ -43,6 +43,10 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const walkInNeedsPayment = appointment.queueType === "WALK_IN" && !isConsultationPaid(appointment.invoices[0]);
   const canRecord = canNurseRecordVitals(appointment);
+  const doctorOnVisit =
+    user.role === "DOCTOR" || (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id);
+  const doctorCanSkip = doctorOnVisit && !vitals;
+  const skipVitalsHref = `${visitHref}?skipVitals=1`;
 
   return (
     <AppShell title="Update vitals" dense>
@@ -50,12 +54,19 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
         <p className="text-sm font-semibold text-text-primary">
           {patientName(appointment.patient)} · Token {tokenLabel(appointment.tokenNumber)}
         </p>
-        <Link href={visitHref} className={secondaryButtonClass}>
-          Back to visit
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {doctorCanSkip ? (
+            <Link href={skipVitalsHref} className={secondaryButtonClass}>
+              Skip vitals
+            </Link>
+          ) : null}
+          <Link href={visitHref} className={secondaryButtonClass}>
+            Back to visit
+          </Link>
+        </div>
       </div>
 
-      {walkInNeedsPayment ? (
+      {walkInNeedsPayment && !doctorOnVisit ? (
         <div className="max-w-3xl rounded-xl border border-border bg-surface p-4 shadow-card">
           <p className="mb-3 text-sm text-text-secondary">Record the consultation fee before vitals.</p>
           <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
@@ -72,13 +83,25 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
           </Link>
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
-          <VitalsForm
-            appointmentId={appointment.id}
-            initial={vitals}
-            returnTo={visitHref}
-            heading={vitals ? "Update today's vitals" : "Record vitals"}
-          />
+        <div className="space-y-3">
+          {walkInNeedsPayment && doctorOnVisit ? (
+            <div className="max-w-3xl rounded-xl border border-border bg-surface p-4 shadow-card">
+              <p className="mb-3 text-sm text-text-secondary">
+                The consultation fee is not recorded yet. You can record it now, or after these vitals.
+              </p>
+              <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} inline-flex`}>
+                Record payment
+              </Link>
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
+            <VitalsForm
+              appointmentId={appointment.id}
+              initial={vitals}
+              returnTo={doctorCanSkip ? skipVitalsHref : visitHref}
+              heading={vitals ? "Update today's vitals" : "Record vitals"}
+            />
+          </div>
         </div>
       )}
     </AppShell>

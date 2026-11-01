@@ -36,15 +36,24 @@ export const metadata: Metadata = {
     title: siteTitle,
     description: siteDescription,
     locale: "en_IN",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "MedERP — clinic and hospital ERP for India",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: siteTitle,
     description: siteDescription,
+    images: ["/opengraph-image"],
   },
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
   },
   verification: {
     google: "6iti9iTP9D8-2SfejfQy-ElG0U2Mr66Ile1GnR2-B7k",

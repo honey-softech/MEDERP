@@ -241,117 +241,109 @@ export function AppointmentForm({
     }
     const appointmentId = data.appointment?.id as string | undefined;
     if (queueType === "WALK_IN" && appointmentId) {
-      router.push(`/billing/collect/${appointmentId}`);
+      // A doctor chooses record payment, record vitals, or skip vitals on the visit.
+      router.push(lockDoctor ? `/appointments/${appointmentId}` : `/billing/collect/${appointmentId}`);
     } else {
       router.push(appointmentId ? `/appointments/${appointmentId}` : "/appointments");
     }
     router.refresh();
   }
 
+  const registerHref = walkInDefault ? "/patients/new?next=walkin" : "/patients/new?next=appointment";
+  const showQueueType = !(walkInDefault && lockDoctor);
+  const doctorNote = !lockDoctor && doctors.length === 0
+    ? "No doctor users in this hospital yet. Add one under Hospital users with the Doctor role."
+    : selectedOnLeave
+      ? isWalkIn
+        ? "Marked on leave today. Walk-in is still allowed if they are consulting."
+        : "This doctor is on leave that day. Choose another doctor or another date."
+      : null;
+  const walkInHint = !doctorId
+    ? "Select a doctor to use their hours for today."
+    : walkInNoWindowToday
+      ? "This doctor has no availability windows today."
+      : walkInHoursEnded
+        ? "Clinic hours have ended. Walk-in will still be added now."
+        : remainingWalkInWindows.length === 1
+          ? `Joins today's ${remainingWalkInWindows[0].startTime}–${remainingWalkInWindows[0].endTime} session.`
+          : windowsHint || "No set hours yet. Walk-in uses the current time.";
+
   return (
     <form
       onSubmit={onSubmit}
-      className="grid max-w-4xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:grid-cols-2"
+      className="w-full space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
     >
-      <div className="md:col-span-2">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-slate-500">
-            Search an existing patient, or register a new one and continue booking.
-          </p>
-          <Link
-            href={walkInDefault ? "/patients/new?next=walkin" : "/patients/new?next=appointment"}
-            className={primaryButtonClass}
-          >
+      <PatientPicker
+        initial={initialPatient}
+        registerHref={registerHref}
+        labelAction={
+          <Link href={registerHref} className={`${primaryButtonClass} h-8 px-3 text-xs sm:h-9 sm:text-sm`}>
             Register patient
           </Link>
-        </div>
-        <PatientPicker
-          initial={initialPatient}
-          registerHref={walkInDefault ? "/patients/new?next=walkin" : "/patients/new?next=appointment"}
-        />
-      </div>
-      {lockDoctor && defaultDoctorId ? (
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        {lockDoctor && defaultDoctorId ? (
+          <label className="text-sm font-medium text-slate-700">
+            Doctor
+            <input type="hidden" name="doctorId" value={defaultDoctorId} />
+            <input className={`${fieldClass} bg-slate-50`} value={lockedDoctor?.label ?? "You"} readOnly />
+          </label>
+        ) : (
+          <label className="text-sm font-medium text-slate-700">
+            Doctor
+            <select
+              className={fieldClass}
+              name="doctorId"
+              required
+              value={doctorId}
+              onChange={(event) => selectDoctor(event.target.value)}
+            >
+              <option value="">Select doctor</option>
+              {doctors.map((item) => (
+                <option key={item.id} value={item.id} disabled={!isWalkIn && onLeaveIds.includes(item.id)}>
+                  {item.label}
+                  {onLeaveIds.includes(item.id) ? " (on leave)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="text-sm font-medium text-slate-700">
-          Doctor
-          <input type="hidden" name="doctorId" value={defaultDoctorId} />
-          <input className={`${fieldClass} bg-slate-50`} value={lockedDoctor?.label ?? "You"} readOnly />
-          {selectedOnLeave ? (
-            <span className="mt-1 block text-xs font-normal text-amber-700">
-              {isWalkIn
-                ? "You are marked on leave today — walk-in is still allowed if you are consulting."
-                : "You are on leave this day."}
-            </span>
-          ) : null}
-        </label>
-      ) : (
-        <label className="text-sm font-medium text-slate-700">
-          Doctor
+          Department
           <select
             className={fieldClass}
-            name="doctorId"
+            name="departmentId"
             required
-            value={doctorId}
-            onChange={(event) => selectDoctor(event.target.value)}
+            value={departmentId}
+            onChange={(event) => setDepartmentId(event.target.value)}
           >
-            <option value="">Select doctor</option>
-            {doctors.map((item) => (
-              <option key={item.id} value={item.id} disabled={!isWalkIn && onLeaveIds.includes(item.id)}>
+            <option value="">Select department</option>
+            {departments.map((item) => (
+              <option key={item.id} value={item.id}>
                 {item.label}
-                {onLeaveIds.includes(item.id) ? " (on leave)" : ""}
               </option>
             ))}
           </select>
-          {doctors.length === 0 ? (
-            <span className="mt-1 block text-xs font-normal text-amber-700">
-              No doctor users in this hospital yet. Add one under Hospital users with the Doctor role.
-            </span>
-          ) : selectedOnLeave && isWalkIn ? (
-            <span className="mt-1 block text-xs font-normal text-amber-700">
-              This doctor is on leave today — walk-in is still allowed if they are consulting.
-            </span>
-          ) : (
-            <span className="mt-1 block text-xs font-normal text-slate-500">
-              Times below are for the selected doctor only.
-            </span>
-          )}
         </label>
-      )}
-      <label className="text-sm font-medium text-slate-700">
-        Department
-        <select
-          className={fieldClass}
-          name="departmentId"
-          required
-          value={departmentId}
-          onChange={(event) => setDepartmentId(event.target.value)}
-        >
-          <option value="">Select department</option>
-          {departments.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </label>
+        {doctorNote ? (
+          <p className={`text-xs font-normal sm:col-span-2 ${doctors.length === 0 || selectedOnLeave ? "text-amber-700" : "text-slate-500"}`}>
+            {doctorNote}
+          </p>
+        ) : null}
+      </div>
 
       {isWalkIn ? (
-        <div className="space-y-2 text-sm font-medium text-slate-700">
-          <p>Date and time</p>
-          <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-700">
-            Today — {todayLabel}
-            <span className="mt-0.5 block text-xs text-slate-500">Walk-ins can only be added for today.</span>
-          </p>
-          {!doctorId ? (
-            <p className="text-xs font-normal text-slate-500">Select a doctor to use their hours for today.</p>
-          ) : walkInNoWindowToday ? (
-            <p className="text-xs font-normal text-amber-700">This doctor has no availability windows today.</p>
-          ) : walkInHoursEnded ? (
-            <p className="text-xs font-normal text-slate-500">
-              Clinic hours have ended. Walk-in will still be added now.
-            </p>
-          ) : walkInNeedsTimeChoice ? (
-            <label className="block text-sm font-medium text-slate-700">
-              Session time
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+          <div className="text-sm font-medium text-slate-700">
+            Date
+            <p className={`${fieldClass} flex items-center bg-slate-50 font-normal`}>Today — {todayLabel}</p>
+          </div>
+          <VisitTypeField visitType={visitType} onChange={setVisitType} />
+          {walkInNeedsTimeChoice ? (
+            <label className="text-sm font-medium text-slate-700 sm:col-span-2 sm:max-w-xs">
+              Session
               <select
                 className={fieldClass}
                 required
@@ -365,21 +357,14 @@ export function AppointmentForm({
                   </option>
                 ))}
               </select>
-              {windowsHint ? <span className="mt-1 block text-xs font-normal text-slate-500">{windowsHint}</span> : null}
             </label>
-          ) : remainingWalkInWindows.length === 1 ? (
-            <p className="text-xs font-normal text-slate-500">
-              Walk-in joins today&apos;s {remainingWalkInWindows[0].startTime}–{remainingWalkInWindows[0].endTime}{" "}
-              session.
-            </p>
-          ) : (
-            <p className="text-xs font-normal text-slate-500">
-              {windowsHint || "No availability windows for this doctor yet — walk-in uses the current time."}
-            </p>
-          )}
+          ) : null}
+          <p className={`text-xs font-normal sm:col-span-2 ${walkInNoWindowToday ? "text-amber-700" : "text-slate-500"}`}>
+            {walkInHint}
+          </p>
         </div>
       ) : (
-        <>
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
             Date
             <input
@@ -406,10 +391,6 @@ export function AppointmentForm({
                   </option>
                 ))}
               </select>
-              {windowsHint ? <span className="mt-1 block text-xs font-normal text-slate-500">{windowsHint}</span> : null}
-              {slotMode && slots.length === 0 ? (
-                <span className="mt-1 block text-xs font-normal text-amber-700">No slots this day — pick another date.</span>
-              ) : null}
               <input type="hidden" name="scheduledAt" value={scheduledAt} />
             </label>
           ) : (
@@ -427,48 +408,42 @@ export function AppointmentForm({
                 }}
               />
               <input type="hidden" name="scheduledAt" value={scheduledAt} />
-              <span className="mt-1 block text-xs font-normal text-slate-500">
-                No availability windows for this doctor yet — any time is allowed.
-              </span>
             </label>
           )}
-        </>
+          {slotMode && slots.length === 0 ? (
+            <p className="text-xs font-normal text-amber-700 sm:col-span-2">No slots this day. Pick another date.</p>
+          ) : windowsHint ? (
+            <p className="text-xs font-normal text-slate-500 sm:col-span-2">{windowsHint}</p>
+          ) : !slotMode ? (
+            <p className="text-xs font-normal text-slate-500 sm:col-span-2">
+              No set hours for this doctor yet. Any time is allowed.
+            </p>
+          ) : null}
+        </div>
       )}
 
-      {walkInDefault && lockDoctor ? (
-        <input type="hidden" name="queueType" value="WALK_IN" />
+      {showQueueType ? (
+        <div className={`grid grid-cols-1 gap-x-4 gap-y-3 ${isWalkIn ? "" : "sm:grid-cols-2"}`}>
+          <label className={`text-sm font-medium text-slate-700 ${isWalkIn ? "max-w-sm" : ""}`}>
+            Queue type
+            <select
+              className={fieldClass}
+              name="queueType"
+              value={queueType}
+              onChange={(event) => setQueueType(event.target.value === "WALK_IN" ? "WALK_IN" : "SCHEDULED")}
+            >
+              <option value="SCHEDULED">Scheduled</option>
+              <option value="WALK_IN">Walk-in</option>
+            </select>
+          </label>
+          {isWalkIn ? null : <VisitTypeField visitType={visitType} onChange={setVisitType} />}
+        </div>
       ) : (
-        <label className="text-sm font-medium text-slate-700">
-          Queue type
-          <select
-            className={fieldClass}
-            name="queueType"
-            value={queueType}
-            onChange={(event) => setQueueType(event.target.value === "WALK_IN" ? "WALK_IN" : "SCHEDULED")}
-          >
-            <option value="SCHEDULED">Scheduled</option>
-            <option value="WALK_IN">Walk-in</option>
-          </select>
-        </label>
+        <input type="hidden" name="queueType" value="WALK_IN" />
       )}
-      <label className="text-sm font-medium text-slate-700">
-        Visit type
-        <select
-          className={fieldClass}
-          name="visitType"
-          value={visitType}
-          onChange={(event) => {
-            const next = event.target.value;
-            setVisitType(next === "FOLLOW_UP" || next === "EMERGENCY" ? next : "NEW");
-          }}
-        >
-          <option value="NEW">New</option>
-          <option value="FOLLOW_UP">Follow-up</option>
-          <option value="EMERGENCY">Emergency</option>
-        </select>
-      </label>
+
       {visitType === "FOLLOW_UP" ? (
-        <label className="md:col-span-2 flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-2.5 text-sm font-medium text-slate-700">
+        <label className="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-2 text-sm font-medium text-slate-700">
           <input
             type="checkbox"
             className="mt-0.5"
@@ -478,38 +453,66 @@ export function AppointmentForm({
           <span>
             Bring previous vitals and show last assessment sheet
             <span className="mt-0.5 block text-xs font-normal text-slate-500">
-              Copies the latest recorded vitals onto this visit so the doctor can review them, and links the prior
-              assessment sheet on the visit screen.
+              Copies the latest vitals onto this visit and links the prior assessment.
             </span>
           </span>
         </label>
       ) : null}
-      <label className="text-sm font-medium text-slate-700">
-        Referral
-        <select className={fieldClass} name="referralSource" defaultValue="SELF">
-          <option value="SELF">Self</option>
-          <option value="DOCTOR">Doctor referred</option>
-          <option value="INSURANCE">Insurance</option>
-        </select>
-      </label>
-      <label className="text-sm font-medium text-slate-700">
-        Referred by
-        <input className={fieldClass} name="referredBy" placeholder="Doctor or insurer name" />
-      </label>
-      <label className="md:col-span-2 text-sm font-medium text-slate-700">
-        Reason / notes
-        <input className={fieldClass} name="reason" />
-      </label>
+
+      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        <label className="text-sm font-medium text-slate-700">
+          Referral
+          <select className={fieldClass} name="referralSource" defaultValue="SELF">
+            <option value="SELF">Self</option>
+            <option value="DOCTOR">Doctor referred</option>
+            <option value="INSURANCE">Insurance</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium text-slate-700">
+          Referred by
+          <input className={fieldClass} name="referredBy" placeholder="Name, if someone referred them" />
+        </label>
+        <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+          Reason
+          <input className={fieldClass} name="reason" placeholder="Optional" />
+        </label>
+      </div>
+
       <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
         <input type="checkbox" name="checkInNow" defaultChecked={isWalkIn} />
         Check in now and issue token
       </label>
-      {error ? <p className="md:col-span-2 text-sm text-red-600">{error}</p> : null}
-      <div className="md:col-span-2">
-        <button className={buttonClass} type="submit" disabled={pending || (!isWalkIn && selectedOnLeave) || walkInNoWindowToday}>
-          {pending ? "Saving…" : isWalkIn ? "Add walk-in" : "Book appointment"}
-        </button>
-      </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <button className={buttonClass} type="submit" disabled={pending || (!isWalkIn && selectedOnLeave) || walkInNoWindowToday}>
+        {pending ? "Saving…" : isWalkIn ? "Add walk-in" : "Book appointment"}
+      </button>
     </form>
+  );
+}
+
+function VisitTypeField({
+  visitType,
+  onChange,
+}: {
+  visitType: "NEW" | "FOLLOW_UP" | "EMERGENCY";
+  onChange: (value: "NEW" | "FOLLOW_UP" | "EMERGENCY") => void;
+}) {
+  return (
+    <label className="text-sm font-medium text-slate-700">
+      Visit type
+      <select
+        className={fieldClass}
+        name="visitType"
+        value={visitType}
+        onChange={(event) => {
+          const next = event.target.value;
+          onChange(next === "FOLLOW_UP" || next === "EMERGENCY" ? next : "NEW");
+        }}
+      >
+        <option value="NEW">New</option>
+        <option value="FOLLOW_UP">Follow-up</option>
+        <option value="EMERGENCY">Emergency</option>
+      </select>
+    </label>
   );
 }

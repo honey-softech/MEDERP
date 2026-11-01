@@ -23,8 +23,16 @@ import {
   tokenLabel,
 } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
+import { compactPrimaryButtonClass } from "@/lib/ui";
 import { resolveViewContext } from "@/lib/view-mode";
 import type { AppRole } from "@prisma/client";
+
+function versusYesterday(today: number, yesterday: number, format: (value: number) => string = String) {
+  const delta = today - yesterday;
+  if (delta > 0) return `+${format(delta)} vs yesterday`;
+  if (delta < 0) return `−${format(Math.abs(delta))} vs yesterday`;
+  return `${format(0)} vs yesterday`;
+}
 
 function titleCaseName(value: string) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -61,41 +69,35 @@ function bannerCopy(
 ) {
   if (role === "SOFTWARE_ADMIN") {
     return {
-      tagline: "Here's what's happening across your hospitals today. Stay aware, stay ahead.",
       locationTitle: "Platform administration",
       locationSubtitle: "MedERP SaaS console",
     };
   }
   if (role === "HELPDESK") {
     return {
-      tagline: "Account fixes stay here. Escalate to software admin when hospital tools are needed.",
       locationTitle: "Helpdesk",
       locationSubtitle: "MedERP support desk",
     };
   }
   if (asDoctor || role === "DOCTOR") {
     return {
-      tagline: "Here's what's happening in your practice today. Stay aware, stay ahead.",
       locationTitle: "Clinical care",
       locationSubtitle: hospitalName ?? "Your hospital",
     };
   }
   if (role === "SUPER_ADMIN") {
     return {
-      tagline: "Here's what's happening in your hospital today. Stay aware, stay ahead.",
       locationTitle: "Hospital administration",
       locationSubtitle: hospitalName ?? "Your hospital",
     };
   }
   if (role === "RECEPTIONIST" || (role === "NURSE" && nurseAsReceptionist)) {
     return {
-      tagline: "Here's what's happening at the front desk today. Stay aware, stay ahead.",
       locationTitle: "Reception",
       locationSubtitle: hospitalName ?? "Your hospital",
     };
   }
   return {
-    tagline: "Here's what's happening in your hospital today. Stay aware, stay ahead.",
     locationTitle: role.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()),
     locationSubtitle: hospitalName ?? "Your hospital",
   };
@@ -259,8 +261,8 @@ export async function HomeDashboard({
           prisma.appointment.count({
             where: {
               hospitalId: user.hospitalId,
-              scheduledAt: { gte: yesterdayRange.start, lt: yesterdayRange.end },
-              status: "COMPLETED",
+              scheduledAt: { gte: todayRange.start, lt: todayRange.end },
+              status: "SCHEDULED",
               ...(myDoctorId ? { doctorId: myDoctorId } : {}),
             },
           }),
@@ -276,32 +278,40 @@ export async function HomeDashboard({
           ([
             patients,
             appointments,
-            inQueue,
+            withDoctor,
             collections,
             yPatients,
             yAppointments,
-            yCompleted,
+            waiting,
             yCollections,
           ]) => [
             {
-              label: "New registrations",
-              value: String(patients),
-              yesterday: `Yesterday · ${yPatients}`,
+              label: myDoctorId ? "In my OPD now" : "In OPD now",
+              value: String(waiting + withDoctor),
+              detail: `${waiting} waiting · ${withDoctor} with doctor`,
+              href: queueHref,
             },
             {
               label: myDoctorId ? "My appointments today" : "Appointments today",
               value: String(appointments),
-              yesterday: `Yesterday · ${yAppointments}`,
-            },
-            {
-              label: myDoctorId ? "In my OPD now" : "In OPD now",
-              value: String(inQueue),
-              yesterday: `Yesterday seen · ${yCompleted}`,
+              detail: versusYesterday(appointments, yAppointments),
+              href: queueHref,
             },
             {
               label: "Collections today",
               value: inr(collections._sum.amount ?? 0),
-              yesterday: `Yesterday · ${inr(yCollections._sum.amount ?? 0)}`,
+              detail: versusYesterday(
+                Number(collections._sum.amount ?? 0),
+                Number(yCollections._sum.amount ?? 0),
+                (amount) => inr(amount),
+              ),
+              href: "/billing/collections",
+            },
+            {
+              label: "New registrations",
+              value: String(patients),
+              detail: versusYesterday(patients, yPatients),
+              href: "/patients",
             },
           ],
         )
@@ -347,53 +357,17 @@ export async function HomeDashboard({
   const doctorQueues = isToday ? [...grouped, ...emptyDoctors] : grouped;
 
   const showBoard = Boolean(user?.hospitalId && !isPlatformRole(user.role));
+  const showQueue = Boolean(showBoard && user?.role !== "LAB_TECH");
 
   return (
     <AppShell title="Dashboard">
-      <div
-        className={
-          showBoard
-            ? "mb-5 grid items-stretch gap-4 lg:h-[26rem] lg:min-h-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,26rem)] xl:grid-cols-[minmax(0,1.15fr)_28rem]"
-            : undefined
-        }
-      >
-        {user ? (
-          <WelcomeBanner
-            displayName={prettyName(user, asDoctor)}
-            tagline={copy.tagline}
-            locationTitle={copy.locationTitle}
-            locationSubtitle={copy.locationSubtitle}
-            compact={showBoard}
-            className={showBoard ? "lg:h-full" : undefined}
-          />
-        ) : null}
-
-        {showBoard && user ? (
-          <BoardChat posts={boardPosts} currentUserId={user.id} />
-        ) : null}
-      </div>
-
-      {user?.hospitalId &&
-      user.hospital?.trialEndsAt &&
-      !isPlatformRole(user.role) &&
-      !hospitalHasActivePaidSubscription(user.hospital.subscription) ? (
-        <section className="home-panel mb-4 p-5">
-          <h3 className="font-semibold text-teal-950">
-            {trialDaysRemaining(user.hospital.trialEndsAt) === 0
-              ? "Free trial ended"
-              : `${trialDaysRemaining(user.hospital.trialEndsAt)} day${trialDaysRemaining(user.hospital.trialEndsAt) === 1 ? "" : "s"} left on your free trial`}
-          </h3>
-          <p className="mt-1 text-sm text-teal-900">
-            Your clinic can use the selected plan until{" "}
-            {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Link payment on
-            Subscription before then so auto-debit continues after the trial.
-          </p>
-          {user.role === "SUPER_ADMIN" ? (
-            <Link href="/hospital/subscription" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
-              Open subscription →
-            </Link>
-          ) : null}
-        </section>
+      {user && !showBoard ? (
+        <WelcomeBanner
+          displayName={prettyName(user, asDoctor)}
+          locationTitle={copy.locationTitle}
+          locationSubtitle={copy.locationSubtitle}
+          className="mb-5"
+        />
       ) : null}
 
       {escalatedHelpdeskTickets.length > 0 && user?.role === "SOFTWARE_ADMIN" ? (
@@ -472,56 +446,52 @@ export async function HomeDashboard({
         </section>
       ) : null}
 
-      {pendingJoins > 0 ? (
-        <section className="home-panel mb-4 p-5">
-          <h3 className="font-semibold text-teal-950">
-            {pendingJoins} staff join request{pendingJoins === 1 ? "" : "s"} waiting
-          </h3>
-          <p className="mt-1 text-sm text-teal-900">
-            People signed up and asked to join this hospital. Approve them before they can work here.
-          </p>
-          <Link href="/hospital/join-requests" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
-            Review join requests →
-          </Link>
-        </section>
-      ) : null}
-
-      {pendingLeaves > 0 ? (
-        <section className="home-panel mb-4 border-[#ead7a4] bg-[#fffaf0] p-5">
-          <h3 className="font-semibold text-amber-950">
-            {pendingLeaves} leave request{pendingLeaves === 1 ? "" : "s"} waiting
-          </h3>
-          <p className="mt-1 text-sm text-amber-900">
-            Doctors, nurses, and other staff have applied for leave. Approve or reject them here.
-          </p>
-          <Link href="/hospital/leaves" className="mt-3 inline-flex text-sm font-medium text-amber-800 hover:underline">
-            Review staff leave →
-          </Link>
-        </section>
-      ) : null}
-
-      {user && !user.hospitalId && !isPlatformRole(user.role) ? (
-        <section className="home-panel mb-4 border-[#ead7a4] bg-[#fffaf0] p-5">
-          <h3 className="font-semibold text-amber-950">Join a listed hospital</h3>
-          <p className="mt-1 text-sm text-amber-900">
-            Your account is ready, but you are not on a hospital yet. Pick a listed hospital and wait for the
-            super admin to approve you. You cannot add yourself directly.
-          </p>
-          <Link href="/join" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
-            Request to join →
-          </Link>
-        </section>
-      ) : null}
-
+      {showBoard && user ? (
+        <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <WelcomeBanner
+              displayName={prettyName(user, asDoctor)}
+              locationTitle={copy.locationTitle}
+              locationSubtitle={copy.locationSubtitle}
+              actions={
+                showQueue
+                  ? [
+                      { href: "/patients/new", label: "Register patient" },
+                      { href: "/appointments/new", label: "Book appointment" },
+                      { href: queueHref, label: "Open OPD", primary: true },
+                    ]
+                  : []
+              }
+            />
+            <section className="grid flex-1 gap-3 sm:grid-cols-2">
+              {(hospitalStats ?? []).map((stat) => {
+                const detail = "detail" in stat && typeof stat.detail === "string" ? stat.detail : "";
+                const card = (
+                  <>
+                    <p className="home-stat-kicker">{stat.label}</p>
+                    <p className="home-stat-value">{stat.value}</p>
+                    {detail ? <p className="mt-3 text-xs text-[#7b8ba0]">{detail}</p> : null}
+                  </>
+                );
+                return (
+                  <Link key={stat.label} href={stat.href} className="home-stat transition hover:border-[#1976d2]">
+                    {card}
+                  </Link>
+                );
+              })}
+            </section>
+          </div>
+          <BoardChat posts={boardPosts} currentUserId={user.id} />
+        </div>
+      ) : (
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {(platformStats ?? hospitalStats ?? []).map((stat) => {
+          const detail = "detail" in stat && typeof stat.detail === "string" ? stat.detail : "";
           const card = (
             <>
               <p className="home-stat-kicker">{stat.label}</p>
               <p className="home-stat-value">{stat.value}</p>
-              {"yesterday" in stat && stat.yesterday ? (
-                <p className="mt-3 text-xs text-[#7b8ba0]">{stat.yesterday}</p>
-              ) : null}
+              {detail ? <p className="mt-3 text-xs text-[#7b8ba0]">{detail}</p> : null}
             </>
           );
           const href = "href" in stat ? stat.href : undefined;
@@ -536,6 +506,7 @@ export async function HomeDashboard({
           );
         })}
       </section>
+      )}
 
       {openHelpdeskTickets.length > 0 && (user?.role === "SOFTWARE_ADMIN" || user?.role === "HELPDESK") ? (
         <section className="mt-6 sm:mt-8">
@@ -571,84 +542,158 @@ export async function HomeDashboard({
         </section>
       ) : null}
 
-      {user?.role === "LAB_TECH" ? (
-        <section className="home-panel mt-6 p-5 sm:mt-8">
-          <h3 className="font-semibold">Laboratory</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Paid requests wait here. Upload the report and mark done. The doctor is notified on the patient record.
+      {user && !user.hospitalId && !isPlatformRole(user.role) ? (
+        <section className="home-panel mt-6 border-[#ead7a4] bg-[#fffaf0] p-5 sm:mt-8">
+          <h3 className="font-semibold text-amber-950">Join a listed hospital</h3>
+          <p className="mt-1 text-sm text-amber-900">
+            Your account is ready, but you are not on a hospital yet. Pick a listed hospital and wait for the
+            super admin to approve you. You cannot add yourself directly.
           </p>
-          <Link href="/lab" className="mt-3 inline-flex text-sm font-medium text-teal-700 hover:underline">
-            Open laboratory →
+          <Link href="/join" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
+            Request to join →
           </Link>
         </section>
       ) : null}
 
-      {user?.hospitalId && !isPlatformRole(user.role) && user.role !== "LAB_TECH" ? (
-        <section className="mt-6 space-y-6 sm:mt-8">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h3 className="font-semibold">
-                {myDoctorId ? "My OPD queue" : "OPD queue by doctor"}
-                {!isToday ? ` · ${dayLabel}` : ""}
+      {showBoard && user ? (
+        <div className="mt-6 space-y-4 sm:mt-8">
+          {user.hospital?.trialEndsAt && !hospitalHasActivePaidSubscription(user.hospital.subscription) ? (
+            <section className="home-panel p-5">
+              <h3 className="font-semibold text-teal-950">
+                {trialDaysRemaining(user.hospital.trialEndsAt) === 0
+                  ? "Free trial ended"
+                  : `${trialDaysRemaining(user.hospital.trialEndsAt)} day${trialDaysRemaining(user.hospital.trialEndsAt) === 1 ? "" : "s"} left on your free trial`}
               </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                {isToday
-                  ? "Live queue for today. Open a previous day to review past OPD tokens."
-                  : "Past OPD for this date, including completed visits."}
+              <p className="mt-1 text-sm text-teal-900">
+                Your clinic can use the selected plan until{" "}
+                {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Link payment on
+                Subscription before then so auto-debit continues after the trial.
               </p>
-            </div>
-            <OpdDayNav action="/" dateValue={dateValue} />
-          </div>
-          {doctorQueues.length === 0 ? (
-            <p className="home-panel p-6 text-sm text-slate-500">
-              {isToday ? "No doctor queues to show yet." : `No OPD visits on ${dayLabel}.`}
-            </p>
-          ) : (
-            doctorQueues.map((group) => (
-              <div key={group.doctorId} className="home-panel overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
-                  <div>
-                    <p className="font-semibold">{doctorName(group.doctor)}</p>
-                    <p className="text-xs text-slate-500">
-                      {isToday
-                        ? `Waiting ${group.waiting} · With doctor ${group.inConsult} · Today ${group.items.length} · Next token ${tokenLabel(group.lastToken + 1)}`
-                        : `Completed ${group.items.filter((row) => row.status === "COMPLETED").length} · Visits ${group.items.length}`}
-                    </p>
-                  </div>
-                  <Link href={queueHref} className="text-sm text-teal-700 hover:underline">
-                    Open OPD
-                  </Link>
-                </div>
-                <div className="[&>div]:rounded-none [&>div]:border-0 [&>div]:shadow-none">
-                  <FilterableTable
-                    rows={group.items.map((row) => ({
-                      id: row.id,
-                      token: tokenLabel(row.tokenNumber),
-                      time: row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-                      patient: patientName(row.patient),
-                      department: row.department.name,
-                      status: prettyEnum(row.status),
-                      vitals: row.vitals ? "Recorded" : "Pending",
-                    }))}
-                    empty={
-                      isToday
-                        ? "No patients in this doctor's queue yet. Tokens start at T-001."
-                        : "No patients in this doctor's OPD on this date."
-                    }
-                    columns={[
-                      { key: "token", header: "Token" },
-                      { key: "time", header: "Time" },
-                      { key: "patient", header: "Patient", className: "font-medium" },
-                      { key: "department", header: "Department" },
-                      { key: "status", header: "Status" },
-                      { key: "vitals", header: "Vitals" },
-                    ]}
-                  />
+              {user.role === "SUPER_ADMIN" ? (
+                <Link href="/hospital/subscription" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
+                  Open subscription →
+                </Link>
+              ) : null}
+            </section>
+          ) : null}
+
+          {pendingJoins > 0 ? (
+            <section className="home-panel p-5">
+              <h3 className="font-semibold text-teal-950">
+                {pendingJoins} staff join request{pendingJoins === 1 ? "" : "s"} waiting
+              </h3>
+              <p className="mt-1 text-sm text-teal-900">
+                People signed up and asked to join this hospital. Approve them before they can work here.
+              </p>
+              <Link href="/hospital/join-requests" className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline">
+                Review join requests →
+              </Link>
+            </section>
+          ) : null}
+
+          {pendingLeaves > 0 ? (
+            <section className="home-panel border-[#ead7a4] bg-[#fffaf0] p-5">
+              <h3 className="font-semibold text-amber-950">
+                {pendingLeaves} leave request{pendingLeaves === 1 ? "" : "s"} waiting
+              </h3>
+              <p className="mt-1 text-sm text-amber-900">
+                Doctors, nurses, and other staff have applied for leave. Approve or reject them here.
+              </p>
+              <Link href="/hospital/leaves" className="mt-3 inline-flex text-sm font-medium text-amber-800 hover:underline">
+                Review staff leave →
+              </Link>
+            </section>
+          ) : null}
+
+          {showQueue ? (
+            <section className="min-w-0 space-y-6">
+              <div>
+                <h3 className="font-semibold">
+                  {myDoctorId ? "My OPD queue" : "OPD queue by doctor"}
+                  {!isToday ? ` · ${dayLabel}` : ""}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isToday
+                    ? "Live queue for today. Open a previous day to review past OPD tokens."
+                    : "Past OPD for this date, including completed visits."}
+                </p>
+                <div className="mt-3">
+                  <OpdDayNav action="/" dateValue={dateValue} />
                 </div>
               </div>
-            ))
+              {doctorQueues.length === 0 ? (
+                <p className="home-panel p-6 text-sm text-slate-500">
+                  {isToday ? "No doctor queues to show yet." : `No OPD visits on ${dayLabel}.`}
+                </p>
+              ) : (
+                doctorQueues.map((group) => {
+                  const oneDepartment = new Set(group.items.map((row) => row.department.name)).size <= 1;
+                  return (
+                    <div key={group.doctorId} className="home-panel overflow-hidden">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
+                        <div>
+                          <p className="font-semibold">{doctorName(group.doctor)}</p>
+                          <p className="text-xs text-slate-500">
+                            {isToday
+                              ? `Waiting ${group.waiting} · With doctor ${group.inConsult} · Today ${group.items.length} · Next token ${tokenLabel(group.lastToken + 1)}`
+                              : `Completed ${group.items.filter((row) => row.status === "COMPLETED").length} · Visits ${group.items.length}`}
+                          </p>
+                        </div>
+                        <Link href={queueHref} className={compactPrimaryButtonClass}>
+                          Open OPD
+                        </Link>
+                      </div>
+                      {group.items.length === 0 ? (
+                        <div className="px-4 py-6 sm:px-5">
+                          <p className="text-sm text-slate-500">
+                            {isToday
+                              ? "No patients in this queue yet."
+                              : "No patients in this doctor's OPD on this date."}
+                          </p>
+                          <Link href="/patients/new" className={`${compactPrimaryButtonClass} mt-3`}>
+                            Register patient
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="[&>div]:rounded-none [&>div]:border-0 [&>div]:shadow-none">
+                          <FilterableTable
+                            rows={group.items.map((row) => ({
+                              id: row.id,
+                              token: tokenLabel(row.tokenNumber),
+                              time: row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+                              patient: patientName(row.patient),
+                              department: row.department.name,
+                              status: prettyEnum(row.status),
+                              vitals: row.vitals ? "Recorded" : "Pending",
+                            }))}
+                            columns={[
+                              { key: "token", header: "Token" },
+                              { key: "time", header: "Time" },
+                              { key: "patient", header: "Patient", className: "font-medium" },
+                              ...(oneDepartment ? [] : [{ key: "department", header: "Department" }]),
+                              { key: "status", header: "Status" },
+                              { key: "vitals", header: "Vitals" },
+                            ]}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </section>
+          ) : (
+            <section className="home-panel p-5">
+              <h3 className="font-semibold">Laboratory</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Paid requests wait here. Upload the report and mark done. The doctor is notified on the patient record.
+              </p>
+              <Link href="/lab" className="mt-3 inline-flex text-sm font-medium text-teal-700 hover:underline">
+                Open laboratory →
+              </Link>
+            </section>
           )}
-        </section>
+        </div>
       ) : null}
     </AppShell>
   );

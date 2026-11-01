@@ -14,6 +14,8 @@ const publicPaths = [
   "/privacy",
   "/help",
   "/demo",
+  "/features",
+  "/pricing",
 ];
 
 export function middleware(request: NextRequest) {

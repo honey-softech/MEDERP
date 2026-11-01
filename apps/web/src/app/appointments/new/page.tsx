@@ -75,7 +75,7 @@ export default async function NewAppointmentPage({
 
   return (
     <AppShell title={isWalkIn ? "Walk-in registration" : "Book appointment"}>
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
         <Link href="/appointments" className="inline-flex text-sm text-teal-700 hover:underline">
           ← Appointments
         </Link>
@@ -88,14 +88,12 @@ export default async function NewAppointmentPage({
           </Link>
         ) : null}
       </div>
-      <p className="mb-4 text-sm text-slate-500">
-        {isWalkIn && actingAsDoctor
-          ? "Add a walk-in for today, record the consultation fee, then vitals and the consult. If you have more than one session, choose the time."
-          : isWalkIn && user.role === "NURSE"
-            ? "Add a walk-in for today, record the consultation fee, then record vitals. If the doctor has more than one session, choose the time."
-            : isWalkIn
-              ? "Add a walk-in for today, then record the consultation fee. Walk-ins can only be added for today."
-              : "Search an existing patient, pick the doctor, then choose any date and time. For a new patient, register them first."}
+      <p className="mb-3 text-sm text-slate-500">
+        {isWalkIn
+          ? actingAsDoctor
+            ? "Today’s visit. Next you can record the fee, record vitals, or skip vitals and start the consult."
+            : "Today’s visit. After this, record the consultation fee."
+          : "Search a patient, then choose the doctor, date, and time."}
       </p>
       {actingAsDoctor && isWalkIn && !myStaffId ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

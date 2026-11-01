@@ -282,6 +282,14 @@ export default async function QueuePage({
                               row.assessment?.status === "APPROVED" ? "Print record" : "Preview summary"
                             }
                           />
+                          {row.queueType === "WALK_IN" && !row.vitals && row.assessment?.status !== "APPROVED" ? (
+                            <Link
+                              href={`/appointments/${row.id}?skipVitals=1`}
+                              className="mt-2.5 inline-block text-[13px] font-medium text-primary hover:underline"
+                            >
+                              Skip vitals
+                            </Link>
+                          ) : null}
                         </div>
                       ) : null}
 

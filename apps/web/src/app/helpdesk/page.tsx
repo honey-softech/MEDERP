@@ -57,7 +57,7 @@ export default async function HelpdeskPage({
                 hospital: ticket.hospital ? `${ticket.hospital.name}` : "Platform",
                 from: ticket.createdBy?.username ?? ticket.contactName ?? ticket.contactMobile ?? "Unknown",
                 status: prettyTicketStatus(ticket.status),
-                updated: ticket.updatedAt.toLocaleString("en-IN"),
+                updated: ticket.updatedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
                 open: "Open",
                 href: `/helpdesk/${ticket.id}`,
               }))}
@@ -174,7 +174,7 @@ export default async function HelpdeskPage({
               hospital: ticket.hospital?.name ?? "Platform",
               from: ticket.createdBy?.username ?? ticket.contactName ?? ticket.contactMobile ?? "Unknown",
               assignedTo: ticket.assignedTo?.username ?? "—",
-              updated: ticket.updatedAt.toLocaleString("en-IN"),
+              updated: ticket.updatedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
               href: `/helpdesk/${ticket.id}`,
               firstResponseDueAt: ticket.firstResponseDueAt?.toISOString() ?? null,
               resolutionDueAt: ticket.resolutionDueAt?.toISOString() ?? null,

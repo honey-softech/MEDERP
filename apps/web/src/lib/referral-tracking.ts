@@ -195,7 +195,7 @@ export function monthlyReferralActivity(rows: ReferralTrackRow[], now = new Date
     const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
     buckets.push({
       key,
-      label: cursor.toLocaleDateString("en-IN", { month: "short" }),
+      label: cursor.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", month: "short" }),
       total: 0,
       approved: 0,
       pending: 0,

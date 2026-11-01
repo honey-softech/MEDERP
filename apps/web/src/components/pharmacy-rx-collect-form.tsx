@@ -153,7 +153,7 @@ export function PharmacyRxCollectForm({
                 </td>
                 <td className="px-3 py-2 text-xs text-text-secondary">
                   {line.batch
-                    ? `${line.batch.batchNo} · exp ${new Date(line.batch.expiryDate).toLocaleDateString("en-IN")}`
+                    ? `${line.batch.batchNo} · exp ${new Date(line.batch.expiryDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}`
                     : "—"}
                 </td>
                 <td className="px-3 py-2">₹{line.unitPrice.toFixed(2)}</td>

@@ -198,7 +198,7 @@ export default async function AppointmentDetailPage({
 
   const pastVisits: PastVisitItem[] = pastVisitRows.map((row) => ({
     id: row.id,
-    when: row.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+    when: row.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }),
     doctor: doctorName(row.doctor),
     department: row.department.name,
     diagnosis: row.assessment?.diagnosis ?? "",
@@ -369,7 +369,7 @@ export default async function AppointmentDetailPage({
             </div>
             <p className="text-xs text-text-secondary">
               {doctorName(appointment.doctor)} · {appointment.department.name} ·{" "}
-              {appointment.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
+              {appointment.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} ·{" "}
               {prettyEnum(appointment.visitType)}
             </p>
           </div>
@@ -618,7 +618,7 @@ export default async function AppointmentDetailPage({
             ) : null}
             {assessment?.followUpAt ? (
               <p className="text-sm text-slate-700">
-                Follow-up on {assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}.
+                Follow-up on {assessment.followUpAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}.
               </p>
             ) : null}
           </div>

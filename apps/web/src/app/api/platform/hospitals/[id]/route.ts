@@ -20,7 +20,7 @@ function sameTrialDay(next: Date | null | undefined, prev: Date | null | undefin
 
 function formatTrialDay(value: Date | null | undefined) {
   if (!value) return "none";
-  return value.toLocaleDateString("en-IN", { dateStyle: "medium" });
+  return value.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" });
 }
 
 async function requireSoftwareAdmin() {

@@ -31,7 +31,7 @@ export default async function LabCollectionsPage() {
           tests: String(order.items.length),
           amount: inr(order.totalAmount),
           status: prettyLabStatus(order.status),
-          when: order.createdAt.toLocaleString("en-IN"),
+          when: order.createdAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
           href: order.status === "AWAITING_PAYMENT" ? `/billing/lab/${order.id}` : `/appointments/${order.appointmentId ?? ""}`,
         }))}
         columns={[

@@ -59,16 +59,16 @@ export default async function HospitalSubscriptionPage() {
       {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && hasSubscription ? (
         <p className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
           Card linked for auto-debit. Free trial ends{" "}
-          {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}
+          {hospital.trialEndsAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}
           {sub?.nextChargeAt
-            ? ` · first charge ${sub.nextChargeAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}`
+            ? ` · first charge ${sub.nextChargeAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}`
             : ""}
           . No need to pay again until then.
         </p>
       ) : null}
       {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && !hasSubscription ? (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}.{" "}
+          Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}.{" "}
           {isMobileApp
             ? "Continue the plan from the MedERP website so the clinic stays open after that date."
             : "Link a card below so auto-debit can keep the clinic open after that date."}
@@ -157,7 +157,7 @@ export default async function HospitalSubscriptionPage() {
                 <dt className="text-slate-500">Next charge</dt>
                 <dd className="font-medium">
                   {sub?.nextChargeAt
-                    ? sub.nextChargeAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                    ? sub.nextChargeAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })
                     : "—"}
                 </dd>
               </div>

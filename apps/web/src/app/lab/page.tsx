@@ -35,7 +35,7 @@ export default async function LabPage() {
           patient: patientName(order.patient),
           tests: order.items.map((item) => item.nameSnapshot).join(", "),
           status: prettyLabStatus(order.status),
-          when: (order.paidAt ?? order.createdAt).toLocaleString("en-IN"),
+          when: (order.paidAt ?? order.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
           href: `/lab/${order.id}`,
         }))}
         columns={[

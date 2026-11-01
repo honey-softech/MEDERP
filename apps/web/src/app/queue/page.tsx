@@ -46,7 +46,7 @@ export default async function QueuePage({
   const { start, end } = dayRange(selectedDay);
   const dateValue = localDayKey(start);
   const isToday = dateValue === localDayKey(new Date());
-  const dayLabel = start.toLocaleDateString("en-IN", {
+  const dayLabel = start.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata",
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -210,7 +210,7 @@ export default async function QueuePage({
                               </Link>
                             </p>
                             <p className="truncate text-[11px] text-text-secondary">
-                              {row.scheduledAt.toLocaleTimeString("en-IN", {
+                              {row.scheduledAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata",
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}{" "}
@@ -220,13 +220,13 @@ export default async function QueuePage({
                               {prettyEnum(row.queueType)} · {prettyEnum(row.visitType)} ·{" "}
                               {prettyEnum(row.referralSource)}
                               {row.checkInAt
-                                ? ` · In ${row.checkInAt.toLocaleTimeString("en-IN", {
+                                ? ` · In ${row.checkInAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata",
                                     hour: "2-digit",
                                     minute: "2-digit",
                                   })}`
                                 : ""}
                               {row.checkOutAt
-                                ? ` · Out ${row.checkOutAt.toLocaleTimeString("en-IN", {
+                                ? ` · Out ${row.checkOutAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata",
                                     hour: "2-digit",
                                     minute: "2-digit",
                                   })}`

@@ -61,7 +61,7 @@ export function AppointmentForm({
   }, []);
   const todayLabel = useMemo(
     () =>
-      new Date().toLocaleDateString("en-IN", {
+      new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata",
         weekday: "short",
         day: "numeric",
         month: "short",

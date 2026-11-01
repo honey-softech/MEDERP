@@ -161,7 +161,7 @@ export function VitalsPanel({
             <p className="text-xs text-teal-800">
               Recorded by {vitals.recordedByUsername}
               {vitals.recordedAt
-                ? ` · ${new Date(vitals.recordedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+                ? ` · ${new Date(vitals.recordedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}`
                 : ""}
             </p>
           ) : null}

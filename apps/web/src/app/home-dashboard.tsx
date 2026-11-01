@@ -125,7 +125,7 @@ export async function HomeDashboard({
   const todayKey = localDayKey(new Date());
   const isToday = dateValue === todayKey;
   const queueHref = isToday ? "/queue" : `/queue?date=${dateValue}`;
-  const dayLabel = start.toLocaleDateString("en-IN", {
+  const dayLabel = start.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata",
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -526,7 +526,7 @@ export async function HomeDashboard({
                 hospital: ticket.hospital?.name ?? "Platform",
                 from: ticket.createdBy?.username ?? ticket.contactName ?? ticket.contactMobile ?? "Unknown",
                 status: ticket.status.replace(/_/g, " "),
-                updated: ticket.updatedAt.toLocaleString("en-IN"),
+                updated: ticket.updatedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
                 href: `/helpdesk/${ticket.id}`,
               }))}
               columns={[
@@ -566,7 +566,7 @@ export async function HomeDashboard({
               </h3>
               <p className="mt-1 text-sm text-teal-900">
                 Your clinic can use the selected plan until{" "}
-                {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}. Link payment on
+                {user.hospital.trialEndsAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}. Link payment on
                 Subscription before then so auto-debit continues after the trial.
               </p>
               {user.role === "SUPER_ADMIN" ? (
@@ -660,7 +660,7 @@ export async function HomeDashboard({
                             rows={group.items.map((row) => ({
                               id: row.id,
                               token: tokenLabel(row.tokenNumber),
-                              time: row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+                              time: row.scheduledAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }),
                               patient: patientName(row.patient),
                               department: row.department.name,
                               status: prettyEnum(row.status),

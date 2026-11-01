@@ -71,7 +71,7 @@ export function PatientVisitHistory({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700">Last visit</p>
               <h3 className="mt-1 font-semibold text-slate-900">
-                {last.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                {last.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
               </h3>
               <p className="mt-1 text-sm text-slate-600">
                 {doctorName(last.doctor)} · {last.department.name} · {prettyEnum(last.visitType)} · {tokenLabel(last.tokenNumber)}
@@ -110,7 +110,7 @@ export function PatientVisitHistory({
               {last.assessment.followUpAt ? (
                 <p className="mt-1 text-slate-600">
                   Follow-up:{" "}
-                  {last.assessment.followUpAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                  {last.assessment.followUpAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}
                 </p>
               ) : null}
               {last.assessment.status === "APPROVED" && canPrintSummary ? (
@@ -173,7 +173,7 @@ export function PatientVisitHistory({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <Link className="font-medium text-teal-700 hover:underline" href={`/appointments/${row.id}`}>
-                      {row.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                      {row.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
                     </Link>
                     <p className="mt-0.5 text-slate-600">
                       {doctorName(row.doctor)} · {row.department.name} · {prettyEnum(row.status)} · {tokenLabel(row.tokenNumber)}

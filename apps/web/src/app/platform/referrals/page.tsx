@@ -8,7 +8,7 @@ import type { ReferralTrackRow } from "@/lib/referral-tracking";
 
 function formatDate(value: Date | null | undefined) {
   if (!value) return "—";
-  return value.toLocaleDateString("en-IN", { dateStyle: "medium" });
+  return value.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" });
 }
 
 const hospitalSelect = {

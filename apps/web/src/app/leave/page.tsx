@@ -43,8 +43,8 @@ export default async function MyLeavePage() {
                 </div>
                 <p className="mt-1 text-slate-600">
                   {staffDisplayName(leave.staff)} ·{" "}
-                  {leave.startAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} –{" "}
-                  {leave.endAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                  {leave.startAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} –{" "}
+                  {leave.endAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
                 </p>
                 {leave.reason ? <p className="mt-1 text-slate-500">{leave.reason}</p> : null}
                 {leave.reviewNote ? <p className="mt-1 text-slate-500">Note: {leave.reviewNote}</p> : null}

@@ -171,7 +171,7 @@ export default async function CollectionsPage({
           payments.map((row) => (
             <li key={row.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <p>
-                {row.receivedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · {prettyEnum(row.method)} ·{" "}
+                {row.receivedAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} · {prettyEnum(row.method)} ·{" "}
                 {inr(row.amount)} · {row.patient.firstName} {row.patient.lastName}
                 {row.invoice?.appointment ? ` · ${doctorName(row.invoice.appointment.doctor)}` : ""}
                 {row.notes ? ` · ${row.notes}` : ""}

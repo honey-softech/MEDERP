@@ -25,7 +25,7 @@ export default async function HelpdeskTeamPage() {
             username: agent.username,
             mobile: agent.mobile,
             status: agent.isActive === false ? "Inactive" : agent.isVerified ? "Active" : "Pending",
-            created: agent.createdAt.toLocaleDateString("en-IN"),
+            created: agent.createdAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
           }))}
           columns={[
             { key: "username", header: "Username", className: "font-medium" },

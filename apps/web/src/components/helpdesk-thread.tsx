@@ -157,7 +157,7 @@ export function HelpdeskThread({
                   </span>
                 ) : null}
                 {item.author.username} · {item.author.role.replace(/_/g, " ")} ·{" "}
-                {new Date(item.createdAt).toLocaleString("en-IN")}
+                {new Date(item.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
               </p>
               <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{item.body}</p>
             </li>

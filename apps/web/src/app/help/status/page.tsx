@@ -223,7 +223,7 @@ export default function HelpStatusPage() {
                   <li key={item.id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
                     <p className="text-xs text-slate-500">
                       {item.kind === "SYSTEM" ? "System · " : ""}
-                      {item.author} · {new Date(item.createdAt).toLocaleString("en-IN")}
+                      {item.author} · {new Date(item.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
                     </p>
                     <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{item.body}</p>
                   </li>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CLINIC_TIME_ZONE } from "@/lib/clinic-time";
 
 function greetingForHour(hour: number) {
   if (hour < 12) return "Good morning";
@@ -29,8 +30,11 @@ export function WelcomeBanner({
     return () => clearInterval(timer);
   }, []);
 
-  const time = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-  const greeting = greetingForHour(now.getHours());
+  const time = now.toLocaleTimeString("en-IN", { timeZone: CLINIC_TIME_ZONE, hour: "2-digit", minute: "2-digit" });
+  const hour = Number(
+    new Intl.DateTimeFormat("en-IN", { timeZone: CLINIC_TIME_ZONE, hour: "numeric", hourCycle: "h23" }).format(now),
+  );
+  const greeting = greetingForHour(hour);
 
   return (
     <section className={`home-greeting relative flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-3xl px-4 py-4 text-white sm:px-5 ${className}`}>

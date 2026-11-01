@@ -13,7 +13,7 @@ import { earnedBonusMonths, MAX_REFERRAL_BONUS_MONTHS } from "@/lib/hospital-ref
 import { normalizeSubscriptionTierId } from "@/lib/subscription-tiers";
 
 function formatDate(value: Date) {
-  return value.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return value.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
 }
 
 function inr(value: number) {

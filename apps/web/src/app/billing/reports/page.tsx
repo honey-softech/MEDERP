@@ -21,7 +21,7 @@ export default async function BillingReportsPage({
   const lastMonth = yearMonthKey(new Date(start.getFullYear(), start.getMonth() - 1, 1));
   const thisMonth = yearMonthKey(new Date());
   const report = await loadBillingReport(user.hospitalId, start, end);
-  const label = start.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const label = start.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", month: "long", year: "numeric" });
 
   return (
     <AppShell title="Reports">

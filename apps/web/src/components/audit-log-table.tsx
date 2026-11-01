@@ -28,7 +28,7 @@ const ROLES = [
 
 function formatDate(value: Date | string) {
   const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return date.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
 }
 
 function dayKey(value: Date | string) {

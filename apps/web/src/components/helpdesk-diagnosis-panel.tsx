@@ -26,7 +26,7 @@ export function HelpdeskDiagnosisPanel({
   } | null;
 }) {
   const trialLabel = hospital?.trialEndsAt
-    ? new Date(hospital.trialEndsAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(hospital.trialEndsAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })
     : "No trial end set";
 
   return (

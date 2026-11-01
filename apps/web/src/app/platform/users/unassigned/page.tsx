@@ -7,7 +7,7 @@ import { isRemovedAccountMobile } from "@/lib/platform-user-remove";
 import { prisma } from "@/lib/prisma";
 
 function formatDate(value: Date) {
-  return value.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return value.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
 }
 
 export default async function UnassignedUsersPage() {

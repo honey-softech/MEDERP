@@ -110,7 +110,7 @@ export default async function AdmissionStayPage({ params }: { params: Promise<{ 
             />
             <Item
               label="Admitted"
-              value={admission.admittedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+              value={admission.admittedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
             />
             <Item label="Length of stay" value={`${days} day${days === 1 ? "" : "s"}`} />
             <Item label="Estimated bed + nursing" value={inr(estimated)} />
@@ -119,7 +119,7 @@ export default async function AdmissionStayPage({ params }: { params: Promise<{ 
               label="Expected discharge"
               value={
                 admission.expectedDischargeAt
-                  ? admission.expectedDischargeAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
+                  ? admission.expectedDischargeAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })
                   : "—"
               }
             />
@@ -127,7 +127,7 @@ export default async function AdmissionStayPage({ params }: { params: Promise<{ 
               label="Discharged"
               value={
                 admission.dischargedAt
-                  ? `${admission.dischargedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}${
+                  ? `${admission.dischargedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}${
                       admission.dischargeType ? ` · ${prettyEnum(admission.dischargeType)}` : ""
                     }`
                   : "—"
@@ -164,7 +164,7 @@ export default async function AdmissionStayPage({ params }: { params: Promise<{ 
                   {row.fromBed.ward.name} {row.fromBed.number} → {row.toBed.ward.name} {row.toBed.number}
                   <span className="text-slate-500">
                     {" "}
-                    · {row.transferredAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                    · {row.transferredAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
                     {row.reason ? ` · ${row.reason}` : ""}
                   </span>
                 </li>

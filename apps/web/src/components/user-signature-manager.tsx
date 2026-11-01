@@ -212,7 +212,7 @@ export function UserSignatureManager({
                   {active ? (
                     <p className="mt-2 text-slate-500">
                       Uploaded by {active.uploadedByUsername} on{" "}
-                      {new Date(active.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                      {new Date(active.createdAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}
                     </p>
                   ) : null}
                 </div>
@@ -291,9 +291,9 @@ export function UserSignatureManager({
                     {history.map((row) => (
                       <li key={row.id}>
                         v{row.version} · {row.displayName} · uploaded by {row.uploadedByUsername} on{" "}
-                        {new Date(row.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                        {new Date(row.createdAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}
                         {row.revokedAt
-                          ? ` · revoked ${new Date(row.revokedAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}`
+                          ? ` · revoked ${new Date(row.revokedAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}`
                           : ""}
                       </li>
                     ))}

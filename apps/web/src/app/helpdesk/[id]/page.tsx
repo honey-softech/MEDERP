@@ -91,7 +91,7 @@ export default async function HelpdeskTicketPage({ params }: Ctx) {
           <p className="mt-2 text-xs text-red-800">
             {ticket.escalatedBy?.username ? `By ${ticket.escalatedBy.username}` : "Escalated"}
             {ticket.escalatedAt
-              ? ` · ${new Date(ticket.escalatedAt).toLocaleString("en-IN")}`
+              ? ` · ${new Date(ticket.escalatedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`
               : ""}
           </p>
         </section>

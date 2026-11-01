@@ -15,7 +15,7 @@ import {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-IN", { dateStyle: "medium" });
+  return new Date(value).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" });
 }
 
 function percent(value: number | null) {

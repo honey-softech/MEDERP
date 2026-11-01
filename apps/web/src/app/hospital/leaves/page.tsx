@@ -39,8 +39,8 @@ export default async function HospitalLeavesPage() {
                   {staffDisplayName(item.staff)} · {prettyEnum(item.staff.role)}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {prettyEnum(item.type)} · {item.startAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}{" "}
-                  – {item.endAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                  {prettyEnum(item.type)} · {item.startAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}{" "}
+                  – {item.endAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
                 </p>
                 {item.reason ? <p className="mt-2 text-sm text-slate-600">{item.reason}</p> : null}
               </div>
@@ -56,7 +56,7 @@ export default async function HospitalLeavesPage() {
             {others.map((item) => (
               <li key={item.id} className="rounded-xl border border-slate-100 bg-white px-4 py-3">
                 {staffDisplayName(item.staff)} · {prettyEnum(item.staff.role)} · {prettyEnum(item.type)} ·{" "}
-                {prettyEnum(item.status)} · {item.startAt.toLocaleDateString("en-IN")} – {item.endAt.toLocaleDateString("en-IN")}
+                {prettyEnum(item.status)} · {item.startAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })} – {item.endAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
               </li>
             ))}
           </ul>

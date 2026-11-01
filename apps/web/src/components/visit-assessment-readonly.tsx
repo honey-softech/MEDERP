@@ -63,7 +63,7 @@ export function VisitAssessmentReadonly({
   const examText = readableClinicalText(examination);
   const adviceText = readableClinicalText(advice);
   const followUpLabel = followUpAt
-    ? new Date(followUpAt).toLocaleDateString("en-IN", { dateStyle: "medium" })
+    ? new Date(followUpAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })
     : null;
   const outcomeLabel =
     visitOutcome === "DISCHARGE"

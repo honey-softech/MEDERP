@@ -96,7 +96,7 @@ export default async function InvoiceDetailPage({
         <h2 className="mt-3 text-xl font-semibold">Receipt / invoice</h2>
         <p className="mt-1 font-mono text-sm font-semibold text-slate-800">Invoice {invoice.invoiceNo}</p>
         <p className="mt-1 text-sm text-slate-500">
-          {invoice.issuedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} · {prettyEnum(invoice.status)}
+          {invoice.issuedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} · {prettyEnum(invoice.status)}
         </p>
         <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
           <p>
@@ -171,7 +171,7 @@ export default async function InvoiceDetailPage({
             <ul className="mt-2 space-y-1 text-sm text-slate-600">
               {invoice.payments.map((payment) => (
                 <li key={payment.id}>
-                  {payment.receivedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
+                  {payment.receivedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} ·{" "}
                   {prettyEnum(payment.kind)} · {prettyEnum(payment.method)} · {inr(payment.amount)}
                 </li>
               ))}

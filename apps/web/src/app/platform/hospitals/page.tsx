@@ -67,7 +67,7 @@ export default async function HospitalsPage() {
               ? `${sub?.status ?? "Linked"}${sub?.cancelAtPeriodEnd ? " · cancel queued" : ""}`
               : "Not linked",
             lastDebit: lastPaid?.paidAt
-              ? lastPaid.paidAt.toLocaleDateString("en-IN", { dateStyle: "medium" })
+              ? lastPaid.paidAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })
               : linked
                 ? "Pending first charge"
                 : "—",

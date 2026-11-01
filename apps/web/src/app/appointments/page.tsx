@@ -147,8 +147,8 @@ export default async function AppointmentsPage({
   const nextWeek = localDayKey(addCalendarDays(anchor, 7));
   const prevMonth = localDayKey(addMonths(anchor, -1));
   const nextMonth = localDayKey(addMonths(anchor, 1));
-  const weekLabel = `${weekDays[0].toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${weekDays[6].toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
-  const monthLabel = monthStart.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const weekLabel = `${weekDays[0].toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })} – ${weekDays[6].toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" })}`;
+  const monthLabel = monthStart.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", month: "long", year: "numeric" });
 
   function rowsForDay(day: Date) {
     const key = localDayKey(day);
@@ -257,7 +257,7 @@ export default async function AppointmentsPage({
         </div>
 
         <p className="w-full text-sm font-semibold text-slate-800 sm:w-auto sm:text-right">
-          {view === "month" ? monthLabel : view === "week" ? weekLabel : anchor.toLocaleDateString("en-IN", { dateStyle: "full" })}
+          {view === "month" ? monthLabel : view === "week" ? weekLabel : anchor.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "full" })}
         </p>
       </div>
 
@@ -314,7 +314,7 @@ export default async function AppointmentsPage({
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className={`text-xs font-medium ${isToday ? "text-teal-700" : "text-slate-500"}`}>
-                    {day.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                    {day.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" })}
                   </p>
                   <Link
                     href={buildHref({ view: "list", date: key, ...filterBase })}
@@ -329,7 +329,7 @@ export default async function AppointmentsPage({
                     <div key={row.id} className="rounded-lg bg-slate-50 p-2 text-xs">
                       <p className="font-medium">
                         <Link className="text-teal-700 hover:underline" href={visitHref(row.id, view, dateValue)}>
-                          {row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} ·{" "}
+                          {row.scheduledAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} ·{" "}
                           {patientName(row.patient)}
                         </Link>
                       </p>
@@ -385,7 +385,7 @@ export default async function AppointmentsPage({
                         href={visitHref(row.id, view, dateValue)}
                         className="block truncate rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-teal-800 hover:bg-teal-50"
                       >
-                        {row.scheduledAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}{" "}
+                        {row.scheduledAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}{" "}
                         {patientName(row.patient)}
                       </Link>
                     ))}
@@ -423,7 +423,7 @@ export default async function AppointmentsPage({
                       <span className="ml-2 font-mono text-xs text-slate-500">{row.patient.mrn}</span>
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
-                      {row.scheduledAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
+                      {row.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} ·{" "}
                       {doctorName(row.doctor)} · {row.department.name}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
@@ -457,8 +457,8 @@ export default async function AppointmentsPage({
             {leaves.map((leave) => (
               <li key={leave.id}>
                 {doctorName(leave.staff)} ·{" "}
-                {leave.startAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} –{" "}
-                {leave.endAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                {leave.startAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} –{" "}
+                {leave.endAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
                 {leave.reason ? ` · ${leave.reason}` : ""}
               </li>
             ))}

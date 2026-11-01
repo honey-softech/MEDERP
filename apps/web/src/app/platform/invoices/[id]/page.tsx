@@ -68,7 +68,7 @@ export default async function PlatformInvoicePage({ params }: { params: Promise<
             <p className="font-semibold">TAX INVOICE</p>
             <p className="font-mono">{invoice.invoiceNo}</p>
             <p className="text-slate-600">
-              {invoice.issuedAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}
+              {invoice.issuedAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}
             </p>
             <p className="mt-1 font-medium text-teal-800">{invoice.status}</p>
           </div>
@@ -87,7 +87,7 @@ export default async function PlatformInvoicePage({ params }: { params: Promise<
             <p>{invoice.paymentMethod ?? "—"}</p>
             {invoice.paidAt ? (
               <p className="text-slate-600">
-                Paid {invoice.paidAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                Paid {invoice.paidAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}
               </p>
             ) : null}
             {invoice.notes ? <p className="text-slate-600">{invoice.notes}</p> : null}

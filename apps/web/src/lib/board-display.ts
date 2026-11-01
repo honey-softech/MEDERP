@@ -1,3 +1,4 @@
+import { CLINIC_TIME_ZONE } from "@/lib/clinic-time";
 import { personLabel } from "@/lib/display";
 
 export function boardAuthorName(author: {
@@ -21,7 +22,7 @@ export function prettyRole(role: string) {
 }
 
 export function formatBoardTime(value: string | Date) {
-  return new Date(value).toLocaleString("en-IN", {
+  return new Date(value).toLocaleString("en-IN", { timeZone: CLINIC_TIME_ZONE,
     day: "numeric",
     month: "short",
     hour: "2-digit",

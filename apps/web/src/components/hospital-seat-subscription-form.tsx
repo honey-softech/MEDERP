@@ -270,7 +270,7 @@ export function HospitalSeatSubscriptionForm({
             <dt className="text-slate-500">Next charge</dt>
             <dd className="font-medium">
               {nextChargeAt
-                ? new Date(nextChargeAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                ? new Date(nextChargeAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })
                 : "—"}
             </dd>
           </div>

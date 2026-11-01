@@ -50,7 +50,6 @@ export function AppointmentForm({
   const [walkInConfigured, setWalkInConfigured] = useState(false);
   const [walkInWindowStart, setWalkInWindowStart] = useState("");
   const [visitType, setVisitType] = useState<"NEW" | "FOLLOW_UP" | "EMERGENCY">("NEW");
-  const [carryPriorVitals, setCarryPriorVitals] = useState(true);
   const walkInDefault = defaultQueueType === "WALK_IN";
   const isWalkIn = queueType === "WALK_IN";
   const todayIso = useMemo(() => {
@@ -230,7 +229,6 @@ export function AppointmentForm({
         scheduledAt: isWalkIn ? `${todayIso}T00:00` : scheduledAt || payload.scheduledAt,
         walkInWindowStartMinute: isWalkIn && walkInWindowStart ? Number(walkInWindowStart) : undefined,
         checkInNow: payload.checkInNow === "on" || queueType === "WALK_IN",
-        carryPriorVitals: visitType === "FOLLOW_UP" && carryPriorVitals,
       }),
     });
     const data = await response.json();
@@ -441,23 +439,6 @@ export function AppointmentForm({
       ) : (
         <input type="hidden" name="queueType" value="WALK_IN" />
       )}
-
-      {visitType === "FOLLOW_UP" ? (
-        <label className="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-2 text-sm font-medium text-slate-700">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={carryPriorVitals}
-            onChange={(event) => setCarryPriorVitals(event.target.checked)}
-          />
-          <span>
-            Bring previous vitals and show last assessment sheet
-            <span className="mt-0.5 block text-xs font-normal text-slate-500">
-              Copies the latest vitals onto this visit and links the prior assessment.
-            </span>
-          </span>
-        </label>
-      ) : null}
 
       <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
         <label className="text-sm font-medium text-slate-700">

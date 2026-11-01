@@ -19,10 +19,18 @@ import { formatClinicDate } from "@/lib/clinic-time";
 import { printClock } from "@/lib/print-document-pdf";
 import { ageGenderLine, encounterNumber, generalExaminationRows, visitDateLabel } from "@/lib/visit-summary";
 import { visitLetterhead, visitSignatureImage } from "@/lib/issued-document";
+import { resolveReturnVisit } from "@/lib/appointments/return-visit-lookup";
 
-export default async function VisitSummaryPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VisitSummaryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnVisit?: string }>;
+}) {
   const user = await requireHospitalPage();
   const { id } = await params;
+  const { returnVisit } = await searchParams;
   const appointment = await prisma.appointment.findFirst({
     where: { id, hospitalId: user.hospitalId },
     include: {
@@ -37,6 +45,13 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
     },
   });
   if (!appointment?.assessment) notFound();
+
+  const returnToCurrent = await resolveReturnVisit({
+    hospitalId: user.hospitalId,
+    patientId: appointment.patientId,
+    currentAppointmentId: appointment.id,
+    returnVisit,
+  });
 
   const approved = appointment.assessment.status === "APPROVED";
   const canPreviewDraft = DOCTOR_VISIT_ROLES.includes(user.role);
@@ -83,8 +98,11 @@ export default async function VisitSummaryPage({ params }: { params: Promise<{ i
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/appointments/${appointment.id}`} className={secondaryButtonClass}>
-            Back to visit
+          <Link
+            href={returnToCurrent ? `/appointments/${returnToCurrent}` : `/appointments/${appointment.id}`}
+            className={secondaryButtonClass}
+          >
+            {returnToCurrent ? "Back to current assessment" : "Back to visit"}
           </Link>
           {approved ? (
             <SendPatientMessageButton

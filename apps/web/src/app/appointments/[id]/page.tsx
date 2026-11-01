@@ -45,17 +45,19 @@ import { toVitalsValues } from "@/lib/vitals";
 import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 import { followUpReminderHint } from "@/lib/appointments/follow-up-reminder";
+import { withReturnVisit } from "@/lib/appointments/return-visit";
+import { resolveReturnVisit } from "@/lib/appointments/return-visit-lookup";
 
 export default async function AppointmentDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string; from?: string; view?: string; date?: string; skipVitals?: string }>;
+  searchParams: Promise<{ edit?: string; from?: string; view?: string; date?: string; skipVitals?: string; returnVisit?: string }>;
 }) {
   const user = await requireHospitalPage();
   const { id } = await params;
-  const { edit, from, view: calendarView, date: calendarDate, skipVitals: skipVitalsQuery } = await searchParams;
+  const { edit, from, view: calendarView, date: calendarDate, skipVitals: skipVitalsQuery, returnVisit } = await searchParams;
   const fromCalendar = from === "calendar";
   const editing = edit === "1" || edit === "true";
   const view = await resolveViewContext(user);
@@ -87,6 +89,20 @@ export default async function AppointmentDetailPage({
     },
   });
   if (!appointment) notFound();
+
+  const returnToCurrent = await resolveReturnVisit({
+    hospitalId: user.hospitalId,
+    patientId: appointment.patientId,
+    currentAppointmentId: appointment.id,
+    returnVisit,
+  });
+  const assessmentReturnId = returnToCurrent ?? appointment.id;
+  const ownSummaryHref = withReturnVisit(
+    `/appointments/${appointment.id}/summary`,
+    returnToCurrent,
+  );
+  const ownEditHref = withReturnVisit(`/appointments/${appointment.id}?edit=1`, returnToCurrent);
+  const ownVisitHref = withReturnVisit(`/appointments/${appointment.id}`, returnToCurrent);
 
   const canView = CLINICAL_VIEW_ROLES.includes(user.role);
   if (!canView) notFound();
@@ -298,7 +314,14 @@ export default async function AppointmentDetailPage({
   return (
     <AppShell title={scheduleView ? "Appointment" : "Visit details"} dense={useCockpit}>
       <div className={useCockpit ? "flex min-w-0 flex-col gap-2 overflow-x-hidden lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden" : undefined}>
-      {calendarBack ? (
+      {returnToCurrent ? (
+        <Link
+          href={`/appointments/${returnToCurrent}`}
+          className="inline-flex w-fit rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800 hover:underline print:hidden"
+        >
+          ← Back to current assessment
+        </Link>
+      ) : calendarBack ? (
         <Link href={calendarBack} className="inline-flex text-sm text-teal-700 hover:underline print:hidden">
           ← Appointments
         </Link>
@@ -366,11 +389,11 @@ export default async function AppointmentDetailPage({
                 />
               ) : null}
               {canPrintSummary ? (
-                <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+                <Link href={ownSummaryHref} className={compactButtonClass}>
                   Print
                 </Link>
               ) : null}
-              <Link href={`/appointments/${appointment.id}?edit=1`} className={compactButtonClass}>
+              <Link href={ownEditHref} className={compactButtonClass}>
                 Edit
               </Link>
             </>
@@ -385,13 +408,13 @@ export default async function AppointmentDetailPage({
                 resendLabel="Resend"
                 alreadySent={summaryAlreadySent}
               />
-              <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+              <Link href={ownSummaryHref} className={compactButtonClass}>
                 Print
               </Link>
             </>
           ) : null}
           {!summaryApproved && assessment && (canAssess || canPrintSummary) ? (
-            <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+            <Link href={ownSummaryHref} className={compactButtonClass}>
               Preview
             </Link>
           ) : null}
@@ -407,6 +430,7 @@ export default async function AppointmentDetailPage({
             canViewLabReports={canViewLabReport}
             patientPhone={appointment.patient.phone}
             label="Past visits"
+            returnVisitId={assessmentReturnId}
           />
           {canAssess ? (
             <Link
@@ -477,11 +501,11 @@ export default async function AppointmentDetailPage({
                 />
               ) : null}
               {canPrintSummary ? (
-                <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+                <Link href={ownSummaryHref} className={compactButtonClass}>
                   Print
                 </Link>
               ) : null}
-              <Link href={`/appointments/${appointment.id}?edit=1`} className={compactButtonClass}>
+              <Link href={ownEditHref} className={compactButtonClass}>
                 Edit
               </Link>
             </>
@@ -496,13 +520,13 @@ export default async function AppointmentDetailPage({
                 resendLabel="Resend"
                 alreadySent={summaryAlreadySent}
               />
-              <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+              <Link href={ownSummaryHref} className={compactButtonClass}>
                 Print
               </Link>
             </>
           ) : null}
           {!summaryApproved && assessment && (canAssess || canPrintSummary) ? (
-            <Link href={`/appointments/${appointment.id}/summary`} className={compactButtonClass}>
+            <Link href={ownSummaryHref} className={compactButtonClass}>
               Preview
             </Link>
           ) : null}
@@ -518,6 +542,7 @@ export default async function AppointmentDetailPage({
             canViewLabReports={canViewLabReport}
             patientPhone={appointment.patient.phone}
             label="Past visits"
+            returnVisitId={assessmentReturnId}
           />
           {canAssess ? (
             <Link
@@ -555,7 +580,7 @@ export default async function AppointmentDetailPage({
       {editing && visitClosed && showEditableAssessment ? (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 print:hidden">
           <p className="text-xs text-amber-900">Editing approved visit — publish again when finished.</p>
-          <Link href={`/appointments/${appointment.id}`} className={compactButtonClass}>
+          <Link href={ownVisitHref} className={compactButtonClass}>
             Cancel edit
           </Link>
         </div>
@@ -586,7 +611,7 @@ export default async function AppointmentDetailPage({
                   resendLabel="Resend WhatsApp"
                   alreadySent={summaryAlreadySent}
                 />
-                <Link href={`/appointments/${appointment.id}/summary`} className={`${primaryButtonClass} inline-flex`}>
+                <Link href={ownSummaryHref} className={`${primaryButtonClass} inline-flex`}>
                   View / print record
                 </Link>
               </div>
@@ -629,6 +654,7 @@ export default async function AppointmentDetailPage({
                 }
               : null
           }
+          returnVisitId={assessmentReturnId}
         />
         {useCockpit && canViewLab && !testsLiveInPopup ? (
           <LabOrderPanel

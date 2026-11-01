@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { compactButtonClass, compactPrimaryButtonClass, textActionClass } from "@/components/auth-shell";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
+import { withReturnVisit } from "@/lib/appointments/return-visit";
 
 export type PastVisitItem = {
   id: string;
@@ -26,6 +27,7 @@ export function VisitHistorySheet({
   patientPhone,
   label = "Past visits",
   variant = "button",
+  returnVisitId = null,
 }: {
   visits: PastVisitItem[];
   patientHref: string;
@@ -34,6 +36,7 @@ export function VisitHistorySheet({
   patientPhone?: string | null;
   label?: string;
   variant?: "button" | "link";
+  returnVisitId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -106,7 +109,7 @@ export function VisitHistorySheet({
                         ) : null}
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <Link
-                            href={`/appointments/${visit.id}`}
+                            href={withReturnVisit(`/appointments/${visit.id}`, returnVisitId)}
                             className={compactButtonClass}
                             onClick={() => setOpen(false)}
                           >
@@ -121,7 +124,10 @@ export function VisitHistorySheet({
                                 label="Send on WhatsApp"
                                 alreadySent={Boolean(visit.summaryAlreadySent)}
                               />
-                              <Link href={`/appointments/${visit.id}/summary`} className={compactPrimaryButtonClass}>
+                              <Link
+                                href={withReturnVisit(`/appointments/${visit.id}/summary`, returnVisitId)}
+                                className={compactPrimaryButtonClass}
+                              >
                                 Summary
                               </Link>
                             </>

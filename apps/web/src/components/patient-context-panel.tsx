@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { compactButtonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
 import { VitalsPanel } from "@/components/vitals-panel";
+import { withReturnVisit } from "@/lib/appointments/return-visit";
 import type { VitalsValues } from "@/lib/vitals";
 
 export type PatientContextData = {
@@ -37,11 +38,13 @@ export function PatientContextPanel({
   canEditHistory,
   priorVisit = null,
   recordVitalsHref = null,
+  returnVisitId = null,
 }: {
   patient: PatientContextData;
   vitals?: VitalsValues | null;
   canEditHistory: boolean;
   recordVitalsHref?: string | null;
+  returnVisitId?: string | null;
   priorVisit?: {
     id: string;
     scheduledAtLabel: string;
@@ -133,11 +136,14 @@ export function PatientContextPanel({
               ) : null}
             </div>
             {priorVisit.summaryApproved ? (
-              <Link href={`/appointments/${priorVisit.id}/summary`} className={compactButtonClass}>
+              <Link
+                href={withReturnVisit(`/appointments/${priorVisit.id}/summary`, returnVisitId)}
+                className={compactButtonClass}
+              >
                 Assessment sheet
               </Link>
             ) : (
-              <Link href={`/appointments/${priorVisit.id}`} className={compactButtonClass}>
+              <Link href={withReturnVisit(`/appointments/${priorVisit.id}`, returnVisitId)} className={compactButtonClass}>
                 Open visit
               </Link>
             )}

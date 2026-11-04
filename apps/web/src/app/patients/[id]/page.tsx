@@ -12,6 +12,7 @@ import { PatientVisitHistory } from "@/components/patient-visit-history";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
 import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageLabel, hasFrontDeskAccess, hasRoleAccess, inr, patientName, prettyEnum } from "@/lib/front-desk";
+import { patientWhatsAppLanguageLabel } from "@/lib/messaging/whatsapp-language";
 import { prisma } from "@/lib/prisma";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
@@ -226,6 +227,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           <div><dt className="text-slate-500">Name</dt><dd>{patientName(patient)}</dd></div>
           <div><dt className="text-slate-500">UHID</dt><dd className="font-mono">{patient.mrn}</dd></div>
           <div><dt className="text-slate-500">Phone</dt><dd>{display(patient.phone)}</dd></div>
+          <div><dt className="text-slate-500">WhatsApp language</dt><dd>{patientWhatsAppLanguageLabel(patient.whatsappLanguage, user.hospital?.whatsappLanguage)}</dd></div>
           <div><dt className="text-slate-500">Age / gender</dt><dd>{ageLabel(patient.dateOfBirth)} · {prettyEnum(patient.gender)}</dd></div>
           <div className="sm:col-span-2"><dt className="text-slate-500">Address</dt><dd>{display(patient.address)}</dd></div>
           <div><dt className="text-slate-500">Blood group</dt><dd>{display(patient.bloodGroup)}</dd></div>
@@ -360,6 +362,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           familyOfPatientId={patient.id}
           familyHeadName={patientName(patient)}
           familyRelationDefault="CHILD"
+          hospitalLanguage={user.hospital?.whatsappLanguage}
           initial={{
             firstName: "",
             lastName: patient.lastName,
@@ -383,6 +386,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             insurancePolicyNo: patient.insurancePolicyNo ?? "",
             insuranceValidUntil: dateInput(patient.insuranceValidUntil),
             photoData: "",
+            whatsappLanguage: patient.whatsappLanguage ?? "",
           }}
         />
         <div className="mt-6">

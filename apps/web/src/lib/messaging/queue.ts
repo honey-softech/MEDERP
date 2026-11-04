@@ -6,6 +6,7 @@ import {
   renderTemplate,
   type MessageTemplateKey,
 } from "@/lib/messaging/templates";
+import { isPatientWhatsAppTemplate, resolveWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 
 const MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 20;
@@ -53,6 +54,24 @@ export async function processOutboundQueue() {
     orderBy: { createdAt: "asc" },
     take: BATCH_SIZE,
   });
+  const patientIds = [...new Set(pending.flatMap((row) => (row.patientId ? [row.patientId] : [])))];
+  const hospitalIds = [...new Set(pending.map((row) => row.hospitalId))];
+  const [patients, hospitals] = await Promise.all([
+    patientIds.length > 0
+      ? prisma.patient.findMany({
+          where: { id: { in: patientIds } },
+          select: { id: true, whatsappLanguage: true },
+        })
+      : Promise.resolve([]),
+    hospitalIds.length > 0
+      ? prisma.hospital.findMany({
+          where: { id: { in: hospitalIds } },
+          select: { id: true, whatsappLanguage: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const patientLanguage = new Map(patients.map((row) => [row.id, row.whatsappLanguage]));
+  const hospitalLanguage = new Map(hospitals.map((row) => [row.id, row.whatsappLanguage]));
   let sent = 0;
   let failed = 0;
   for (const row of pending) {
@@ -69,6 +88,9 @@ export async function processOutboundQueue() {
       if (typeof value === "string") stringVars[key] = value;
     }
     const otp = typeof variables.otp === "string" ? variables.otp : undefined;
+    const language = isPatientWhatsAppTemplate(row.templateKey)
+      ? resolveWhatsAppLanguage(patientLanguage.get(row.patientId ?? ""), hospitalLanguage.get(row.hospitalId))
+      : "en";
     const result = await deliverMessage({
       toPhone: row.toPhone,
       channel: row.channel,
@@ -76,6 +98,7 @@ export async function processOutboundQueue() {
       templateKey: row.templateKey,
       otp,
       variables: stringVars,
+      language,
     });
     if (result.ok) {
       sent += 1;

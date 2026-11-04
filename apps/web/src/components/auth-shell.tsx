@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
 import { AuthBack } from "@/components/auth-back";
+import { landingBody, landingDisplay } from "@/fonts/marketing";
 
 export {
   buttonClass,
@@ -16,16 +16,6 @@ export {
   textActionClass,
   iconButtonClass,
 } from "@/lib/ui";
-
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-landing-display",
-});
-
-const body = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-landing-body",
-});
 
 export function AuthShell({
   title,
@@ -59,7 +49,7 @@ export function AuthShell({
   void _doodles;
 
   return (
-    <div className={`auth-stage ${display.variable} ${body.variable}${keyboardSafe ? " auth-signin" : ""}`}>
+    <div className={`auth-stage ${landingDisplay.variable} ${landingBody.variable}${keyboardSafe ? " auth-signin" : ""}`}>
       <header className="auth-top">
         <div className={`auth-bar mx-auto flex w-full items-center justify-between gap-3 py-3.5 ${wide ? "max-w-[90rem]" : "max-w-6xl"}`}>
           <div className="flex min-w-0 items-center gap-2.5">

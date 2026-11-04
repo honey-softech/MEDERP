@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { parseFollowUpReminderDaysBefore } from "@/lib/appointments/follow-up-reminder";
+import { parseHospitalWhatsAppLanguage, whatsappLanguageLabel } from "@/lib/messaging/whatsapp-language";
 import { extraPhonesForStorage } from "@/lib/hospital-letterhead";
 import { requireHospitalActor, sanitizeLogoData } from "@/lib/front-desk";
 
@@ -71,7 +72,16 @@ export async function PATCH(request: Request) {
     }
   }
 
-  if (!brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent) {
+  const whatsappLanguageSent = body != null && "whatsappLanguage" in body;
+  if (whatsappLanguageSent) {
+    const language = parseHospitalWhatsAppLanguage(body.whatsappLanguage);
+    if (!language.ok) {
+      return NextResponse.json({ error: language.error }, { status: 400 });
+    }
+    data.whatsappLanguage = language.value;
+  }
+
+  if (!brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent && !whatsappLanguageSent) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -109,14 +119,19 @@ export async function PATCH(request: Request) {
         "nurseAsReceptionist",
         "followUpReminderEnabled",
         "followUpReminderDaysBefore",
+        "whatsappLanguage",
       ],
     },
   );
 
-  const followUpOnly = followUpReminderSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent;
-  const action = followUpOnly
+  const whatsappLanguageOnly =
+    whatsappLanguageSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent;
+  const followUpOnly = followUpReminderSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !whatsappLanguageSent;
+  const action = whatsappLanguageOnly
+    ? "HOSPITAL_WHATSAPP_LANGUAGE_UPDATED"
+    : followUpOnly
     ? "HOSPITAL_FOLLOW_UP_REMINDER_POLICY_UPDATED"
-    : nurseReceptionSent && !brandingSent && !policySent && !walkInSent
+    : nurseReceptionSent && !brandingSent && !policySent && !walkInSent && !whatsappLanguageSent
     ? "HOSPITAL_NURSE_RECEPTIONIST_POLICY_UPDATED"
     : walkInSent && !brandingSent && !policySent
     ? "HOSPITAL_WALK_IN_POLICY_UPDATED"
@@ -138,7 +153,9 @@ export async function PATCH(request: Request) {
     action,
     entity: "Hospital",
     entityId: hospital.id,
-    summary: followUpOnly
+    summary: whatsappLanguageOnly
+      ? `${scoped.user.username} set the WhatsApp language to ${whatsappLanguageLabel(data.whatsappLanguage)}.`
+      : followUpOnly
       ? reminderEnabled
         ? `${scoped.user.username} turned on follow-up reminders ${reminderDays} day${reminderDays === 1 ? "" : "s"} before.`
         : `${scoped.user.username} turned off automatic follow-up reminders.`

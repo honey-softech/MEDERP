@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { renderTemplate } from "@/lib/messaging/templates";
+import { resolveWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { buildMedicalCertificatePdf } from "@/lib/medical-certificate-pdf";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
 import { patientName, PRINT_SUMMARY_ROLES, requireHospitalActor } from "@/lib/front-desk";
@@ -32,7 +33,7 @@ export async function POST(request: Request, context: Ctx) {
     include: {
       patient: true,
       hospital: {
-        select: { name: true, address: true, phone: true, altPhones: true, code: true, logoData: true, sealData: true },
+        select: { name: true, address: true, phone: true, altPhones: true, code: true, logoData: true, sealData: true, whatsappLanguage: true },
       },
       issuedBySignature: { select: { imageData: true } },
     },
@@ -86,6 +87,7 @@ export async function POST(request: Request, context: Ctx) {
     variables,
     documentMediaId,
     documentFilename: filename,
+    language: resolveWhatsAppLanguage(certificate.patient.whatsappLanguage, certificate.hospital.whatsappLanguage),
   });
 
   const outbound = await prisma.outboundMessage.create({

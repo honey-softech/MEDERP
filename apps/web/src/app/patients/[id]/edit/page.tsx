@@ -60,7 +60,9 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
           insurancePolicyNo: patient.insurancePolicyNo ?? "",
           insuranceValidUntil: dateInput(patient.insuranceValidUntil),
           photoData: patient.photoData ?? "",
+          whatsappLanguage: patient.whatsappLanguage ?? "",
         }}
+        hospitalLanguage={user.hospital?.whatsappLanguage}
       />
     </AppShell>
   );

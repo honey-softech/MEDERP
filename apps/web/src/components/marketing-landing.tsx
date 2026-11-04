@@ -1,19 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
 import { DeveloperCredit, ManagedByCredit } from "@/components/auth-branding";
 import { OpenOnWeb } from "@/components/open-on-web";
+import { landingBody, landingDisplay } from "@/fonts/marketing";
 import { MEDERP_PUBLIC_ORIGIN, mederpWebUrl } from "@/lib/mobile-app";
-
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-landing-display",
-});
-
-const body = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-landing-body",
-});
 
 type FeatureIcon =
   | "opd"
@@ -403,7 +393,7 @@ const structuredData = {
 
 export function MarketingLanding({ isMobileApp = false }: { isMobileApp?: boolean }) {
   return (
-    <div className={`landing text-[#10211e] ${display.variable} ${body.variable}`}>
+    <div className={`landing text-[#10211e] ${landingDisplay.variable} ${landingBody.variable}`}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <header className="landing-nav">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8">

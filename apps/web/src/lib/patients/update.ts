@@ -6,6 +6,7 @@ import { sanitizePhotoData } from "@/lib/opd/patients";
 import type { PatientActionResult } from "@/lib/patients/types";
 import { prisma } from "@/lib/prisma";
 import { hospitalScope } from "@/lib/tenancy";
+import { parsePatientWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { CLINICAL_HISTORY_FIELDS, GENDERS, ID_PROOFS } from "@/lib/validation/patient";
 
 const FRONT_DESK_TEXT_FIELDS = [
@@ -79,6 +80,11 @@ export function buildPatientUpdatePayload(input: {
     }
     if (input.body.photoData !== undefined) {
       data.photoData = sanitizePhotoData(input.body.photoData);
+    }
+    if (input.body.whatsappLanguage !== undefined) {
+      const language = parsePatientWhatsAppLanguage(input.body.whatsappLanguage);
+      if (!language.ok) return language;
+      data.whatsappLanguage = language.value;
     }
     if (!data.firstName) data.firstName = input.existing.firstName;
   }

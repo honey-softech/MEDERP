@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dateOfBirthFromAge, parsePatientAge } from "@/lib/display";
 import { babyOfName, startOfLocalDay } from "@/lib/patients/infant";
+import { parsePatientWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { mobileValidationError, normalizeMobile } from "@/lib/phone";
 
 export const GENDERS = ["MALE", "FEMALE", "OTHER"] as const;
@@ -60,6 +61,7 @@ export const createPatientSchema = z
     unnamedInfant: z.unknown().optional(),
     parentName: z.unknown().optional(),
     force: z.unknown().optional(),
+    whatsappLanguage: z.unknown().optional(),
   })
   .transform((data, ctx) => {
     const unnamedInfant = Boolean(data.unnamedInfant);
@@ -116,6 +118,11 @@ export const createPatientSchema = z
       ctx.addIssue({ code: "custom", message: "Enter a valid insurance expiry date." });
       return z.NEVER;
     }
+    const whatsappLanguage = parsePatientWhatsAppLanguage(data.whatsappLanguage);
+    if (!whatsappLanguage.ok) {
+      ctx.addIssue({ code: "custom", message: whatsappLanguage.error });
+      return z.NEVER;
+    }
     return {
       firstName,
       lastName,
@@ -143,6 +150,7 @@ export const createPatientSchema = z
       unnamedInfant,
       parentName: parentName || null,
       force: Boolean(data.force),
+      whatsappLanguage: whatsappLanguage.value,
     };
   });
 

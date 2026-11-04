@@ -1,16 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
-
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-landing-display",
-});
-
-const body = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-landing-body",
-});
+import { landingBody, landingDisplay } from "@/fonts/marketing";
 
 export function MarketingPublic({
   kicker,
@@ -24,7 +14,7 @@ export function MarketingPublic({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`landing text-[#10211e] ${display.variable} ${body.variable}`}>
+    <div className={`landing text-[#10211e] ${landingDisplay.variable} ${landingBody.variable}`}>
       <header className="landing-nav">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
           <Link href="/" className="inline-flex min-w-0 items-center gap-2.5">

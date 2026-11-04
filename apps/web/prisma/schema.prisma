@@ -421,6 +421,8 @@ model Hospital {
   nurseAsReceptionist Boolean          @default(false)
   followUpReminderEnabled Boolean      @default(false)
   followUpReminderDaysBefore Int       @default(1)
+  /** Default language for patient WhatsApp messages: en, hi, ta, kn, ml. */
+  whatsappLanguage       String            @default("en")
   trialEndsAt        DateTime?
   /** Set when a software admin removes the hospital. Hidden from the hospital list; phone and logins are released. */
   removedAt          DateTime?
@@ -842,6 +844,8 @@ model Patient {
   advanceBalance      Decimal          @default(0) @db.Decimal(12, 2)
   smsOptIn            Boolean          @default(true)
   whatsappOptIn       Boolean          @default(true)
+  /** Null follows the hospital WhatsApp language. */
+  whatsappLanguage    String?
   mergedIntoId        String?
   mergedInto          Patient?         @relation("PatientMerge", fields: [mergedIntoId], references: [id])
   mergedFrom          Patient[]        @relation("PatientMerge")

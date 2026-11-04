@@ -32,6 +32,7 @@ export default async function NewPatientPage({
       <PatientForm
         submitLabel={bookingNext ? "Register and continue booking" : "Register patient"}
         nextHref={bookingNext}
+        hospitalLanguage={user.hospital?.whatsappLanguage}
       />
     </AppShell>
   );

@@ -12,6 +12,7 @@ import type { BillingActionResult } from "@/lib/billing/types";
 import { inr, patientName } from "@/lib/display";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { renderTemplate } from "@/lib/messaging/templates";
+import { resolveWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { prisma } from "@/lib/prisma";
 
@@ -61,6 +62,7 @@ export async function sendInvoiceWhatsApp(params: {
     variables,
     documentMediaId,
     documentFilename: filename,
+    language: resolveWhatsAppLanguage(invoice.patient.whatsappLanguage, invoice.hospital.whatsappLanguage),
   });
 
   const outbound = await prisma.outboundMessage.create({

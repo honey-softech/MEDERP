@@ -9,7 +9,7 @@ import { hospitalScope } from "@/lib/tenancy";
 
 export const invoiceReceiptInclude = {
   patient: true,
-  hospital: { select: { name: true, address: true, phone: true, altPhones: true } },
+  hospital: { select: { name: true, address: true, phone: true, altPhones: true, whatsappLanguage: true } },
   items: true,
   payments: {
     orderBy: { receivedAt: "desc" as const },

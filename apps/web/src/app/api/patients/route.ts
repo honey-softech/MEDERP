@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     unnamedInfant,
     parentName,
     force,
+    whatsappLanguage,
   } = parsed.data;
   const photoData = sanitizePhotoData(parsed.data.photoData);
 
@@ -225,6 +226,7 @@ export async function POST(request: Request) {
       photoData,
       familyGroupId,
       familyGroupCode,
+      whatsappLanguage,
     },
   });
 

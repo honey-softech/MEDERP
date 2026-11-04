@@ -7,6 +7,7 @@ import { SignaturePolicyForm } from "@/components/signature-policy-form";
 import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
 import { NurseReceptionistForm } from "@/components/nurse-receptionist-form";
 import { FollowUpReminderPolicyForm } from "@/components/follow-up-reminder-policy-form";
+import { WhatsAppLanguageForm } from "@/components/whatsapp-language-form";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { parseExtraPhones } from "@/lib/hospital-letterhead";
 import { countStaffWithoutSignature } from "@/lib/signatures";
@@ -45,6 +46,7 @@ export default async function HospitalSettingsPage() {
         nurseAsReceptionist: true,
         followUpReminderEnabled: true,
         followUpReminderDaysBefore: true,
+        whatsappLanguage: true,
       },
     }),
     countStaffWithoutSignature(user.hospitalId),
@@ -124,6 +126,7 @@ export default async function HospitalSettingsPage() {
           followUpReminderDaysBefore: hospital.followUpReminderDaysBefore,
         }}
       />
+      <WhatsAppLanguageForm initial={{ whatsappLanguage: hospital.whatsappLanguage }} />
       <WalkInPolicyForm
         initial={{
           walkInByDoctor: hospital.walkInByDoctor,

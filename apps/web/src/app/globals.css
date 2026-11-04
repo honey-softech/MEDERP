@@ -880,7 +880,7 @@ html:has(.landing) body {
 }
 
 .landing {
-  font-family: var(--font-landing-body), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-landing-body), ui-sans-serif, system-ui, sans-serif;
   background:
     radial-gradient(ellipse 70% 42% at 100% -8%, rgb(18 117 108 / 0.14), transparent 52%),
     radial-gradient(ellipse 42% 32% at -6% 18%, rgb(212 101 78 / 0.1), transparent 48%),
@@ -1145,7 +1145,7 @@ html:has(.landing) body {
 
 /* -- Auth pages share the public homepage -- */
 .auth-stage {
-  font-family: var(--font-landing-body), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-landing-body), ui-sans-serif, system-ui, sans-serif;
   color: #10211e;
   width: 100%;
   max-width: 100%;

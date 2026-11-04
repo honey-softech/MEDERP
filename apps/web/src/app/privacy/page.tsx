@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { AuthBack } from "@/components/auth-back";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { landingBody, landingDisplay } from "@/fonts/marketing";
 
 export const metadata: Metadata = {
   title: { absolute: "Privacy Policy · MedERP" },
@@ -18,19 +18,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-landing-display",
-});
-
-const body = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-landing-body",
-});
-
 export default function PrivacyPage() {
   return (
-    <div className={`landing text-[#0c1f2e] ${display.variable} ${body.variable}`}>
+    <div className={`landing text-[#0c1f2e] ${landingDisplay.variable} ${landingBody.variable}`}>
       <header className="flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
         <div className="flex min-w-0 items-center gap-2.5">
           <AuthBack href="/" />

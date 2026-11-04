@@ -11,6 +11,12 @@ import {
   subscriptionBillComponents,
   type WhatsAppComponent,
 } from "@/lib/messaging/whatsapp-meta-templates";
+import {
+  isPatientWhatsAppTemplate,
+  normalizeWhatsAppLanguage,
+  resolveWhatsAppTemplateName,
+  type WhatsAppLanguageCode,
+} from "@/lib/messaging/whatsapp-language";
 
 export type SendResult = { ok: true; providerMessageId?: string } | { ok: false; error: string };
 
@@ -24,6 +30,8 @@ export type ProviderPayload = {
   /** WhatsApp media id for DOCUMENT header templates (investigation / visit summary / bill PDF). */
   documentMediaId?: string;
   documentFilename?: string;
+  /** Patient message language. Login OTP and subscription bills stay English. */
+  language?: string;
 };
 
 export async function sendViaConsole(payload: ProviderPayload): Promise<SendResult> {
@@ -86,7 +94,7 @@ function whatsappConfigured() {
   return Boolean(askevaToken());
 }
 
-function templateName(key: string) {
+function englishTemplateName(key: string) {
   if (key === "otp") return env("WHATSAPP_OTP_TEMPLATE", META_PATIENT_TEMPLATES.otp.defaultName);
   if (key === "investigation_list") {
     return env("WHATSAPP_INVESTIGATION_TEMPLATE", META_PATIENT_TEMPLATES.investigation_list.defaultName);
@@ -98,6 +106,15 @@ function templateName(key: string) {
     return env("WHATSAPP_SUBSCRIPTION_BILL_TEMPLATE", META_PATIENT_TEMPLATES.subscription_bill.defaultName);
   }
   return env("WHATSAPP_REMINDER_TEMPLATE", META_PATIENT_TEMPLATES.appointment_reminder.defaultName);
+}
+
+function templateName(key: string, language: WhatsAppLanguageCode) {
+  return resolveWhatsAppTemplateName(key, language, englishTemplateName(key));
+}
+
+function messageLanguage(payload: ProviderPayload): WhatsAppLanguageCode {
+  if (!isPatientWhatsAppTemplate(payload.templateKey)) return "en";
+  return normalizeWhatsAppLanguage(payload.language) ?? "en";
 }
 
 function reminderParamFormat(): "named" | "positional" {
@@ -352,8 +369,9 @@ async function sendWhatsAppTemplateWithFallbacks(params: {
   to: string;
   name: string;
   components: WhatsAppComponent[];
+  language: WhatsAppLanguageCode;
 }): Promise<SendResult> {
-  const languages = templateLanguages();
+  const languages = params.language === "en" ? templateLanguages() : [params.language];
   const variants = [params.components, asPositionalComponents(params.components)];
   let last: SendResult = { ok: false, error: "No WhatsApp template language configured." };
   for (const language of languages) {
@@ -379,10 +397,11 @@ export async function sendViaWhatsApp(payload: ProviderPayload): Promise<SendRes
     return sendViaConsole(payload);
   }
 
-  const name = templateName(payload.templateKey);
+  const language = messageLanguage(payload);
+  const name = templateName(payload.templateKey, language);
   const components = templateComponents(payload);
   if ("error" in components) return { ok: false, error: components.error };
-  return sendWhatsAppTemplateWithFallbacks({ to: mobile, name, components });
+  return sendWhatsAppTemplateWithFallbacks({ to: mobile, name, components, language });
 }
 
 export function messagingProvider() {

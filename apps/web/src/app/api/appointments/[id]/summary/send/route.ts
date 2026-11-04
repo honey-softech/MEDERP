@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
 import { renderTemplate } from "@/lib/messaging/templates";
+import { resolveWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { formatVisitSummaryWhen } from "@/lib/clinic-time";
 import { printClock } from "@/lib/print-document-pdf";
 import { toVitalsValues } from "@/lib/vitals";
@@ -39,7 +40,7 @@ export async function POST(request: Request, context: Ctx) {
     where: { id, hospitalId: scoped.user.hospitalId },
     include: {
       patient: true,
-      hospital: { select: { name: true, address: true, phone: true, altPhones: true, code: true, logoData: true, sealData: true } },
+      hospital: { select: { name: true, address: true, phone: true, altPhones: true, code: true, logoData: true, sealData: true, whatsappLanguage: true } },
       doctor: { include: { appUser: { select: { username: true, firstName: true, lastName: true } } } },
       department: { select: { name: true } },
       vitals: true,
@@ -106,6 +107,7 @@ export async function POST(request: Request, context: Ctx) {
     variables,
     documentMediaId,
     documentFilename: filename,
+    language: resolveWhatsAppLanguage(appointment.patient.whatsappLanguage, appointment.hospital.whatsappLanguage),
   });
 
   const outbound = await prisma.outboundMessage.create({

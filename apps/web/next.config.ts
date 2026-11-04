@@ -1,6 +1,25 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Chrome 111+, Safari 16.4, and Firefox 111 already implement the features in
+  // next/dist/build/polyfills/polyfill-module. Shipping them costs ~14 KB on every page.
+  turbopack: {
+    resolveAlias: {
+      "next/dist/build/polyfills/polyfill-module": "./src/lib/empty-module.js",
+      "next/dist/build/polyfills/polyfill-module.js": "./src/lib/empty-module.js",
+      "../build/polyfills/polyfill-module": "./src/lib/empty-module.js",
+      "../build/polyfills/polyfill-module.js": "./src/lib/empty-module.js",
+    },
+    rules: {
+      "*.js": {
+        condition: {
+          all: ["browser", { path: /[/\\]polyfill-module\.js$/ }],
+        },
+        loaders: ["./src/lib/strip-polyfill-loader.js"],
+        as: "*.js",
+      },
+    },
+  },
   serverExternalPackages: ["@prisma/client", "prisma", "socket.io", "bufferutil", "utf-8-validate"],
   experimental: {
     proxyClientMaxBodySize: "10mb",

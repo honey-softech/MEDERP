@@ -6,6 +6,7 @@ import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth
 import { ExpandToggle } from "@/components/expand-toggle";
 import { PhotoCapture } from "@/components/photo-capture";
 import { ageFromDateInput } from "@/lib/display";
+import { WHATSAPP_LANGUAGES, whatsappLanguageLabel } from "@/lib/messaging/whatsapp-language";
 import { babyOfName, dateInputValue, isUnnamedInfantName } from "@/lib/patients/infant";
 
 const GENDERS = [
@@ -56,6 +57,7 @@ export type PatientFormValues = {
   insurancePolicyNo: string;
   insuranceValidUntil: string;
   photoData: string;
+  whatsappLanguage: string;
 };
 
 type Duplicate = {
@@ -77,6 +79,7 @@ export function PatientForm({
   familyHeadName,
   familyRelationDefault = "CHILD",
   nextHref,
+  hospitalLanguage,
 }: {
   initial?: PatientFormValues;
   submitLabel: string;
@@ -84,6 +87,7 @@ export function PatientForm({
   familyHeadName?: string;
   familyRelationDefault?: string;
   nextHref?: string;
+  hospitalLanguage?: string | null;
 }) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
@@ -125,6 +129,7 @@ export function PatientForm({
       insurancePolicyNo: "",
       insuranceValidUntil: "",
       photoData: "",
+      whatsappLanguage: "",
     },
   );
 
@@ -362,6 +367,25 @@ export function PatientForm({
         required={!isEdit}
         placeholder="10-digit mobile"
       />
+      <label className="md:col-span-2 text-sm font-medium text-slate-700">
+        WhatsApp language
+        <select
+          className={fieldClass}
+          value={values.whatsappLanguage}
+          onChange={(event) => setField("whatsappLanguage", event.target.value)}
+        >
+          <option value="">Same as hospital ({whatsappLanguageLabel(hospitalLanguage)})</option>
+          {WHATSAPP_LANGUAGES.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block font-normal text-slate-500">
+          Visit summary, bill, tests, certificate, and appointment reminder use this language. Leave the hospital
+          language unless this patient needs a different one.
+        </span>
+      </label>
       <Field label="Blood group" value={values.bloodGroup} onChange={(v) => setField("bloodGroup", v)} placeholder="B+" />
       <p className="md:col-span-2 text-sm text-slate-500">
         Extra details stay collapsed. Expand a section only if you need to add or change it.

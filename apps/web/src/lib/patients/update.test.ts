@@ -34,6 +34,34 @@ describe("patient update payload", () => {
     expect(result.data.lastName).toBe("Kumar");
   });
 
+  it("lets front desk set or clear the WhatsApp language", () => {
+    const set = buildPatientUpdatePayload({
+      isFrontDesk: true,
+      existing: { firstName: "Ravi", lastName: "Kumar" },
+      body: { whatsappLanguage: "Tamil" },
+    });
+    expect(set.ok).toBe(true);
+    if (!set.ok) return;
+    expect(set.data.whatsappLanguage).toBe("ta");
+
+    const cleared = buildPatientUpdatePayload({
+      isFrontDesk: true,
+      existing: { firstName: "Ravi", lastName: "Kumar" },
+      body: { whatsappLanguage: "" },
+    });
+    expect(cleared.ok).toBe(true);
+    if (!cleared.ok) return;
+    expect(cleared.data.whatsappLanguage).toBeNull();
+
+    expect(
+      buildPatientUpdatePayload({
+        isFrontDesk: true,
+        existing: { firstName: "Ravi", lastName: "Kumar" },
+        body: { whatsappLanguage: "French" },
+      }),
+    ).toEqual({ ok: false, error: "Select a valid WhatsApp language." });
+  });
+
   it("lets front desk clear an optional last name", () => {
     const result = buildPatientUpdatePayload({
       isFrontDesk: true,

@@ -1,0 +1,1 @@
+/* Modern browsers already include the features Next polyfills here. */

@@ -12,8 +12,7 @@ import { hospitalAccessBlocked } from "@/lib/hospital-access";
 import { MAX_REFERRALS_PER_HOSPITAL, MAX_TOTAL_FREE_MONTHS, referralSummary } from "@/lib/hospital-referrals";
 import { ReferralCodeCopy } from "@/components/referral-code-copy";
 import { OtpDangerAction } from "@/components/otp-danger-action";
-import { OpenOnWeb } from "@/components/open-on-web";
-import { isMobileAppRequest, mederpWebUrl } from "@/lib/mobile-app";
+import { isMobileAppRequest } from "@/lib/mobile-app";
 
 function inr(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -53,7 +52,7 @@ export default async function HospitalSubscriptionPage() {
     <AppShell title="Subscription">
       <p className="mb-6 text-sm text-slate-500">
         {isMobileApp
-          ? `The monthly MedERP plan for ${hospital.name} (${hospital.code}). Billing changes are made on the website.`
+          ? `The monthly MedERP plan for ${hospital.name} (${hospital.code}).`
           : `Manage the monthly MedERP plan for ${hospital.name} (${hospital.code}). Auto-debit runs every billing cycle until you cancel. Plan changes you schedule here apply from the next cycle.`}
       </p>
       {hospital.trialEndsAt && !hospitalAccessBlocked(hospital) && hasSubscription ? (
@@ -70,7 +69,7 @@ export default async function HospitalSubscriptionPage() {
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Free trial ends {hospital.trialEndsAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })}.{" "}
           {isMobileApp
-            ? "Continue the plan from the MedERP website so the clinic stays open after that date."
+            ? "The clinic account stays open until that date."
             : "Link a card below so auto-debit can keep the clinic open after that date."}
         </p>
       ) : null}
@@ -78,7 +77,7 @@ export default async function HospitalSubscriptionPage() {
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           The free trial has ended.{" "}
           {isMobileApp
-            ? "Continue the plan from the MedERP website to restore access for your staff."
+            ? "This clinic account is inactive. Ask your hospital administrator."
             : "Start a paid subscription below to restore access for your staff."}
         </p>
       ) : null}
@@ -163,10 +162,6 @@ export default async function HospitalSubscriptionPage() {
               </div>
             </dl>
           </section>
-          <OpenOnWeb
-            message="Subscription and billing are managed on the MedERP website. Open this address in a web browser and sign in to reach the subscription page."
-            url={mederpWebUrl("/hospital/subscription")}
-          />
         </div>
       ) : (
         <HospitalSeatSubscriptionForm

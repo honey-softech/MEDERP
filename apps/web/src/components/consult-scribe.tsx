@@ -6,11 +6,10 @@ import {
   SCRIBE_ASSESSMENT_KEYS,
   draftToAssessment,
   fieldsToCheck,
-  medicineNotes,
+  missingLabels,
   type ScribeAssessmentKey,
   type ScribeAssessmentPatch,
   type ScribeDraft,
-  type ScribeMedicine,
 } from "@/lib/scribe/draft-schema";
 
 type SessionStatus = "RECORDING" | "TRANSCRIBED" | "DRAFTED" | "APPLIED" | "DISCARDED";
@@ -78,13 +77,14 @@ export function ConsultScribe({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [failedChunk, setFailedChunk] = useState(false);
-  const [editor, setEditor] = useState<ScribeDraft | null>(null);
-  const [included, setIncluded] = useState<Partial<Record<ScribeAssessmentKey, boolean>>>({});
+  const [missing, setMissing] = useState<string[]>([]);
 
   const recordingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const segmentTimerRef = useRef<number | null>(null);
+  const partsRef = useRef<Blob[]>([]);
+  const mimeRef = useRef("audio/webm");
   const sessionIdRef = useRef<string | null>(null);
   const seqRef = useRef(1);
   const uploadChainRef = useRef(Promise.resolve());
@@ -115,10 +115,7 @@ export function ConsultScribe({
           setTranslation(data.session.translation ?? "");
           sessionIdRef.current = data.session.id;
           seqRef.current = (data.session.chunkCount ?? 0) + 1;
-          if (data.session.draft && (data.session.status === "DRAFTED" || data.session.status === "APPLIED")) {
-            setEditor(data.session.draft);
-            setIncluded(includedFields(data.session.draft));
-          }
+          setMissing(missingLabels(data.session.draft?.missingFields ?? []));
         }
       })
       .catch(() => {
@@ -142,7 +139,7 @@ export function ConsultScribe({
   useEffect(() => {
     return () => {
       recordingRef.current = false;
-      if (segmentTimerRef.current != null) window.clearTimeout(segmentTimerRef.current);
+      if (segmentTimerRef.current != null) window.clearInterval(segmentTimerRef.current);
       if (recorderRef.current?.state === "recording") recorderRef.current.stop();
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
@@ -159,12 +156,7 @@ export function ConsultScribe({
     setTranslation(next.translation ?? "");
     sessionIdRef.current = next.id;
     seqRef.current = (next.chunkCount ?? 0) + 1;
-    if (next.draft && (next.status === "DRAFTED" || next.status === "APPLIED")) {
-      setEditor(next.draft);
-      setIncluded(includedFields(next.draft));
-    } else if (next.status === "RECORDING" || next.status === "TRANSCRIBED") {
-      setEditor(null);
-    }
+    setMissing(missingLabels(next.draft?.missingFields ?? []));
   }
 
   async function sendChunk(blob: Blob) {
@@ -175,6 +167,7 @@ export function ConsultScribe({
     body.set("audio", blob, "consult.webm");
     body.set("sessionId", sessionId);
     body.set("seq", String(seq));
+    body.set("mode", "replace");
     const response = await fetch(`/api/appointments/${appointmentId}/scribe/transcribe`, {
       method: "POST",
       body,
@@ -207,24 +200,34 @@ export function ConsultScribe({
     if (typeof data.session?.translation === "string") setTranslation(data.session.translation);
   }
 
-  function enqueue(blob: Blob) {
+  function enqueue(blob: Blob, final = false) {
     uploadChainRef.current = uploadChainRef.current
       .catch(() => undefined)
       .then(() => sendChunk(blob))
       .catch((reason: unknown) => {
+        const message = reason instanceof Error ? reason.message : "Could not save that part of the conversation.";
+        if (!final && recordingRef.current) {
+          setError(message);
+          return;
+        }
         recordingRef.current = false;
-        if (segmentTimerRef.current != null) window.clearTimeout(segmentTimerRef.current);
+        if (segmentTimerRef.current != null) window.clearInterval(segmentTimerRef.current);
         if (recorderRef.current?.state === "recording") recorderRef.current.stop();
         setLive(false);
-        setError(reason instanceof Error ? reason.message : "Could not save that part of the conversation.");
+        setError(message);
         throw reason;
       });
+  }
+
+  function currentRecording() {
+    return new Blob(partsRef.current, { type: mimeRef.current || "audio/webm" });
   }
 
   function startSegment() {
     const stream = streamRef.current;
     if (!stream || !recordingRef.current) return;
     const mime = recorderMime();
+    partsRef.current = [];
     let rec: MediaRecorder;
     try {
       rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
@@ -236,19 +239,16 @@ export function ConsultScribe({
       return;
     }
     recorderRef.current = rec;
-    const parts: Blob[] = [];
+    mimeRef.current = rec.mimeType || mime || "audio/webm";
     rec.ondataavailable = (event) => {
-      if (event.data.size > 0) parts.push(event.data);
+      if (event.data.size > 0) partsRef.current.push(event.data);
     };
     rec.onstop = () => {
-      const blob = new Blob(parts, { type: rec.mimeType || mime || "audio/webm" });
-      const keepGoing = recordingRef.current;
-      if (failedBlobRef.current) return;
-      if (blob.size > 0) enqueue(blob);
-      if (keepGoing) startSegment();
+      const blob = currentRecording();
+      if (blob.size > 0) enqueue(blob, true);
     };
     try {
-      rec.start();
+      rec.start(1000);
     } catch {
       setError("Could not start recording.");
       recordingRef.current = false;
@@ -256,10 +256,12 @@ export function ConsultScribe({
       stopTracks();
       return;
     }
-    if (segmentTimerRef.current != null) window.clearTimeout(segmentTimerRef.current);
-    segmentTimerRef.current = window.setTimeout(() => {
-      if (rec.state === "recording") rec.stop();
-    }, 8_000);
+    if (segmentTimerRef.current != null) window.clearInterval(segmentTimerRef.current);
+    segmentTimerRef.current = window.setInterval(() => {
+      if (!recordingRef.current || rec.state !== "recording") return;
+      const blob = currentRecording();
+      if (blob.size > 800) enqueue(blob);
+    }, 20_000);
   }
 
   async function beginStream() {
@@ -309,7 +311,7 @@ export function ConsultScribe({
   async function finishUploads() {
     recordingRef.current = false;
     if (segmentTimerRef.current != null) {
-      window.clearTimeout(segmentTimerRef.current);
+      window.clearInterval(segmentTimerRef.current);
       segmentTimerRef.current = null;
     }
     const rec = recorderRef.current;
@@ -347,6 +349,33 @@ export function ConsultScribe({
         return;
       }
       remember(data.session);
+      const draft = data.session.draft;
+      if (!draft) {
+        setError("Nothing clear was heard. Say the complaint, then each medicine with the dose.");
+        return;
+      }
+      const values = draftToAssessment(draft);
+      const patch: ScribeAssessmentPatch = {};
+      for (const key of SCRIBE_ASSESSMENT_KEYS) {
+        if (values[key].trim()) patch[key] = values[key];
+      }
+      if (Object.keys(patch).length === 0) {
+        setError("Nothing clear was heard. Say the complaint, then each medicine with the dose.");
+        setMissing(missingLabels(draft.missingFields ?? []));
+        return;
+      }
+      const applied = await fetch(`/api/appointments/${appointmentId}/scribe/session`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "applied", sessionId, draft }),
+      });
+      const appliedData = (await applied.json().catch(() => ({}))) as { error?: string; session?: SessionView };
+      if (!applied.ok || !appliedData.session) {
+        setError(appliedData.error ?? "Could not fill the assessment.");
+        return;
+      }
+      remember(appliedData.session);
+      onApply?.(patch, fieldsToCheck(draft));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not draft the visit note.");
     } finally {
@@ -385,7 +414,7 @@ export function ConsultScribe({
         return;
       }
       setSession(null);
-      setEditor(null);
+      setMissing([]);
       setTranscript("");
       setTranslation("");
       sessionIdRef.current = null;
@@ -396,56 +425,12 @@ export function ConsultScribe({
     }
   }
 
-  async function applyDraft() {
-    if (!session || !editor) return;
-    setBusy("apply");
-    setError("");
-    try {
-      const response = await fetch(`/api/appointments/${appointmentId}/scribe/session`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "applied", sessionId: session.id, draft: editor }),
-      });
-      const data = (await response.json().catch(() => ({}))) as { error?: string; session?: SessionView };
-      if (!response.ok || !data.session) {
-        setError(data.error ?? "Could not apply the draft.");
-        return;
-      }
-      remember(data.session);
-      const values = draftToAssessment(editor);
-      const patch: ScribeAssessmentPatch = {};
-      for (const key of SCRIBE_ASSESSMENT_KEYS) {
-        if (included[key]) patch[key] = values[key];
-      }
-      const uncertain = fieldsToCheck(editor).filter((key) => included[key]);
-      onApply?.(patch, uncertain);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  function updateMedicine(index: number, patch: Partial<ScribeMedicine>) {
-    setEditor((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        medicines: current.medicines.map((medicine, item) => {
-          if (item !== index) return medicine;
-          const next = { ...medicine, ...patch };
-          if (patch.name != null && patch.name !== medicine.name) next.matched = false;
-          return next;
-        }),
-      };
-    });
-  }
-
   if (hidden || (mode === "view" && (loading || !session || (!session.transcript && !session.translation && !session.draft)))) {
     return null;
   }
 
-  const checks = new Set(editor ? fieldsToCheck(editor) : []);
   const openRecording = session?.status === "RECORDING" || session?.status === "TRANSCRIBED";
-  const showReview = Boolean(editor) && !live && (session?.status === "DRAFTED" || session?.status === "APPLIED");
+  const filled = !live && (session?.status === "APPLIED" || session?.status === "DRAFTED");
 
   const transcriptBlock = (
     <div>
@@ -512,8 +497,7 @@ export function ConsultScribe({
       {!loading && mode === "edit" && !session && configured ? (
         <div className="mt-2 space-y-2">
           <p className="text-[13px] text-text-secondary">
-            Talk with the patient. English wording appears here as you speak, including when the conversation is in another language. Nothing reaches
-            the pharmacy until you approve.
+            Say these in order: complaint, how long, examination, diagnosis, each medicine with the dose and days, advice, then when to come back. The note is written into this assessment. Nothing reaches the pharmacy until you approve.
           </p>
           <label className="flex items-start gap-2 text-[13px] text-text-primary">
             <input
@@ -535,13 +519,16 @@ export function ConsultScribe({
         </div>
       ) : null}
 
-      {!loading && mode === "edit" && session && (live || openRecording) && !showReview ? (
+      {!loading && mode === "edit" && session && (live || openRecording) && !filled ? (
         <div className="mt-2 space-y-2">
           {liveText}
+          <p className="text-[12px] text-text-secondary">
+            Complaint, how long, examination, diagnosis, each medicine with dose and days, advice, then when to come back.
+          </p>
           <div className="flex flex-wrap gap-2">
             {live ? (
               <button type="button" className={compactPrimaryButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>
-                {busy === "draft" ? "Drafting…" : "Stop and draft"}
+                {busy === "draft" ? "Filling the assessment…" : "Stop and fill assessment"}
               </button>
             ) : (
               <>
@@ -549,7 +536,7 @@ export function ConsultScribe({
                   Continue
                 </button>
                 <button type="button" className={compactButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>
-                  {busy === "draft" ? "Drafting…" : "Draft note"}
+                  {busy === "draft" ? "Filling the assessment…" : "Fill assessment"}
                 </button>
               </>
             )}
@@ -567,181 +554,41 @@ export function ConsultScribe({
         </div>
       ) : null}
 
-      {!loading && mode === "edit" && showReview && editor ? (
-        <div className="mt-2 space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-3">
-              <div>
-                <p className="text-[13px] font-semibold text-text-primary">Live translation</p>
-                <div className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-app-bg px-2.5 py-2 text-[13px] text-text-primary">
-                  {translation.trim() || "No translation yet."}
-                </div>
-              </div>
-              {transcriptBlock}
-            </div>
-            <div className="space-y-2">
-              <p className="text-[13px] font-semibold text-text-primary">AI draft</p>
-              {SCRIBE_ASSESSMENT_KEYS.filter((key) => key !== "prescription").map((key) => (
-                <label key={key} className="block text-[11px] font-medium text-text-secondary">
-                  <span className="mb-1 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1">
-                      {FIELD_LABELS[key]}
-                      {checks.has(key) ? (
-                        <span className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800">Check</span>
-                      ) : null}
-                    </span>
-                    <span className="inline-flex items-center gap-1 font-normal">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(included[key])}
-                        onChange={(event) => setIncluded((current) => ({ ...current, [key]: event.target.checked }))}
-                      />
-                      Use
-                    </span>
-                  </span>
-                  {key === "visitOutcome" ? (
-                    <select
-                      className="h-8 w-full rounded-lg border border-border bg-surface px-2 text-sm text-text-primary"
-                      value={editor.outcome}
-                      onChange={(event) =>
-                        setEditor({ ...editor, outcome: event.target.value as ScribeDraft["outcome"] })
-                      }
-                    >
-                      <option value="">Not mentioned</option>
-                      <option value="FOLLOW_UP">Follow up</option>
-                      <option value="DISCHARGE">Discharge</option>
-                    </select>
-                  ) : key === "followUpAt" ? (
-                    <input
-                      className="h-8 w-full rounded-lg border border-border px-2 text-sm text-text-primary"
-                      inputMode="numeric"
-                      placeholder="Days until review"
-                      value={editor.followUpInDays ?? ""}
-                      onChange={(event) => {
-                        const raw = event.target.value.trim();
-                        const days = raw ? Number(raw) : null;
-                        setEditor({
-                          ...editor,
-                          followUpInDays: days != null && Number.isInteger(days) && days > 0 ? days : null,
-                          outcome: editor.outcome || (days ? "FOLLOW_UP" : ""),
-                        });
-                      }}
-                    />
-                  ) : (
-                    <textarea
-                      className="min-h-14 w-full resize-y rounded-lg border border-border px-2 py-1.5 text-sm text-text-primary"
-                      value={draftFieldValue(editor, key)}
-                      placeholder="Not mentioned"
-                      onChange={(event) => setEditor(setDraftField(editor, key, event.target.value))}
-                    />
-                  )}
-                </label>
-              ))}
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <p className="inline-flex items-center gap-1 text-[11px] font-medium text-text-secondary">
-                    Prescription
-                    {checks.has("prescription") ? (
-                      <span className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800">Check</span>
-                    ) : null}
-                  </p>
-                  <label className="inline-flex items-center gap-1 text-[11px] font-normal text-text-secondary">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(included.prescription)}
-                      onChange={(event) =>
-                        setIncluded((current) => ({ ...current, prescription: event.target.checked }))
-                      }
-                    />
-                    Use
-                  </label>
-                </div>
-                {editor.medicines.length === 0 ? (
-                  <p className="text-[13px] text-text-secondary">No medicines mentioned.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {editor.medicines.map((medicine, index) => (
-                      <li key={`${medicine.spokenName}-${index}`} className="rounded-lg border border-border px-2 py-1.5">
-                        <input
-                          className="h-8 w-full rounded-md border border-border px-2 text-sm text-text-primary"
-                          value={medicine.name}
-                          aria-label={`Medicine ${index + 1}`}
-                          onChange={(event) => updateMedicine(index, { name: event.target.value })}
-                        />
-                        <p className="mt-1 text-[11px] text-text-secondary">
-                          {medicineNotes(medicine) || "No dose stated"}
-                          {medicine.matched ? "" : " · Not in catalog"}
-                          {medicine.uncertain ? " · Check" : ""}
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-1 text-[11px] font-medium text-critical"
-                          onClick={() =>
-                            setEditor({
-                              ...editor,
-                              medicines: editor.medicines.filter((_, item) => item !== index),
-                            })
-                          }
-                        >
-                          Remove
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
-          <p className="text-[11px] text-text-secondary">
-            Apply fills the assessment. The pharmacy receives the medicines only when you approve.
+      {!loading && mode === "edit" && filled ? (
+        <div className="mt-2 space-y-2">
+          {liveText}
+          <p className="text-[13px] text-text-secondary">
+            Filled the assessment below. Check those fields, then Approve. The pharmacy is updated only when you approve.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={compactPrimaryButtonClass} disabled={Boolean(busy)} onClick={() => void applyDraft()}>
-              {busy === "apply" ? "Applying…" : "Apply to assessment"}
-            </button>
-            <button type="button" className={compactButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>
-              {busy === "draft" ? "Drafting…" : "Draft again"}
-            </button>
-            {session?.status !== "APPLIED" ? (
+          {missing.length > 0 ? (
+            <p className="text-[13px] text-text-primary">Still to ask: {missing.join(", ")}.</p>
+          ) : null}
+          {session?.status === "DRAFTED" ? (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={compactPrimaryButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>
+                {busy === "draft" ? "Filling the assessment…" : "Fill assessment"}
+              </button>
               <button type="button" className={compactButtonClass} disabled={Boolean(busy)} onClick={() => void discard()}>
                 Discard
               </button>
-            ) : (
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 text-[12px] text-text-secondary">
+                <input type="checkbox" className="mt-0.5" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+                <span>Patient has agreed to record again</span>
+              </label>
               <button type="button" className={compactButtonClass} disabled={Boolean(busy) || !consent} onClick={() => void startRecording()}>
                 Record again
               </button>
-            )}
-          </div>
-          {session?.status === "APPLIED" ? (
-            <label className="flex items-start gap-2 text-[12px] text-text-secondary">
-              <input type="checkbox" className="mt-0.5" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              <span>Patient has agreed to record again</span>
-            </label>
-          ) : null}
+            </div>
+          )}
         </div>
       ) : null}
 
       {error ? <p className="mt-2 text-sm text-critical">{error}</p> : null}
     </section>
   );
-}
-
-function draftFieldValue(draft: ScribeDraft, key: ScribeAssessmentKey) {
-  if (key === "chiefComplaint") return draft.chiefComplaint;
-  if (key === "examination") return draft.examination;
-  if (key === "diagnosis") return draft.diagnoses.join(", ");
-  if (key === "summary") return draft.history;
-  if (key === "advice") return draft.advice;
-  return "";
-}
-
-function setDraftField(draft: ScribeDraft, key: ScribeAssessmentKey, value: string): ScribeDraft {
-  if (key === "chiefComplaint") return { ...draft, chiefComplaint: value };
-  if (key === "examination") return { ...draft, examination: value };
-  if (key === "diagnosis") return { ...draft, diagnoses: value.trim() ? [value] : [] };
-  if (key === "summary") return { ...draft, history: value };
-  if (key === "advice") return { ...draft, advice: value };
-  return draft;
 }
 
 function DraftReadout({ draft }: { draft: ScribeDraft | null }) {
@@ -766,11 +613,4 @@ function outcomeLabel(value: string) {
   if (value === "DISCHARGE") return "Discharged";
   if (value === "FOLLOW_UP") return "Follow up";
   return value;
-}
-
-function includedFields(draft: ScribeDraft) {
-  const values = draftToAssessment(draft);
-  const next: Partial<Record<ScribeAssessmentKey, boolean>> = {};
-  for (const key of SCRIBE_ASSESSMENT_KEYS) next[key] = Boolean(values[key].trim());
-  return next;
 }

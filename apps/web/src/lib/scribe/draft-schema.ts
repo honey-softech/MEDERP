@@ -40,6 +40,7 @@ export type ScribeDraft = {
   followUpInDays: number | null;
   outcome: "FOLLOW_UP" | "DISCHARGE" | "";
   uncertainFields: string[];
+  missingFields?: string[];
 };
 
 const medicineSchema = z
@@ -69,6 +70,7 @@ const draftSchema = z
     followUpInDays: z.number().int().nullable(),
     outcome: z.enum(["FOLLOW_UP", "DISCHARGE", ""]),
     uncertainFields: z.array(z.string()),
+    missingFields: z.array(z.string()).optional(),
   })
   .strict();
 
@@ -126,6 +128,7 @@ export function parseScribeDraft(value: unknown): { ok: true; draft: ScribeDraft
       followUpInDays,
       outcome: raw.outcome,
       uncertainFields: [...uncertain].slice(0, 20),
+      missingFields: [...new Set((raw.missingFields ?? []).map((field) => field.trim()).filter(Boolean))].slice(0, 8),
     },
   };
 }
@@ -202,6 +205,44 @@ const FIELD_ALIASES: Record<string, ScribeAssessmentKey> = {
   outcome: "visitOutcome",
   visitoutcome: "visitOutcome",
 };
+
+const MISSING_LABELS: Record<string, string> = {
+  chiefcomplaint: "chief complaint",
+  complaint: "chief complaint",
+  complaints: "chief complaint",
+  history: "how long and other symptoms",
+  hpi: "how long and other symptoms",
+  summary: "how long and other symptoms",
+  examination: "examination",
+  exam: "examination",
+  diagnosis: "diagnosis",
+  diagnoses: "diagnosis",
+  medicines: "medicines and dose",
+  medicine: "medicines and dose",
+  prescription: "medicines and dose",
+  advice: "advice",
+  followup: "follow-up",
+  followupindays: "follow-up",
+};
+
+const MISSING_ORDER = [
+  "chief complaint",
+  "how long and other symptoms",
+  "examination",
+  "diagnosis",
+  "medicines and dose",
+  "advice",
+  "follow-up",
+];
+
+export function missingLabels(fields: string[]) {
+  const found = new Set<string>();
+  for (const field of fields) {
+    const label = MISSING_LABELS[field.toLowerCase().replace(/[^a-z]/g, "")];
+    if (label) found.add(label);
+  }
+  return MISSING_ORDER.filter((label) => found.has(label));
+}
 
 export function fieldsToCheck(draft: ScribeDraft): ScribeAssessmentKey[] {
   const flags = new Set<ScribeAssessmentKey>();

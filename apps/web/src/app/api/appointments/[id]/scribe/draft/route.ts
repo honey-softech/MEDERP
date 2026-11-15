@@ -34,7 +34,13 @@ export async function POST(request: Request, context: Ctx) {
   }
 
   try {
-    const raw = await draftConsult(session.transcript);
+    const english = session.translation?.trim() ?? "";
+    const original = session.transcript.trim();
+    const combined =
+      english && english !== original
+        ? `English wording:\n${english}\n\nOriginal words:\n${original}`
+        : original;
+    const raw = await draftConsult(combined);
     const parsed = parseScribeDraft(raw);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 502 });

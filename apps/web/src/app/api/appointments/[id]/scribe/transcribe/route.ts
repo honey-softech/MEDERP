@@ -34,6 +34,7 @@ export async function POST(request: Request, context: Ctx) {
   const audio = form?.get("audio");
   const sessionId = String(form?.get("sessionId") ?? "");
   const seq = Number(form?.get("seq"));
+  const replace = String(form?.get("mode") ?? "") === "replace";
   if (!(audio instanceof Blob) || !Number.isInteger(seq) || seq < 1) {
     return NextResponse.json({ error: "Send the next part of the recording." }, { status: 400 });
   }
@@ -88,8 +89,13 @@ export async function POST(request: Request, context: Ctx) {
       if (text && (current.transcript?.length ?? 0) >= SCRIBE_MAX_TRANSCRIPT_CHARS) {
         return { error: "long" as const, session: current };
       }
-      const transcript = joinTranscript(current.transcript, text);
-      const translation = joinTranscript(current.translation, translated || text);
+      const spoken = (translated || text).trim();
+      const transcript = replace
+        ? (text.trim() ? text.trim() : (current.transcript ?? "").trim()).slice(0, SCRIBE_MAX_TRANSCRIPT_CHARS)
+        : joinTranscript(current.transcript, text);
+      const translation = replace
+        ? (spoken ? spoken : (current.translation ?? "").trim()).slice(0, SCRIBE_MAX_TRANSCRIPT_CHARS)
+        : joinTranscript(current.translation, translated || text);
       const updated = await tx.consultScribeSession.update({
         where: { id: current.id },
         data: {

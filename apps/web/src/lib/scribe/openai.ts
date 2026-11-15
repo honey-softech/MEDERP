@@ -6,19 +6,24 @@ const OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
 
 const SYSTEM_PROMPT = `You convert an outpatient consultation transcript into a structured visit note for a doctor in India.
 
+The doctor speaks in this order when they can: chief complaint, how long and associated symptoms, examination, diagnosis, each medicine with strength and timing, advice, then follow-up.
+
 Rules:
 - Write clear English clinical wording, even when the conversation is in another language or a mix of languages.
 - Use only facts stated in the transcript. Never invent symptoms, findings, diagnoses, medicines, doses, durations, or advice.
-- Leave a field empty when it was not mentioned: empty string, empty array, or null.
-- chiefComplaint is a short list of the patient's complaints.
-- history is the history of the present illness: onset, duration, and associated symptoms.
-- examination is only what the doctor actually observed or said they found.
-- diagnoses are short labels the doctor stated or clearly concluded.
-- medicines: name as spoken. morning, afternoon, and night are true only when a dose at that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. Set uncertain true when the name or dose is unclear.
+- Do not drop a spoken complaint, diagnosis, medicine name, strength, or dose. If the dose was not said, still keep the medicine and set uncertain true.
+- When both an English wording and the original words are given, keep any symptom, medicine, strength, or dose that appears in either. If they disagree, trust the original words.
+- Leave a field empty only when that topic was never spoken.
+- Put every topic that was never spoken into missingFields. Use only these names: chiefComplaint, history, examination, diagnosis, medicines, advice, followUp.
+- chiefComplaint is the patient's complaints, separated by commas.
+- history is onset, duration, and associated symptoms.
+- examination is only what the doctor said they found.
+- diagnoses are the labels the doctor stated.
+- medicines: keep the spoken name and strength. morning, afternoon, and night are true only when that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. Set uncertain true when the name or dose is unclear.
 - advice is what the doctor told the patient to do.
 - outcome is FOLLOW_UP when a review was asked, DISCHARGE when the patient was discharged, otherwise an empty string.
 - followUpInDays is the number of days until review, or null.
-- Add the field name to uncertainFields when you are not confident. Use these names only: chiefComplaint, history, examination, diagnosis, medicines, advice, followUp, outcome.`;
+- Add a field name to uncertainFields only when a word was spoken but the dose or name is unclear. Use these names only: chiefComplaint, history, examination, diagnosis, medicines, advice, followUp, outcome.`;
 
 const CONSULT_DRAFT_JSON_SCHEMA = {
   type: "object",
@@ -33,6 +38,7 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
     "followUpInDays",
     "outcome",
     "uncertainFields",
+    "missingFields",
   ],
   properties: {
     chiefComplaint: { type: "string" },
@@ -72,6 +78,7 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
     followUpInDays: { type: ["integer", "null"] },
     outcome: { type: "string", enum: ["FOLLOW_UP", "DISCHARGE", ""] },
     uncertainFields: { type: "array", items: { type: "string" } },
+    missingFields: { type: "array", items: { type: "string" } },
   },
 } as const;
 
@@ -123,7 +130,7 @@ export async function transcribeAudio(input: { bytes: Uint8Array; mime: string }
   body.set("file", new File([copy], audioFilename(mime), { type: mime }));
   body.set("model", transcribeModel());
   body.set("response_format", "json");
-  body.set("prompt", "Outpatient consultation. Symptoms, examination, diagnosis, medicine names, and doses.");
+  body.set("prompt", "Outpatient visit. Keep every symptom, medicine name, strength, and dose.");
 
   let response: Response;
   try {
@@ -168,9 +175,9 @@ export async function translateUtterance(text: string): Promise<string> {
           {
             role: "system",
             content:
-              "You translate one fragment of a doctor-patient conversation into clear English. Keep names, symptoms, doses, and timing. Do not add anything that was not said. If the fragment is already English, return it unchanged. Return only the English text.",
+              "Translate this outpatient consultation into clear English. Keep every symptom, diagnosis, medicine name, strength, and dose exactly. Do not summarise and do not add anything that was not said. If it is already English, return it unchanged. Return only the English text.",
           },
-          { role: "user", content: source.slice(0, 4_000) },
+          { role: "user", content: source.slice(0, 12_000) },
         ],
       }),
       signal: AbortSignal.timeout(20_000),

@@ -5,6 +5,7 @@ import {
   draftToAssessment,
   fieldsToCheck,
   medicineNotes,
+  missingLabels,
   parseScribeDraft,
   prescriptionFromDraft,
   resolveAiAssisted,
@@ -105,6 +106,14 @@ describe("scribe draft", () => {
 
   it("does not write both before-food and after-food on one line", () => {
     expect(medicineNotes(medicine({ beforeFood: true, afterFood: true }))).toBe("1-0-1 for 5 days");
+  });
+
+  it("lists unheard topics in the order the doctor should ask them", () => {
+    expect(missingLabels(["followUp", "medicines", "chiefComplaint", "not-a-field"])).toEqual([
+      "chief complaint",
+      "medicines and dose",
+      "follow-up",
+    ]);
   });
 
   it("flags the history and any uncertain medicine for the doctor to check", () => {

@@ -12,7 +12,7 @@ import {
   type ScribeAssessmentPatch,
   type ScribeDraft,
 } from "@/lib/scribe/draft-schema";
-import { requestInstalledMicrophone, runningInInstalledApp } from "@/lib/native-app-session";
+import { openInstalledSettings, runningInInstalledApp } from "@/lib/native-app-session";
 import { SCRIBE_MAX_RECORDING_MS } from "@/lib/scribe/limits";
 import {
   isSpeechLevel,
@@ -62,7 +62,9 @@ function formatElapsed(ms: number) {
 function micMessage(error: unknown) {
   if (error instanceof Error && error.message.startsWith("This browser")) return error.message;
   if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
-    return "Allow the microphone to record the consultation.";
+    return runningInInstalledApp()
+      ? "The microphone is off for MedERP. Turn it on in Settings, then record again."
+      : "Allow the microphone to record the consultation.";
   }
   return "Could not use the microphone.";
 }
@@ -368,14 +370,6 @@ export function ConsultScribe({
   async function startRecording() {
     setError("");
     setBusy("start");
-    if (runningInInstalledApp()) {
-      const allowed = await requestInstalledMicrophone();
-      if (!allowed) {
-        setBusy("");
-        setError("Allow the microphone to record the consultation.");
-        return;
-      }
-    }
     const micReady = openMicrophone().then(
       (stream) => stream,
       (reason: unknown) => reason,
@@ -410,13 +404,6 @@ export function ConsultScribe({
 
   async function continueRecording() {
     setError("");
-    if (runningInInstalledApp()) {
-      const allowed = await requestInstalledMicrophone();
-      if (!allowed) {
-        setError("Allow the microphone to record the consultation.");
-        return;
-      }
-    }
     await beginStream();
   }
 
@@ -719,9 +706,18 @@ export function ConsultScribe({
                 <input type="checkbox" className="mt-0.5" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
                 <span>Patient has agreed to record again</span>
               </label>
+              {!consent ? (
+                <p className="text-[13px] text-text-primary">Tick the agreement, then Record again.</p>
+              ) : null}
               <button type="button" className={compactButtonClass} disabled={Boolean(busy) || !consent} onClick={() => void startRecording()}>
-                Record again
+                {busy === "start" ? "Starting…" : "Record again"}
               </button>
+              {error ? <p className="text-sm text-critical">{error}</p> : null}
+              {error && runningInInstalledApp() ? (
+                <button type="button" className={compactButtonClass} onClick={openInstalledSettings}>
+                  Open Settings
+                </button>
+              ) : null}
             </div>
           )}
         </div>

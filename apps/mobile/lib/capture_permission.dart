@@ -12,6 +12,15 @@ bool isMicrophoneRequest(String raw) {
   }
 }
 
+bool isOpenSettingsRequest(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    return decoded is Map && decoded['type'] == 'open-settings';
+  } catch (_) {
+    return false;
+  }
+}
+
 const _channel = MethodChannel('mederp/capture');
 
 /// Shows the iOS microphone or camera alert and waits for the answer.

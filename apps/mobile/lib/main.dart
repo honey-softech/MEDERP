@@ -91,7 +91,11 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             return;
           }
           if (isMicrophoneRequest(raw)) {
-            unawaited(_answerMicrophoneRequest());
+            unawaited(requestIosCapture('microphone'));
+            return;
+          }
+          if (isOpenSettingsRequest(raw)) {
+            unawaited(requestIosCapture('open-settings'));
             return;
           }
           final sessionAction = nativeSessionAction(raw);
@@ -149,15 +153,6 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
     });
     SystemNotifications.ensureReady().catchError((_) {});
     PushNotifications.start(webView: _controller).catchError((_) {});
-  }
-
-  Future<void> _answerMicrophoneRequest() async {
-    final granted = await requestIosCapture('microphone');
-    try {
-      await _controller.runJavaScript(
-        'window.__mederpMic && window.__mederpMic(${granted ? 'true' : 'false'})',
-      );
-    } catch (_) {}
   }
 
   void _allowCaptureAfterIosPrompt(PlatformWebViewPermissionRequest request) {

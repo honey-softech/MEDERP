@@ -23,6 +23,15 @@ import UIKit
         return
       }
       let kind = call.arguments as? String ?? ""
+      if kind == "open-settings" {
+        result(true)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+          DispatchQueue.main.async {
+            UIApplication.shared.open(url)
+          }
+        }
+        return
+      }
       if kind != "camera" {
         askForMicrophone(result)
         return
@@ -47,8 +56,11 @@ private var microphoneAsking = false
 /// One system alert, shared by the page and the web view.
 /// The website prompt from the simulator does not appear on an installed iPhone.
 private func askForMicrophone(_ result: @escaping FlutterResult) {
-  let session = AVAudioSession.sharedInstance()
-  switch session.recordPermission {
+  if !Thread.isMainThread {
+    DispatchQueue.main.async { askForMicrophone(result) }
+    return
+  }
+  switch microphonePermission() {
   case .granted:
     activateRecordSession()
     result(true)
@@ -58,7 +70,14 @@ private func askForMicrophone(_ result: @escaping FlutterResult) {
     microphoneWaiters.append(result)
     if microphoneAsking { return }
     microphoneAsking = true
-    session.requestRecordPermission { granted in
+    // The category has to be set before the alert, or a phone shows nothing.
+    let session = AVAudioSession.sharedInstance()
+    try? session.setCategory(
+      .playAndRecord,
+      mode: .default,
+      options: [.defaultToSpeaker, .allowBluetoothHFP]
+    )
+    let finish: (Bool) -> Void = { granted in
       DispatchQueue.main.async {
         microphoneAsking = false
         if granted {
@@ -69,9 +88,28 @@ private func askForMicrophone(_ result: @escaping FlutterResult) {
         waiters.forEach { $0(granted) }
       }
     }
+    if #available(iOS 17.0, *) {
+      AVAudioApplication.requestRecordPermission(completionHandler: finish)
+    } else {
+      session.requestRecordPermission(finish)
+    }
   @unknown default:
     result(false)
   }
+}
+
+private func microphonePermission() -> AVAudioSession.RecordPermission {
+  if #available(iOS 17.0, *) {
+    switch AVAudioApplication.shared.recordPermission {
+    case .granted:
+      return .granted
+    case .denied:
+      return .denied
+    default:
+      return .undetermined
+    }
+  }
+  return AVAudioSession.sharedInstance().recordPermission
 }
 
 /// WebKit opens the microphone as soon as the page is allowed to record.

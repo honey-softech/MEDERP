@@ -24,6 +24,8 @@ void main() {
     expect(isMicrophoneRequest('{"type":"microphone"}'), isTrue);
     expect(isMicrophoneRequest('{"type":"signed-in"}'), isFalse);
     expect(isMicrophoneRequest('not json'), isFalse);
+    expect(isOpenSettingsRequest('{"type":"open-settings"}'), isTrue);
+    expect(isOpenSettingsRequest('{"type":"microphone"}'), isFalse);
   });
 
   test('capture permission stays off outside iOS', () async {

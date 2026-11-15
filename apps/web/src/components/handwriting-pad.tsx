@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   HANDWRITING_MAX_PAGE_CHARS,
   HANDWRITING_MAX_PAGES,
@@ -26,6 +26,16 @@ const SIZES = [
 
 const EXPORT_WIDTH = 1200;
 
+function prefersPen() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /iPad/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function subscribePenDefault() {
+  return () => undefined;
+}
+
 function newPage(base: string | null = null): PageModel {
   return { id: Math.random().toString(36).slice(2, 10), base, strokes: [] };
 }
@@ -41,25 +51,36 @@ function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, width: number
   const boost = stroke.tool === "eraser" ? 8 : 1;
   const points = stroke.points;
 
-  const paintSegment = (from: Point, to: Point) => {
-    const pressure = ((from.p > 0 ? from.p : 0.5) + (to.p > 0 ? to.p : 0.5)) / 2;
-    ctx.beginPath();
-    ctx.lineWidth = stroke.size * (0.45 + pressure) * scale * boost;
-    ctx.moveTo(from.x * width, from.y * height);
-    const midX = ((from.x + to.x) / 2) * width;
-    const midY = ((from.y + to.y) / 2) * height;
-    ctx.quadraticCurveTo(from.x * width, from.y * height, midX, midY);
-    ctx.stroke();
+  const widthFor = (point: Point) => {
+    const pressure = point.p > 0 ? point.p : 0.5;
+    return stroke.size * (0.55 + pressure * 0.7) * scale * boost;
   };
 
   if (points.length === 1) {
     const point = points[0];
-    paintSegment(point, { ...point, x: Math.min(1, point.x + 0.0008) });
-  } else {
-    for (let index = 1; index < points.length; index += 1) {
-      paintSegment(points[index - 1], points[index]);
-    }
+    ctx.beginPath();
+    ctx.lineWidth = widthFor(point);
+    ctx.moveTo(point.x * width, point.y * height);
+    ctx.lineTo(point.x * width + 0.4, point.y * height);
+    ctx.stroke();
+    ctx.restore();
+    return;
   }
+
+  ctx.beginPath();
+  ctx.lineWidth = widthFor(points[0]);
+  ctx.moveTo(points[0].x * width, points[0].y * height);
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const current = points[index];
+    const next = points[index + 1];
+    ctx.lineWidth = widthFor(current);
+    const midX = ((current.x + next.x) / 2) * width;
+    const midY = ((current.y + next.y) / 2) * height;
+    ctx.quadraticCurveTo(current.x * width, current.y * height, midX, midY);
+  }
+  const last = points[points.length - 1];
+  ctx.lineTo(last.x * width, last.y * height);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -132,7 +153,9 @@ export function HandwritingPad({
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState<string>(COLORS[0].value);
   const [size, setSize] = useState<number>(SIZES[1].value);
-  const [penOnly, setPenOnly] = useState(false);
+  const tabletPen = useSyncExternalStore(subscribePenDefault, prefersPen, () => false);
+  const [penOnlyChoice, setPenOnlyChoice] = useState<boolean | null>(null);
+  const penOnly = penOnlyChoice ?? tabletPen;
   const [revision, setRevision] = useState(0);
 
   onChangeRef.current = onChange;
@@ -188,6 +211,20 @@ export function HandwritingPad({
   }
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const block = (event: Event) => event.preventDefault();
+    canvas.addEventListener("touchstart", block, { passive: false });
+    canvas.addEventListener("touchmove", block, { passive: false });
+    canvas.addEventListener("gesturestart", block);
+    return () => {
+      canvas.removeEventListener("touchstart", block);
+      canvas.removeEventListener("touchmove", block);
+      canvas.removeEventListener("gesturestart", block);
+    };
+  }, [pageIndex]);
+
+  useEffect(() => {
     for (const page of pagesRef.current) {
       if (page.base) rememberImage(page.base);
     }
@@ -201,20 +238,39 @@ export function HandwritingPad({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageCount]);
 
-  function pointFromEvent(event: React.PointerEvent<HTMLCanvasElement>): Point {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const pressure = event.pointerType === "mouse" ? 0.5 : event.pressure || 0.5;
+  function pointFromClient(target: HTMLCanvasElement, clientX: number, clientY: number, pointerType: string, pressure: number): Point {
+    const rect = target.getBoundingClientRect();
+    const inkPressure = pointerType === "mouse" ? 0.5 : pressure || 0.5;
     return {
-      x: rect.width ? Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) : 0,
-      y: rect.height ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)) : 0,
-      p: pressure,
+      x: rect.width ? Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) : 0,
+      y: rect.height ? Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)) : 0,
+      p: inkPressure,
     };
   }
 
+  function samplesFrom(event: React.PointerEvent<HTMLCanvasElement>): Point[] {
+    const native = event.nativeEvent;
+    const coalesced = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [native];
+    return coalesced.map((sample) =>
+      pointFromClient(event.currentTarget, sample.clientX, sample.clientY, sample.pointerType, sample.pressure),
+    );
+  }
+
+  function isPalm(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType === "pen") {
+      sawPenRef.current = true;
+      return false;
+    }
+    if (event.pointerType !== "touch") return false;
+    return penOnlyRef.current || sawPenRef.current;
+  }
+
   function onPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (penOnlyRef.current && event.pointerType === "touch") return;
-    if (event.pointerType === "touch" && sawPenRef.current) return;
-    if (event.pointerType === "pen") sawPenRef.current = true;
+    if (isPalm(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const page = pagesRef.current[indexRef.current];
     if (!page) return;
     event.preventDefault();
@@ -225,17 +281,23 @@ export function HandwritingPad({
       tool: toolRef.current,
       color: colorRef.current,
       size: sizeRef.current,
-      points: [pointFromEvent(event)],
+      points: samplesFrom(event),
     });
     paint();
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (isPalm(event)) {
+      event.preventDefault();
+      return;
+    }
     if (!paintingRef.current || event.pointerId !== activePointerRef.current) return;
     const page = pagesRef.current[indexRef.current];
     const stroke = page?.strokes[page.strokes.length - 1];
     if (!stroke) return;
-    stroke.points.push(pointFromEvent(event));
+    const samples = samplesFrom(event);
+    if (samples.length === 0) return;
+    stroke.points.push(...samples);
     paint();
   }
 
@@ -296,7 +358,11 @@ export function HandwritingPad({
     }`;
 
   return (
-    <div className="space-y-2">
+    <div
+      className="handwriting-pad space-y-2 select-none"
+      style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <div className="flex flex-wrap items-center gap-1.5">
         <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
           <button type="button" className={toolButton(tool === "pen")} onClick={() => setTool("pen")}>
@@ -344,7 +410,7 @@ export function HandwritingPad({
           type="button"
           aria-pressed={penOnly}
           className={toolButton(penOnly)}
-          onClick={() => setPenOnly((value) => !value)}
+          onClick={() => setPenOnlyChoice((value) => !(value ?? penOnly))}
         >
           Pen only
         </button>
@@ -378,16 +444,20 @@ export function HandwritingPad({
 
       <div
         ref={wrapRef}
-        className="overflow-hidden rounded-lg border border-[#c8c8c8] bg-white"
+        className="touch-none overflow-hidden rounded-lg border border-[#c8c8c8] bg-white"
         style={{
           aspectRatio: "210 / 297",
-          backgroundImage: "repeating-linear-gradient(to bottom, transparent, transparent 27px, #eceae6 28px)",
+          backgroundImage: "linear-gradient(to bottom, transparent 30px, #c8c8c8 30px, #c8c8c8 31.5px)",
+          backgroundSize: "100% 32px",
+          backgroundRepeat: "repeat",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
         }}
       >
         <canvas
           ref={canvasRef}
           aria-label={`Handwriting page ${pageIndex + 1}`}
-          className="h-full w-full touch-none"
+          className="h-full w-full touch-none select-none"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={finishStroke}
@@ -395,7 +465,9 @@ export function HandwritingPad({
         />
       </div>
       <p className="text-[11px] text-text-secondary">
-        Write with a stylus, finger, or mouse. Pen only ignores a resting palm. Lines on the page are a guide and are not saved.
+        {penOnly
+          ? "Pen only is on, so a resting palm is ignored. Turn it off to write with a finger. Lines are a guide and are not saved."
+          : "Write with a stylus, finger, or mouse. Turn on Pen only to ignore a resting palm. Lines are a guide and are not saved."}
       </p>
     </div>
   );

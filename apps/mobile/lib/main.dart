@@ -170,20 +170,36 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       return;
     }
     unawaited(() async {
-      try {
-        if (microphone && !await requestIosCapture('microphone')) {
-          await request.deny();
-          return;
-        }
-        if (camera && !await requestIosCapture('camera')) {
-          await request.deny();
-          return;
-        }
-        await request.grant();
-      } catch (_) {
+      var settled = false;
+      Future<void> deny() async {
+        if (settled) return;
+        settled = true;
         try {
           await request.deny();
         } catch (_) {}
+      }
+      Future<void> grant() async {
+        if (settled) return;
+        settled = true;
+        try {
+          await request.grant();
+        } catch (_) {
+          settled = false;
+          await deny();
+        }
+      }
+      try {
+        if (microphone && !await requestIosCapture('microphone')) {
+          await deny();
+          return;
+        }
+        if (camera && !await requestIosCapture('camera')) {
+          await deny();
+          return;
+        }
+        await grant();
+      } catch (_) {
+        await deny();
       }
     }());
   }

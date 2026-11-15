@@ -180,6 +180,7 @@ export function ConsultScribe({
         analyser.getByteTimeDomainData(samples);
         if (isSpeechLevel(rmsFromSamples(samples))) lastSpeechAtRef.current = now;
       }
+      if (runningInInstalledApp()) return;
       if (silencePromptDue(now - lastSpeechAtRef.current, false)) {
         silenceAskRef.current = true;
         silenceAskedAtRef.current = now;
@@ -211,6 +212,23 @@ export function ConsultScribe({
     const audio = audioContextRef.current;
     audioContextRef.current = null;
     void audio?.close();
+  }
+
+  async function releaseCapture() {
+    recordingRef.current = false;
+    const rec = recorderRef.current;
+    recorderRef.current = null;
+    if (rec && rec.state !== "inactive") {
+      await new Promise<void>((resolve) => {
+        rec.addEventListener("stop", () => resolve(), { once: true });
+        try {
+          rec.stop();
+        } catch {
+          resolve();
+        }
+      });
+    }
+    stopTracks();
   }
 
   function remember(next: SessionView) {
@@ -348,20 +366,24 @@ export function ConsultScribe({
     lastSpeechAtRef.current = startedAtRef.current;
     setLive(true);
     setElapsed(0);
-    try {
-      const audioWindow = window.AudioContext;
-      if (audioWindow) {
-        const audio = new audioWindow();
-        const source = audio.createMediaStreamSource(streamRef.current);
-        const analyser = audio.createAnalyser();
-        analyser.fftSize = 2048;
-        source.connect(analyser);
-        audioContextRef.current = audio;
-        analyserRef.current = analyser;
-        void audio.resume();
+    // The installed app records with MediaRecorder only. An AudioContext on the
+    // same capture stream makes WKWebView quit.
+    if (!runningInInstalledApp()) {
+      try {
+        const audioWindow = window.AudioContext;
+        if (audioWindow) {
+          const audio = new audioWindow();
+          const source = audio.createMediaStreamSource(streamRef.current);
+          const analyser = audio.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+          audioContextRef.current = audio;
+          analyserRef.current = analyser;
+          void audio.resume();
+        }
+      } catch {
+        // Recording continues when the silence meter cannot start.
       }
-    } catch {
-      // Recording continues when the silence meter cannot start.
     }
     startSegment();
     return true;
@@ -404,6 +426,7 @@ export function ConsultScribe({
 
   async function continueRecording() {
     setError("");
+    await releaseCapture();
     await beginStream();
   }
 

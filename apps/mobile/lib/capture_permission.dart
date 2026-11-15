@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -30,7 +31,9 @@ const _channel = MethodChannel('mederp/capture');
 Future<bool> requestIosCapture(String kind) async {
   if (!Platform.isIOS) return false;
   try {
-    final granted = await _channel.invokeMethod<bool>('request', kind);
+    final granted = await _channel
+        .invokeMethod<bool>('request', kind)
+        .timeout(const Duration(seconds: 30));
     return granted == true;
   } catch (_) {
     return false;

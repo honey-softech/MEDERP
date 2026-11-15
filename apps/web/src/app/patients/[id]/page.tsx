@@ -56,6 +56,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
               summary: true,
               followUpAt: true,
               approvedAt: true,
+              entryMode: true,
             },
           },
           labOrders: {

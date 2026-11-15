@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
 import { formatClinicDate } from "@/lib/clinic-time";
 import { printClock } from "@/lib/print-document-pdf";
+import { readHandwritingPages } from "@/lib/handwriting";
 import { ageGenderLine, encounterNumber, generalExaminationRows, visitDateLabel } from "@/lib/visit-summary";
 import { visitLetterhead, visitSignatureImage } from "@/lib/issued-document";
 import { resolveReturnVisit } from "@/lib/appointments/return-visit-lookup";
@@ -145,6 +146,8 @@ export default async function VisitSummaryPage({
         signatureImage={visitSignatureImage(appointment.assessment)}
         signatureName={printableDoctorLabel(appointment.assessment.approvedByDisplayName)}
         signatureCredentials={appointment.assessment.approvedByCredentials}
+        entryMode={appointment.assessment.entryMode}
+        handwritingPages={readHandwritingPages(appointment.assessment.handwritingPages)}
       />
       </div>
     </AppShell>

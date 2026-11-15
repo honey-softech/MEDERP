@@ -972,6 +972,10 @@ model VisitAssessment {
   advice               String?
   visitOutcome         String?
   followUpAt           DateTime?
+  /** TYPED uses the structured fields. HANDWRITTEN stores ink pages. */
+  entryMode            String                @default("TYPED")
+  /** JSON array of transparent PNG data URLs, one per handwritten page. */
+  handwritingPages     String?               @db.Text
   status               VisitAssessmentStatus @default(DRAFT)
   approvedAt           DateTime?
   approvedByUserId     String?

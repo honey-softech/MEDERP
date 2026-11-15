@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BloodTestPicker } from "@/components/blood-test-picker";
+import { HandwritingPad } from "@/components/handwriting-pad";
 import { PrescriptionBuilder } from "@/components/prescription-builder";
 import { ExpandToggle } from "@/components/expand-toggle";
+import { VisitSheetHeader, type VisitSheetHeaderProps } from "@/components/visit-sheet-header";
 import {
   fieldClass,
   textareaClass,
@@ -15,7 +17,42 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/auth-shell";
+import type { AssessmentEntryMode } from "@/lib/handwriting";
+import { approveBlockReason } from "@/lib/handwriting";
 import type { InvestigationPick } from "@/lib/lab-catalog";
+
+const ENTRY_MODE_KEY = "mederp.assessment.entryMode";
+const ENTRY_MODE_EVENT = "mederp-entry-mode";
+
+function readStoredEntryMode(): AssessmentEntryMode {
+  try {
+    return window.localStorage.getItem(ENTRY_MODE_KEY) === "HANDWRITTEN" ? "HANDWRITTEN" : "TYPED";
+  } catch {
+    return "TYPED";
+  }
+}
+
+function subscribeEntryMode(onStoreChange: () => void) {
+  window.addEventListener(ENTRY_MODE_EVENT, onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+  return () => {
+    window.removeEventListener(ENTRY_MODE_EVENT, onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+}
+
+function draftBody(snapshot: string) {
+  const parsed = JSON.parse(snapshot) as {
+    values: AssessmentValues;
+    investigations: InvestigationPick[];
+    handwritingPages: string[];
+  };
+  return JSON.stringify({
+    values: parsed.values,
+    investigations: parsed.investigations,
+    handwritingPages: parsed.handwritingPages,
+  });
+}
 
 export type AssessmentValues = {
   chiefComplaint: string;
@@ -92,8 +129,13 @@ function addDaysIso(days: number) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
-function serializeDraft(values: AssessmentValues, investigations: InvestigationPick[]) {
-  return JSON.stringify({ values, investigations });
+function serializeDraft(
+  values: AssessmentValues,
+  investigations: InvestigationPick[],
+  entryMode: AssessmentEntryMode,
+  handwritingPages: string[],
+) {
+  return JSON.stringify({ values, investigations, entryMode, handwritingPages });
 }
 
 export function ConsultAssessmentForm({
@@ -118,6 +160,9 @@ export function ConsultAssessmentForm({
   allergies = null,
   currentMedications = null,
   nextAppointmentId = null,
+  initialEntryMode = null,
+  initialHandwritingPages = [],
+  sheet = null,
   children,
 }: {
   appointmentId: string;
@@ -144,6 +189,11 @@ export function ConsultAssessmentForm({
   currentMedications?: string | null;
   /** Next patient in today's queue. Ctrl/Cmd+Enter approves and opens this visit. */
   nextAppointmentId?: string | null;
+  /** Saved mode when this visit already has an assessment. Null remembers the doctor's last choice. */
+  initialEntryMode?: AssessmentEntryMode | null;
+  initialHandwritingPages?: string[];
+  /** Letterhead, identity, and vitals already printed on the handwritten sheet. */
+  sheet?: VisitSheetHeaderProps | null;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -173,6 +223,14 @@ export function ConsultAssessmentForm({
   const [investigations, setInvestigations] = useState<InvestigationPick[]>(
     initialInvestigations ?? initialTestIds.map((testId) => ({ testId })),
   );
+  const [chosenMode, setChosenMode] = useState<AssessmentEntryMode | null>(initialEntryMode);
+  const rememberedMode = useSyncExternalStore<AssessmentEntryMode>(
+    subscribeEntryMode,
+    readStoredEntryMode,
+    () => "TYPED",
+  );
+  const entryMode = chosenMode ?? rememberedMode;
+  const [handwritingPages, setHandwritingPages] = useState<string[]>(initialHandwritingPages);
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
   const [saved, setSaved] = useState(canPreview);
@@ -203,10 +261,7 @@ export function ConsultAssessmentForm({
   const approveAfterOutcomeRef = useRef(false);
 
   useEffect(() => {
-    if (!testsMountId || typeof document === "undefined") {
-      setTestsMountEl(null);
-      return;
-    }
+    if (!testsMountId) return;
     const mq = window.matchMedia("(min-width: 640px)");
     function resolve() {
       const desktop = document.getElementById("visit-tests-mount");
@@ -221,25 +276,36 @@ export function ConsultAssessmentForm({
 
   const valuesRef = useRef(values);
   const investigationsRef = useRef(investigations);
-  const lastSavedRef = useRef(serializeDraft(values, investigations));
+  const entryModeRef = useRef(entryMode);
+  const handwritingRef = useRef(handwritingPages);
+  const lastSavedRef = useRef(serializeDraft(values, investigations, entryMode, handwritingPages));
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveSeqRef = useRef(0);
   const mountedRef = useRef(true);
   const inFlightSaveRef = useRef<Promise<boolean> | null>(null);
-  valuesRef.current = values;
-  investigationsRef.current = investigations;
+  useEffect(() => {
+    valuesRef.current = values;
+    investigationsRef.current = investigations;
+    entryModeRef.current = entryMode;
+    handwritingRef.current = handwritingPages;
+  }, [values, investigations, entryMode, handwritingPages]);
 
   const complaintChips = useMemo(() => parseChips(values.chiefComplaint), [values.chiefComplaint]);
   const diagnosisChips = useMemo(() => parseChips(values.diagnosis), [values.diagnosis]);
 
-  const needsDiagnosis = !values.diagnosis.trim();
+  const needsDiagnosis = entryMode === "TYPED" && !values.diagnosis.trim();
   const showDiagnosisError = needsDiagnosis && (diagnosisTouched || approveAttempted);
 
   const missingForApprove = useMemo(() => {
     const missing: string[] = [];
-    if (needsDiagnosis) missing.push("diagnosis");
+    const blocked = approveBlockReason({
+      entryMode,
+      diagnosis: values.diagnosis,
+      handwritingPages,
+    });
+    if (blocked) missing.push(entryMode === "HANDWRITTEN" ? "handwritten note" : "diagnosis");
     return missing;
-  }, [needsDiagnosis]);
+  }, [entryMode, handwritingPages, values.diagnosis]);
 
   const requiredFieldClass = "border-critical bg-critical-bg/40 ring-1 ring-critical/40";
 
@@ -283,15 +349,24 @@ export function ConsultAssessmentForm({
 
     const snapshotValues = valuesRef.current;
     const snapshotInvestigations = investigationsRef.current;
-    const snapshot = serializeDraft(snapshotValues, snapshotInvestigations);
+    const snapshotMode = entryModeRef.current;
+    const snapshotPages = handwritingRef.current;
+    const snapshot = serializeDraft(snapshotValues, snapshotInvestigations, snapshotMode, snapshotPages);
     if (action === "save" && snapshot === lastSavedRef.current) return true;
 
     if (action === "approve") {
-      if (!snapshotValues.diagnosis.trim()) {
+      const blocked = approveBlockReason({
+        entryMode: snapshotMode,
+        diagnosis: snapshotValues.diagnosis,
+        handwritingPages: snapshotPages,
+      });
+      if (blocked) {
         setApproveAttempted(true);
-        setError("Add a diagnosis before approving.");
-        diagnosisInputRef.current?.focus();
-        diagnosisInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+        setError(blocked);
+        if (snapshotMode === "TYPED") {
+          diagnosisInputRef.current?.focus();
+          diagnosisInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
         return false;
       }
     }
@@ -305,11 +380,18 @@ export function ConsultAssessmentForm({
     }
 
     const run = (async () => {
+      const payload = JSON.stringify({
+        action,
+        ...snapshotValues,
+        investigations: snapshotInvestigations,
+        entryMode: snapshotMode,
+        handwritingPages: snapshotPages,
+      });
       const response = await fetch(`/api/appointments/${appointmentId}/assessment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ...snapshotValues, investigations: snapshotInvestigations }),
-        keepalive: action === "save",
+        body: payload,
+        keepalive: action === "save" && payload.length < 60_000,
       });
       const raw = await response.text();
       let data: { error?: string } = {};
@@ -339,7 +421,12 @@ export function ConsultAssessmentForm({
       setError("");
       if (action === "save") {
         setDraftStatus("saved");
-        const latest = serializeDraft(valuesRef.current, investigationsRef.current);
+        const latest = serializeDraft(
+          valuesRef.current,
+          investigationsRef.current,
+          entryModeRef.current,
+          handwritingRef.current,
+        );
         if (latest !== snapshot) scheduleDraftSave();
         return true;
       }
@@ -381,15 +468,29 @@ export function ConsultAssessmentForm({
   }, []);
 
   useEffect(() => {
-    const snapshot = serializeDraft(values, investigations);
+    const snapshot = serializeDraft(values, investigations, entryMode, handwritingPages);
     if (snapshot === lastSavedRef.current) return;
+    // Applying the doctor's remembered mode is not an edit, so it must not create a draft.
+    if (
+      !initialEntryMode &&
+      chosenMode === null &&
+      draftBody(snapshot) === draftBody(lastSavedRef.current)
+    ) {
+      lastSavedRef.current = snapshot;
+      return;
+    }
     setDraftStatus("saving");
     scheduleDraftSave();
-  }, [values, investigations]);
+  }, [values, investigations, entryMode, handwritingPages, initialEntryMode, chosenMode]);
 
   useEffect(() => {
     function flush() {
-      const snapshot = serializeDraft(valuesRef.current, investigationsRef.current);
+      const snapshot = serializeDraft(
+        valuesRef.current,
+        investigationsRef.current,
+        entryModeRef.current,
+        handwritingRef.current,
+      );
       if (snapshot === lastSavedRef.current) return;
       void persist("save");
     }
@@ -436,13 +537,31 @@ export function ConsultAssessmentForm({
     if (match) setOfferedTemplate(match);
   }
 
+  function chooseEntryMode(mode: AssessmentEntryMode) {
+    entryModeRef.current = mode;
+    setChosenMode(mode);
+    try {
+      window.localStorage.setItem(ENTRY_MODE_KEY, mode);
+      window.dispatchEvent(new Event(ENTRY_MODE_EVENT));
+    } catch {
+      // Ignore storage failures. The choice still applies to this visit.
+    }
+  }
+
   function requestApprove(fromShortcut = false) {
     approveViaShortcutRef.current = fromShortcut;
-    if (!valuesRef.current.diagnosis.trim()) {
+    const blocked = approveBlockReason({
+      entryMode: entryModeRef.current,
+      diagnosis: valuesRef.current.diagnosis,
+      handwritingPages: handwritingRef.current,
+    });
+    if (blocked) {
       setApproveAttempted(true);
-      setError("Add a diagnosis before approving.");
-      diagnosisInputRef.current?.focus();
-      diagnosisInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setError(blocked);
+      if (entryModeRef.current === "TYPED") {
+        diagnosisInputRef.current?.focus();
+        diagnosisInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
       return;
     }
     if (!valuesRef.current.visitOutcome) {
@@ -843,6 +962,47 @@ export function ConsultAssessmentForm({
     </div>
   );
 
+  const outcome = (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Outcome</p>
+        <button
+          type="button"
+          className="text-[11px] font-medium text-primary hover:underline"
+          onClick={() => {
+            approveAfterOutcomeRef.current = false;
+            setApproveAfterOutcome(false);
+            setFollowUpOpen(true);
+          }}
+        >
+          Schedule
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          approveAfterOutcomeRef.current = false;
+          setApproveAfterOutcome(false);
+          setFollowUpOpen(true);
+        }}
+        className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-app-bg px-2.5 py-2 text-left text-[12px] hover:bg-surface"
+      >
+        <span className="min-w-0 truncate text-text-primary">
+          {values.visitOutcome === "DISCHARGE"
+            ? "Discharged"
+            : values.followUpAt
+              ? `Follow-up · ${values.followUpAt}`
+              : values.visitOutcome === "FOLLOW_UP"
+                ? "Follow-up · pick a date"
+                : "Not set — tap to schedule"}
+        </span>
+        <span className="shrink-0 text-text-secondary" aria-hidden>
+          ›
+        </span>
+      </button>
+    </div>
+  );
+
   const plan = (
     <div className="space-y-2.5">
       <div>
@@ -937,44 +1097,7 @@ export function ConsultAssessmentForm({
         </div>
       </div>
 
-      <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Outcome</p>
-          <button
-            type="button"
-            className="text-[11px] font-medium text-primary hover:underline"
-            onClick={() => {
-              approveAfterOutcomeRef.current = false;
-              setApproveAfterOutcome(false);
-              setFollowUpOpen(true);
-            }}
-          >
-            Schedule
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            approveAfterOutcomeRef.current = false;
-            setApproveAfterOutcome(false);
-            setFollowUpOpen(true);
-          }}
-          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-app-bg px-2.5 py-2 text-left text-[12px] hover:bg-surface"
-        >
-          <span className="min-w-0 truncate text-text-primary">
-            {values.visitOutcome === "DISCHARGE"
-              ? "Discharged"
-              : values.followUpAt
-                ? `Follow-up · ${values.followUpAt}`
-                : values.visitOutcome === "FOLLOW_UP"
-                  ? "Follow-up · pick a date"
-                  : "Not set — tap to schedule"}
-          </span>
-          <span className="shrink-0 text-text-secondary" aria-hidden>
-            ›
-          </span>
-        </button>
-      </div>
+      {outcome}
     </div>
   );
 
@@ -1091,6 +1214,11 @@ export function ConsultAssessmentForm({
       {approveAttempted && missingForApprove.length > 0 ? (
         <p className="w-full text-xs text-text-secondary">Needs: {missingForApprove.join("; ")}</p>
       ) : null}
+      {entryMode === "HANDWRITTEN" ? (
+        <p className="text-[11px] text-text-secondary">
+          Medicines written on the sheet are not sent to the pharmacy. Switch to Typed if the pharmacy should dispense them.
+        </p>
+      ) : null}
       <div className={cockpit ? "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" : "contents"}>
         <p className="text-xs text-text-secondary">
           {draftStatus === "saving"
@@ -1124,6 +1252,64 @@ export function ConsultAssessmentForm({
     </div>
   );
 
+  const modeSwitch = (
+    <div
+      role="group"
+      aria-label="How to write this visit"
+      className="inline-flex shrink-0 rounded-lg border border-border bg-app-bg p-0.5"
+    >
+      {(["TYPED", "HANDWRITTEN"] as const).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={entryMode === mode}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+            entryMode === mode ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary"
+          }`}
+          onClick={() => chooseEntryMode(mode)}
+        >
+          {mode === "TYPED" ? "Typed" : "Handwritten"}
+        </button>
+      ))}
+    </div>
+  );
+
+  const handwrittenSheet = (
+    <section
+      className={
+        cockpit
+          ? "col-span-full flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-card lg:min-h-0"
+          : "space-y-3"
+      }
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 px-2.5 pt-2.5 2xl:px-3 2xl:pt-3">
+        <h3 className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Handwritten note</h3>
+        {modeSwitch}
+      </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-2.5 pb-3 lg:[scrollbar-gutter:stable] 2xl:px-3">
+        <div className="visit-summary-print handwriting-sheet">
+          {sheet ? <VisitSheetHeader {...sheet} /> : null}
+          <div className="mt-3">
+            <HandwritingPad
+              initialPages={handwritingPages}
+              onChange={(pages) => {
+                handwritingRef.current = pages;
+                setHandwritingPages(pages);
+              }}
+            />
+          </div>
+        </div>
+        {outcome}
+        {children ? <div className="space-y-3">{children}</div> : null}
+      </div>
+      {cockpit ? (
+        <div className="shrink-0 border-t border-border bg-surface px-2.5 py-2.5 2xl:px-3">{actions}</div>
+      ) : (
+        actions
+      )}
+    </section>
+  );
+
   return (
     <>
     <div
@@ -1134,14 +1320,23 @@ export function ConsultAssessmentForm({
       }
     >
       {!cockpit ? (
-        <div>
-          <h3 className="font-semibold">Doctor assessment</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Diagnosis is required to approve. Prescription and other fields are optional. Notes save automatically.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Doctor assessment</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {entryMode === "HANDWRITTEN"
+                ? "Write on the sheet. Letterhead and vitals are already filled in. Notes save automatically."
+                : "Diagnosis is required to approve. Prescription and other fields are optional. Notes save automatically."}
+            </p>
+          </div>
+          {entryMode === "TYPED" ? modeSwitch : null}
         </div>
       ) : null}
 
+      {entryMode === "HANDWRITTEN" ? (
+        handwrittenSheet
+      ) : (
+      <>
       <section
         className={
           cockpit
@@ -1150,9 +1345,10 @@ export function ConsultAssessmentForm({
         }
       >
         {cockpit ? (
-          <h3 className="shrink-0 px-2.5 pt-2.5 text-[13px] font-semibold text-text-primary 2xl:px-3 2xl:pt-3 2xl:text-sm">
-            Findings
-          </h3>
+          <div className="flex shrink-0 items-center justify-between gap-2 px-2.5 pt-2.5 2xl:px-3 2xl:pt-3">
+            <h3 className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Findings</h3>
+            {modeSwitch}
+          </div>
         ) : null}
         <div className={cockpit ? "px-2.5 pt-2 pb-2.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:[scrollbar-gutter:stable] 2xl:px-3 2xl:pb-3" : undefined}>
           {findings}
@@ -1181,6 +1377,8 @@ export function ConsultAssessmentForm({
           actions
         )}
       </section>
+      </>
+      )}
     </div>
     {followUpDialog}
     {testsMountEl

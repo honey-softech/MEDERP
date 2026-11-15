@@ -38,6 +38,7 @@ type VisitRow = {
     summary?: string | null;
     followUpAt?: Date | null;
     approvedAt: Date | null;
+    entryMode?: string | null;
   } | null;
   labOrders?: Array<{
     id: string;
@@ -100,6 +101,8 @@ export function PatientVisitHistory({
               ) : null}
               {last.assessment.diagnosis ? (
                 <p className="mt-1 text-slate-600">Diagnosis: {last.assessment.diagnosis}</p>
+              ) : last.assessment.entryMode === "HANDWRITTEN" ? (
+                <p className="mt-1 text-slate-600">Handwritten note</p>
               ) : null}
               {last.assessment.prescription ? (
                 <p className="mt-1 whitespace-pre-wrap text-slate-600">Prescription: {last.assessment.prescription}</p>
@@ -217,6 +220,8 @@ export function PatientVisitHistory({
                 </div>
                 {row.assessment?.diagnosis ? (
                   <p className="mt-2 text-slate-600">Diagnosis: {row.assessment.diagnosis}</p>
+                ) : row.assessment?.entryMode === "HANDWRITTEN" ? (
+                  <p className="mt-2 text-slate-600">Handwritten note</p>
                 ) : null}
                 {row.assessment?.prescription ? (
                   <p className="mt-1 whitespace-pre-wrap text-slate-600">

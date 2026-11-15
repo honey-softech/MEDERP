@@ -41,6 +41,9 @@ import { investigationsEditable } from "@/lib/lab";
 import { isConsultationPaid } from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
+import { readHandwritingPages } from "@/lib/handwriting";
+import { visitLetterhead } from "@/lib/issued-document";
+import { ageGenderLine, encounterNumber, generalExaminationRows, visitDateLabel } from "@/lib/visit-summary";
 import { toVitalsValues } from "@/lib/vitals";
 import { isActingAsDoctor, resolveViewContext } from "@/lib/view-mode";
 import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
@@ -135,6 +138,7 @@ export default async function AppointmentDetailPage({
             prescription: true,
             chiefComplaint: true,
             status: true,
+            entryMode: true,
           },
         },
         vitals: true,
@@ -203,6 +207,7 @@ export default async function AppointmentDetailPage({
     department: row.department.name,
     diagnosis: row.assessment?.diagnosis ?? "",
     chiefComplaint: row.assessment?.chiefComplaint ?? "",
+    handwritten: row.assessment?.entryMode === "HANDWRITTEN",
     summaryApproved: row.assessment?.status === "APPROVED",
     summaryAlreadySent: pastSummarySentIds.has(row.id),
     reports: row.labOrders
@@ -272,6 +277,27 @@ export default async function AppointmentDetailPage({
     : localDayKey(appointment.scheduledAt);
   const calendarBack = fromCalendar ? `/appointments?view=${calendarBackView}&date=${calendarBackDate}` : null;
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
+  const letterhead = user.hospital
+    ? visitLetterhead(appointment.assessment ?? { status: "DRAFT" }, user.hospital)
+    : null;
+  const writingSheet = letterhead
+    ? {
+        hospitalName: letterhead.name,
+        hospitalAddress: letterhead.address,
+        hospitalPhone: letterhead.phone,
+        logoData: letterhead.logoData,
+        sealData: letterhead.sealData,
+        patientName: patientName(appointment.patient).toUpperCase(),
+        mrn: appointment.patient.mrn,
+        ageGender: ageGenderLine(appointment.patient.dateOfBirth, appointment.patient.gender),
+        encounterNo: encounterNumber(letterhead.code, appointment.scheduledAt, appointment.tokenNumber),
+        appointmentType: prettyEnum(appointment.visitType),
+        visitDate: visitDateLabel(appointment.scheduledAt),
+        physician: doctorName(appointment.doctor),
+        departmentName: appointment.department.name,
+        vitalsRows: generalExaminationRows(vitals),
+      }
+    : null;
   const vitalsEditable = canRecordVitals && canNurseRecordVitals(appointment);
   const visitIsToday = canNurseRecordVitals(appointment);
   const doctorCanEditVitals =
@@ -723,6 +749,11 @@ export default async function AppointmentDetailPage({
             testsMountId={useCockpit && showEditableAssessment ? "visit-tests-mount" : null}
             ordersPanel={labOrdersPanel()}
             followUpReminderNote={followUpReminderHint(user.hospital)}
+            initialEntryMode={
+              assessment ? (assessment.entryMode === "HANDWRITTEN" ? "HANDWRITTEN" : "TYPED") : null
+            }
+            initialHandwritingPages={readHandwritingPages(assessment?.handwritingPages)}
+            sheet={writingSheet}
             initial={{
               chiefComplaint: assessment?.chiefComplaint ?? "",
               examination: assessment?.examination ?? "",
@@ -783,6 +814,8 @@ export default async function AppointmentDetailPage({
               advice={assessment?.advice}
               visitOutcome={assessment?.visitOutcome}
               followUpAt={assessment?.followUpAt}
+              entryMode={assessment?.entryMode}
+              handwritingPages={readHandwritingPages(assessment?.handwritingPages)}
             />
             {canCollectFee && !visitPaid ? (
               <div className="print:hidden">

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { SignatureBlock } from "@/components/signature-block";
+import { VisitSheetHeader } from "@/components/visit-sheet-header";
 import { visitSignoffLine } from "@/lib/doctor-specialties";
+import { readHandwritingPages } from "@/lib/handwriting";
 import { parseMedications, readableClinicalText } from "@/lib/visit-summary";
 
 export function VisitSummaryDocument({
@@ -32,6 +34,8 @@ export function VisitSummaryDocument({
   signatureImage,
   signatureName,
   signatureCredentials,
+  entryMode,
+  handwritingPages,
 }: {
   hospitalName: string;
   hospitalAddress?: string | null;
@@ -61,6 +65,8 @@ export function VisitSummaryDocument({
   signatureImage?: string | null;
   signatureName?: string | null;
   signatureCredentials?: string | null;
+  entryMode?: string | null;
+  handwritingPages?: string[] | string | null;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
   const vitals = examinationVitals(vitalsRows, generalExamination);
@@ -77,6 +83,8 @@ export function VisitSummaryDocument({
         : visitOutcome === "FOLLOW_UP"
           ? "Follow up"
           : "";
+  const handwritten = entryMode === "HANDWRITTEN";
+  const inkPages = handwritten ? readHandwritingPages(handwritingPages) : [];
 
   return (
     <article className="visit-summary-print">
@@ -85,111 +93,70 @@ export function VisitSummaryDocument({
           <p className="vs-draft">Draft preview — approve to release for reception print</p>
         ) : null}
 
-        <header className="vs-letterhead">
-          <div className="vs-letterhead-left">
-            {sealData ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={sealData} alt="" className="vs-mark" />
-            ) : (
-              <div className="vs-mark vs-mark-fallback" aria-hidden>
-                +
-              </div>
-            )}
-          </div>
-          <div className="vs-letterhead-center">
-            <p className="vs-hospital">{hospitalName}</p>
-            {hospitalAddress ? <p className="vs-meta">{hospitalAddress}</p> : null}
-            {hospitalPhone ? <p className="vs-meta">{hospitalPhone}</p> : null}
-          </div>
-          <div className="vs-letterhead-right">
-            {logoData ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoData} alt={hospitalName} className="vs-logo" />
-            ) : null}
-          </div>
-        </header>
-
-        <h1 className="vs-title">Visit summary</h1>
-
-        <section className="vs-top-stack">
-          <section className="vs-identity">
-            <div className="vs-identity-main">
-              <p className="vs-patient-name">{patientName}</p>
-              <p className="vs-patient-age">{ageGender}</p>
-            </div>
-            <div className="vs-identity-ids">
-              <p className="vs-field">
-                <span className="vs-label">Encounter no.</span>
-                <span className="vs-mono">{encounterNo}</span>
-              </p>
-              <p className="vs-field">
-                <span className="vs-label">UHID</span>
-                <span className="vs-mono">{mrn}</span>
-              </p>
-            </div>
-            <div className="vs-identity-meta">
-              <p className="vs-field">
-                <span className="vs-label">Appointment type</span>
-                <span>{appointmentType}</span>
-              </p>
-              <p className="vs-field">
-                <span className="vs-label">Date</span>
-                <span>{visitDate}</span>
-              </p>
-              <p className="vs-field vs-wide">
-                <span className="vs-label">Consulting physician</span>
-                <span>{physician}</span>
-              </p>
-              <p className="vs-field vs-wide">
-                <span className="vs-label">Department</span>
-                <span>{departmentName}</span>
-              </p>
-            </div>
-          </section>
-
-          <section className="vs-exam-panel">
-            <p className="vs-exam-title">General examination</p>
-            <ul className="vs-vitals-list vs-vitals-compact">
-              {vitals.map((row) => (
-                <li key={row.label || row.value}>
-                  {row.label ? <span className="vs-vital-label">{row.label}</span> : null}
-                  <span className={row.value === "—" ? "vs-vital-empty" : "vs-vital-value"}>
-                    {row.value}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </section>
+        <VisitSheetHeader
+          hospitalName={hospitalName}
+          hospitalAddress={hospitalAddress}
+          hospitalPhone={hospitalPhone}
+          logoData={logoData}
+          sealData={sealData}
+          patientName={patientName}
+          mrn={mrn}
+          ageGender={ageGender}
+          encounterNo={encounterNo}
+          appointmentType={appointmentType}
+          visitDate={visitDate}
+          physician={physician}
+          departmentName={departmentName}
+          vitalsRows={vitals}
+        />
 
         <div className="vs-clinical">
-          <ClinicalRow label="Diagnosis">
-            <p className="vs-diagnosis-value">
-              Final Diagnosis: {diagnosisText || "—"}
-            </p>
-          </ClinicalRow>
+          {handwritten ? (
+            <div className="vs-ink">
+              {inkPages.length > 0 ? (
+                inkPages.map((page, index) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={`${index}-${page.length}`}
+                    src={page}
+                    alt={`Handwritten note page ${index + 1}`}
+                    className="vs-ink-page"
+                  />
+                ))
+              ) : (
+                <p className="vs-body">—</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <ClinicalRow label="Diagnosis">
+                <p className="vs-diagnosis-value">Final Diagnosis: {diagnosisText || "—"}</p>
+              </ClinicalRow>
 
-          <ClinicalRow label="Presenting complaints">
-            <p className="vs-body">{complaintText || "—"}</p>
-          </ClinicalRow>
+              <ClinicalRow label="Presenting complaints">
+                <p className="vs-body">{complaintText || "—"}</p>
+              </ClinicalRow>
 
-          <ClinicalRow label="History of present illness">
-            <p className="vs-body">{historyText || "—"}</p>
-          </ClinicalRow>
+              <ClinicalRow label="History of present illness">
+                <p className="vs-body">{historyText || "—"}</p>
+              </ClinicalRow>
 
-          <ClinicalRow label="Systemic examination">
-            <p className="vs-body">{systemicText || "—"}</p>
-          </ClinicalRow>
+              <ClinicalRow label="Systemic examination">
+                <p className="vs-body">{systemicText || "—"}</p>
+              </ClinicalRow>
 
-          <ClinicalRow label="Advice">
-            <p className="vs-body">{adviceText || "—"}</p>
-          </ClinicalRow>
+              <ClinicalRow label="Advice">
+                <p className="vs-body">{adviceText || "—"}</p>
+              </ClinicalRow>
+            </>
+          )}
 
           <ClinicalRow label={followUpAt ? "Follow-up" : "Outcome"}>
             <p className="vs-body vs-followup">{outcomeText || "—"}</p>
           </ClinicalRow>
         </div>
 
+        {handwritten ? null : (
         <section className="vs-meds">
           <table className="vs-table">
             <thead>
@@ -215,6 +182,7 @@ export function VisitSummaryDocument({
             </tbody>
           </table>
         </section>
+        )}
 
         <section className="vs-signoff">
           <div className="vs-signoff-spacer" />

@@ -14,6 +14,7 @@ export type PastVisitItem = {
   department: string;
   diagnosis: string;
   chiefComplaint: string;
+  handwritten?: boolean;
   summaryApproved: boolean;
   summaryAlreadySent?: boolean;
   reports: { id: string; fileName: string }[];
@@ -106,6 +107,8 @@ export function VisitHistorySheet({
                         ) : null}
                         {visit.diagnosis ? (
                           <p className="mt-0.5 text-xs text-text-primary">Dx · {visit.diagnosis}</p>
+                        ) : visit.handwritten ? (
+                          <p className="mt-0.5 text-xs text-text-primary">Handwritten note</p>
                         ) : null}
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <Link

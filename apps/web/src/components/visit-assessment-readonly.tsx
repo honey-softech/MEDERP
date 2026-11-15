@@ -38,6 +38,8 @@ export function VisitAssessmentReadonly({
   advice,
   visitOutcome,
   followUpAt,
+  entryMode,
+  handwritingPages,
   omitBanner = false,
 }: {
   appointmentId: string;
@@ -54,6 +56,8 @@ export function VisitAssessmentReadonly({
   advice?: string | null;
   visitOutcome?: string | null;
   followUpAt?: Date | string | null;
+  entryMode?: string | null;
+  handwritingPages?: string[] | null;
   omitBanner?: boolean;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
@@ -73,6 +77,9 @@ export function VisitAssessmentReadonly({
         : visitOutcome === "FOLLOW_UP"
           ? "Follow up"
           : "";
+  const handwritten = entryMode === "HANDWRITTEN";
+  const inkPages = handwritten ? (handwritingPages ?? []).filter((page) => page.startsWith("data:image/")) : [];
+  const hasTyped = Boolean(complaintText || examText || diagnosisText || historyText || adviceText || medicines.length);
 
   return (
     <div className="min-w-0 space-y-3">
@@ -81,6 +88,29 @@ export function VisitAssessmentReadonly({
       )}
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-2 lg:gap-4">
+        {handwritten ? (
+          <section className="min-w-0 space-y-3 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5 lg:col-span-2">
+            <h3 className="text-base font-semibold text-text-primary">Handwritten note</h3>
+            {inkPages.length > 0 ? (
+              <div className="space-y-3">
+                {inkPages.map((page, index) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={`${index}-${page.length}`}
+                    src={page}
+                    alt={`Handwritten note page ${index + 1}`}
+                    className="w-full rounded-lg border border-border bg-white"
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary">No handwritten page was saved.</p>
+            )}
+            {outcomeLabel ? <ReadonlyBlock label="Outcome" value={outcomeLabel} strong /> : null}
+          </section>
+        ) : null}
+        {hasTyped || !handwritten ? (
+        <>
         <section className="min-w-0 space-y-4 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
           <h3 className="text-base font-semibold text-text-primary">Patient today</h3>
           <ReadonlyBlock label="Chief complaints" value={complaintText} />
@@ -111,8 +141,10 @@ export function VisitAssessmentReadonly({
             )}
           </div>
           <ReadonlyBlock label="Advice" value={adviceText} />
-          {outcomeLabel ? <ReadonlyBlock label="Outcome" value={outcomeLabel} strong /> : null}
+          {outcomeLabel && !handwritten ? <ReadonlyBlock label="Outcome" value={outcomeLabel} strong /> : null}
         </section>
+        </>
+        ) : null}
       </div>
     </div>
   );

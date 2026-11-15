@@ -23,6 +23,12 @@ import {
   cancelPendingFollowUpReminders,
   scheduleFollowUpReminder,
 } from "@/lib/appointments/follow-up-reminder-queue";
+import {
+  approveBlockReason,
+  parseEntryMode,
+  serializeHandwritingPages,
+  validateHandwritingPages,
+} from "@/lib/handwriting";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -61,6 +67,8 @@ const ASSESSMENT_AUDIT_FIELDS = [
   "advice",
   "visitOutcome",
   "followUpAt",
+  "entryMode",
+  "handwritingPages",
   "status",
   "approvedByDisplayName",
   "approvedByCredentials",
@@ -210,12 +218,22 @@ export async function POST(request: Request, context: Ctx) {
     const visitOutcome =
       visitOutcomeRaw === "FOLLOW_UP" || visitOutcomeRaw === "DISCHARGE" ? visitOutcomeRaw : null;
     const investigations = parseInvestigationPicks(body ?? {});
+    const entryMode = parseEntryMode(body?.entryMode);
+    const handwriting = validateHandwritingPages(body?.handwritingPages ?? []);
+    if (!handwriting.ok) {
+      return NextResponse.json({ error: handwriting.error }, { status: 400 });
+    }
 
     const approve = action === "approve";
     const signature = approve ? await activeSignatureFor(scoped.user.id, scoped.user.hospitalId) : null;
     if (approve) {
-      if (!diagnosis) {
-        return NextResponse.json({ error: "Add a diagnosis before approving." }, { status: 400 });
+      const blocked = approveBlockReason({
+        entryMode,
+        diagnosis,
+        handwritingPages: handwriting.pages,
+      });
+      if (blocked) {
+        return NextResponse.json({ error: blocked }, { status: 400 });
       }
       if (!signature && appointment.hospital.requireSignatureForApproval) {
         return NextResponse.json(
@@ -239,6 +257,8 @@ export async function POST(request: Request, context: Ctx) {
       advice,
       visitOutcome,
       followUpAt,
+      entryMode,
+      handwritingPages: serializeHandwritingPages(handwriting.pages),
       status: approve || wasApproved ? ("APPROVED" as const) : ("DRAFT" as const),
       approvedAt: approve ? new Date() : wasApproved ? appointment.assessment?.approvedAt ?? null : null,
       approvedByUserId: approve ? scoped.user.id : wasApproved ? appointment.assessment?.approvedByUserId ?? null : null,
@@ -291,7 +311,7 @@ export async function POST(request: Request, context: Ctx) {
     const changes = diffAuditFields(
       appointment.assessment as Record<string, unknown> | undefined,
       assessment as Record<string, unknown>,
-      { fields: [...ASSESSMENT_AUDIT_FIELDS] },
+      { fields: [...ASSESSMENT_AUDIT_FIELDS], redact: ["handwritingPages"] },
     );
     if (created || approve || changes.length > 0) {
       await writeAuditLog({
@@ -328,13 +348,15 @@ export async function POST(request: Request, context: Ctx) {
         doctorName: doctorName(appointment.doctor),
         token: tokenLabel(appointment.tokenNumber),
       });
-      await syncPharmacyRxFromAssessment({
-        hospitalId: scoped.user.hospitalId,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        prescription: assessment.prescription,
-        orderedByUsername: scoped.user.username,
-      });
+      if (entryMode === "TYPED") {
+        await syncPharmacyRxFromAssessment({
+          hospitalId: scoped.user.hospitalId,
+          appointmentId: appointment.id,
+          patientId: appointment.patientId,
+          prescription: assessment.prescription,
+          orderedByUsername: scoped.user.username,
+        });
+      }
     }
 
     if (assessment.status === "APPROVED") {

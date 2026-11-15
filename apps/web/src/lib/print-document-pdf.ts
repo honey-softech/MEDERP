@@ -354,7 +354,7 @@ export function drawSignoff(doc: PDFKit.PDFDocument, sign: PrintSignoff) {
 
 export function drawPrintFooter(
   doc: PDFKit.PDFDocument,
-  params: { printedAt: string; printedBy?: string; confidential?: boolean },
+  params: { printedAt: string; printedBy?: string; confidential?: boolean; pageLabel?: string },
 ) {
   const left = doc.page.margins.left;
   const width = pageWidth(doc);
@@ -376,7 +376,7 @@ export function drawPrintFooter(
     doc.text(`Printed by: ${params.printedBy}`, left, metaY, { width: width / 2 });
     doc.text(`Printed on: ${params.printedAt}`, left + width / 2, metaY, { width: width / 2, align: "right" });
   } else {
-    doc.text("Page 1/1", left, metaY, { width: width / 2 });
+    doc.text(params.pageLabel ?? "Page 1/1", left, metaY, { width: width / 2 });
     doc.text(`Printed on: ${params.printedAt}`, left + width / 2, metaY, { width: width / 2, align: "right" });
   }
   doc.restore();

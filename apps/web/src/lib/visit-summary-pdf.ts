@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import { formatClinicDate } from "@/lib/clinic-time";
 import { doctorName, printableDoctorLabel, prettyEnum } from "@/lib/front-desk";
 import { visitSignoffLine } from "@/lib/doctor-specialties";
+import { pngSize, readHandwritingPages } from "@/lib/handwriting";
 import {
   drawClinicalRow,
   drawIdentity,
@@ -10,6 +11,8 @@ import {
   drawSignoff,
   drawTitle,
   drawTwoColTable,
+  imageFromDataUrl,
+  pageWidth,
   printClock,
 } from "@/lib/print-document-pdf";
 import {
@@ -60,6 +63,8 @@ export type VisitSummaryPdfInput = {
     approvedByCredentials?: string | null;
     approvedBySignatureImage?: string | null;
     approvedBySignature?: { imageData?: string | null } | null;
+    entryMode?: string | null;
+    handwritingPages?: string[] | string | null;
   };
 };
 
@@ -77,9 +82,11 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
           : "—";
   const physician = doctorName(input.doctor);
   const printedAt = input.printedAt ?? printClock();
+  const handwritten = input.assessment.entryMode === "HANDWRITTEN";
+  const inkPages = handwritten ? readHandwritingPages(input.assessment.handwritingPages) : [];
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: inkPages.length > 1 });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -119,18 +126,38 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
             ].map((label) => ({ label, value: "—" })),
     });
 
-    drawClinicalRow(doc, "Diagnosis", `Final Diagnosis: ${readableClinicalText(input.assessment.diagnosis) || "—"}`);
-    drawClinicalRow(doc, "Presenting complaints", readableClinicalText(input.assessment.chiefComplaint) || "—");
-    drawClinicalRow(doc, "History of present illness", readableClinicalText(input.assessment.summary) || "—");
-    drawClinicalRow(doc, "Systemic examination", readableClinicalText(input.assessment.examination) || "—");
-    drawClinicalRow(doc, "Advice", readableClinicalText(input.assessment.advice) || "—");
+    if (handwritten) {
+      inkPages.forEach((page, index) => {
+        if (index > 0) {
+          doc.addPage();
+          drawLetterhead(doc, input.hospital);
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .fillColor("#616161")
+            .text(`${patientName} · UHID ${input.patient.mrn} · ${visitDateLabel(input.scheduledAt)}`, {
+              align: "center",
+            });
+          doc.moveDown(0.35);
+        }
+        drawInkPage(doc, page);
+      });
+    } else {
+      drawClinicalRow(doc, "Diagnosis", `Final Diagnosis: ${readableClinicalText(input.assessment.diagnosis) || "—"}`);
+      drawClinicalRow(doc, "Presenting complaints", readableClinicalText(input.assessment.chiefComplaint) || "—");
+      drawClinicalRow(doc, "History of present illness", readableClinicalText(input.assessment.summary) || "—");
+      drawClinicalRow(doc, "Systemic examination", readableClinicalText(input.assessment.examination) || "—");
+      drawClinicalRow(doc, "Advice", readableClinicalText(input.assessment.advice) || "—");
+    }
     drawClinicalRow(doc, followUp ? "Follow-up" : "Outcome", outcome);
 
-    drawTwoColTable(
-      doc,
-      ["Drug name", "Notes"],
-      medicines.map((med) => ({ left: med.name, right: med.notes || "—" })),
-    );
+    if (!handwritten) {
+      drawTwoColTable(
+        doc,
+        ["Drug name", "Notes"],
+        medicines.map((med) => ({ left: med.name, right: med.notes || "—" })),
+      );
+    }
 
     drawSignoff(doc, {
       name: printableDoctorLabel(input.assessment.approvedByDisplayName) || physician,
@@ -138,7 +165,40 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
       imageData: input.assessment.approvedBySignatureImage ?? input.assessment.approvedBySignature?.imageData,
     });
 
-    drawPrintFooter(doc, { printedAt, confidential: true });
+    if (inkPages.length > 1) {
+      const range = doc.bufferedPageRange();
+      for (let index = 0; index < range.count; index += 1) {
+        doc.switchToPage(range.start + index);
+        drawPrintFooter(doc, {
+          printedAt,
+          confidential: true,
+          pageLabel: `Page ${index + 1}/${range.count}`,
+        });
+      }
+    } else {
+      drawPrintFooter(doc, { printedAt, confidential: true });
+    }
     doc.end();
   });
+}
+
+function drawInkPage(doc: PDFKit.PDFDocument, dataUrl: string) {
+  const image = imageFromDataUrl(dataUrl);
+  if (!image) return;
+  const size = pngSize(image.data);
+  if (!size) return;
+  const left = doc.page.margins.left;
+  const width = pageWidth(doc);
+  const bottom = doc.page.height - doc.page.margins.bottom - 150;
+  const available = Math.max(120, bottom - doc.y);
+  const scale = Math.min(width / size.width, available / size.height);
+  const drawW = size.width * scale;
+  const drawH = size.height * scale;
+  try {
+    doc.image(image.data, left + (width - drawW) / 2, doc.y, { width: drawW, height: drawH });
+  } catch {
+    return;
+  }
+  doc.y += drawH + 8;
+  doc.x = left;
 }

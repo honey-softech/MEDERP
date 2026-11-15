@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
     },
   },
   serverExternalPackages: ["@prisma/client", "prisma", "socket.io", "bufferutil", "utf-8-validate"],
+  typescript: {
+    // The production image caps Node at 768MB. Compile fits; the typecheck pass does not.
+    // `tsc --noEmit` still runs locally before a deploy.
+    ignoreBuildErrors: process.env.SKIP_TYPECHECK === "1",
+  },
   experimental: {
     proxyClientMaxBodySize: "10mb",
     serverActions: {

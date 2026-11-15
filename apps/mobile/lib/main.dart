@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mederp_mobile/bill_download.dart';
@@ -73,24 +74,8 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
     _controller = WebViewController.fromPlatformCreationParams(
       params,
       onPermissionRequest: (request) {
-        // iOS quits the app if the page uses the microphone before this grant.
-        // Android already denies capture unless the app holds the permission.
-        if (!Platform.isIOS) {
-          request.deny();
-          return;
-        }
-        final capture =
-            request.types.isNotEmpty &&
-            request.types.every(
-              (type) =>
-                  type == WebViewPermissionResourceType.microphone ||
-                  type == WebViewPermissionResourceType.camera,
-            );
-        if (capture) {
-          request.grant();
-        } else {
-          request.deny();
-        }
+        // Android has no microphone permission. Capture stays off there.
+        request.deny();
       },
     )
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -144,6 +129,28 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
           },
         ),
       );
+    final webKit = _controller.platform;
+    if (webKit is WebKitWebViewController) {
+      // grant() answers WebKit without the system alert, so a consult never
+      // asks for the microphone. prompt() shows that alert.
+      unawaited(
+        webKit.setOnPlatformPermissionRequest((request) {
+          final capture =
+              request.types.isNotEmpty &&
+              request.types.every(
+                (type) =>
+                    type == WebViewPermissionResourceType.microphone ||
+                    type == WebViewPermissionResourceType.camera,
+              );
+          if (capture && request is WebKitWebViewPermissionRequest) {
+            request.prompt();
+            return;
+          }
+          request.deny();
+        }),
+      );
+      unawaited(webKit.setInspectable(kDebugMode));
+    }
     // The iOS view has to be on screen before the first load. Reading the
     // user agent earlier throws, which was shown as a connection error.
     WidgetsBinding.instance.addPostFrameCallback((_) {

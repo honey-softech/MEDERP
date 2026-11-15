@@ -59,6 +59,7 @@ function formatElapsed(ms: number) {
 }
 
 function micMessage(error: unknown) {
+  if (error instanceof Error && error.message.startsWith("This browser")) return error.message;
   if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
     return "Allow the microphone to record the consultation.";
   }
@@ -316,13 +317,22 @@ export function ConsultScribe({
     }
   }
 
-  async function beginStream() {
-    if (typeof MediaRecorder === "undefined") {
+  function openMicrophone() {
+    if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      return Promise.reject(new Error("This browser cannot record audio. Use Chrome or Edge."));
+    }
+    // Called from the tap, before any await. iOS only shows the microphone
+    // alert when getUserMedia starts inside that tap.
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+
+  async function beginStream(existing?: MediaStream) {
+    if (!existing && (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia)) {
       setError("This browser cannot record audio. Use Chrome or Edge.");
       return false;
     }
     try {
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = existing ?? (await openMicrophone());
     } catch (reason) {
       setError(micMessage(reason));
       return false;
@@ -352,6 +362,10 @@ export function ConsultScribe({
   async function startRecording() {
     setError("");
     setBusy("start");
+    const micReady = openMicrophone().then(
+      (stream) => stream,
+      (reason: unknown) => reason,
+    );
     try {
       const response = await fetch(`/api/appointments/${appointmentId}/scribe/session`, {
         method: "PATCH",
@@ -359,12 +373,22 @@ export function ConsultScribe({
         body: JSON.stringify({ action: "start", consent: true }),
       });
       const data = (await response.json().catch(() => ({}))) as { error?: string; session?: SessionView };
+      const mic = await micReady;
       if (!response.ok || !data.session) {
+        if (mic instanceof MediaStream) mic.getTracks().forEach((track) => track.stop());
         setError(data.error ?? "Could not start the recording.");
         return;
       }
       remember(data.session);
-      await beginStream();
+      if (!(mic instanceof MediaStream)) {
+        setError(micMessage(mic));
+        return;
+      }
+      await beginStream(mic);
+    } catch (reason) {
+      const mic = await micReady;
+      if (mic instanceof MediaStream) mic.getTracks().forEach((track) => track.stop());
+      setError(reason instanceof Error ? reason.message : "Could not start the recording.");
     } finally {
       setBusy("");
     }

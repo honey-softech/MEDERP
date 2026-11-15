@@ -1,3 +1,4 @@
+import { trimInkDataUrl } from "@/lib/trim-ink";
 import { parseMedications } from "@/lib/prescription-text";
 import { readableClinicalText } from "@/lib/visit-summary";
 
@@ -97,7 +98,7 @@ export function VisitAssessmentReadonly({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={`${index}-${page.length}`}
-                    src={page}
+                    src={trimInkDataUrl(page)}
                     alt={`Handwritten note page ${index + 1}`}
                     className="w-full rounded-lg border border-border bg-white"
                   />

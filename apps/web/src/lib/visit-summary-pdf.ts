@@ -3,6 +3,7 @@ import { formatClinicDate } from "@/lib/clinic-time";
 import { doctorName, printableDoctorLabel, prettyEnum } from "@/lib/front-desk";
 import { visitSignoffLine } from "@/lib/doctor-specialties";
 import { pngSize, readHandwritingPages } from "@/lib/handwriting";
+import { trimInkDataUrl } from "@/lib/trim-ink";
 import {
   drawClinicalRow,
   drawIdentity,
@@ -183,7 +184,7 @@ export async function buildVisitSummaryPdf(input: VisitSummaryPdfInput): Promise
 }
 
 function drawInkPage(doc: PDFKit.PDFDocument, dataUrl: string) {
-  const image = imageFromDataUrl(dataUrl);
+  const image = imageFromDataUrl(trimInkDataUrl(dataUrl));
   if (!image) return;
   const size = pngSize(image.data);
   if (!size) return;

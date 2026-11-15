@@ -16,12 +16,21 @@ const COLORS = [
   { id: "black", value: "#1a1a1a", label: "Black ink" },
   { id: "blue", value: "#1e3a8a", label: "Blue ink" },
   { id: "red", value: "#991b1b", label: "Red ink" },
+  { id: "green", value: "#166534", label: "Green ink" },
 ] as const;
 
-const SIZES = [
+const PEN_SIZES = [
   { id: "fine", value: 1.6, label: "Fine" },
   { id: "medium", value: 2.6, label: "Medium" },
   { id: "broad", value: 4.2, label: "Broad" },
+] as const;
+
+const ERASER_SIZES = [
+  { id: "eraser-fine", value: 2, label: "Fine" },
+  { id: "eraser-medium", value: 4, label: "Medium" },
+  { id: "eraser-broad", value: 8, label: "Broad" },
+  { id: "eraser-large", value: 14, label: "Large" },
+  { id: "eraser-extra", value: 24, label: "Extra" },
 ] as const;
 
 const EXPORT_WIDTH = 1200;
@@ -48,7 +57,7 @@ function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, width: number
   ctx.globalCompositeOperation = stroke.tool === "eraser" ? "destination-out" : "source-over";
   ctx.strokeStyle = stroke.color;
   const scale = width / EXPORT_WIDTH;
-  const boost = stroke.tool === "eraser" ? 8 : 1;
+  const boost = stroke.tool === "eraser" ? 4 : 1;
   const points = stroke.points;
 
   const widthFor = (point: Point) => {
@@ -141,7 +150,7 @@ export function HandwritingPad({
   const onChangeRef = useRef(onChange);
   const toolRef = useRef<Tool>("pen");
   const colorRef = useRef<string>(COLORS[0].value);
-  const sizeRef = useRef<number>(SIZES[1].value);
+  const sizeRef = useRef<number>(PEN_SIZES[1].value);
   const penOnlyRef = useRef(false);
   const sawPenRef = useRef(false);
   const paintingRef = useRef(false);
@@ -152,7 +161,9 @@ export function HandwritingPad({
   const [pageCount, setPageCount] = useState(pagesRef.current.length);
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState<string>(COLORS[0].value);
-  const [size, setSize] = useState<number>(SIZES[1].value);
+  const [penSize, setPenSize] = useState<number>(PEN_SIZES[1].value);
+  const [eraserSize, setEraserSize] = useState<number>(ERASER_SIZES[1].value);
+  const size = tool === "eraser" ? eraserSize : penSize;
   const tabletPen = useSyncExternalStore(subscribePenDefault, prefersPen, () => false);
   const [penOnlyChoice, setPenOnlyChoice] = useState<boolean | null>(null);
   const penOnly = penOnlyChoice ?? tabletPen;
@@ -389,12 +400,12 @@ export function HandwritingPad({
           ))}
         </div>
         <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
-          {SIZES.map((item) => (
+          {(tool === "eraser" ? ERASER_SIZES : PEN_SIZES).map((item) => (
             <button
               key={item.id}
               type="button"
               className={toolButton(size === item.value)}
-              onClick={() => setSize(item.value)}
+              onClick={() => (tool === "eraser" ? setEraserSize(item.value) : setPenSize(item.value))}
             >
               {item.label}
             </button>

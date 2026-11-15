@@ -3,6 +3,7 @@ import { SignatureBlock } from "@/components/signature-block";
 import { VisitSheetHeader } from "@/components/visit-sheet-header";
 import { visitSignoffLine } from "@/lib/doctor-specialties";
 import { readHandwritingPages } from "@/lib/handwriting";
+import { trimInkDataUrl } from "@/lib/trim-ink";
 import { parseMedications, readableClinicalText } from "@/lib/visit-summary";
 
 export function VisitSummaryDocument({
@@ -118,7 +119,7 @@ export function VisitSummaryDocument({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={`${index}-${page.length}`}
-                    src={page}
+                    src={trimInkDataUrl(page)}
                     alt={`Handwritten note page ${index + 1}`}
                     className="vs-ink-page"
                   />

@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>MedERP uses the camera so hospital staff can take photos for patient records, signatures, and document uploads.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MedERP uses the microphone so a doctor can record a consultation after the patient agrees. The recording is used to write the visit note.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MedERP uses your location only while you are using the app, when a hospital page requests it.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

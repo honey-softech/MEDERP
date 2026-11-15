@@ -11,6 +11,7 @@ import 'package:mederp_mobile/system_notifications.dart';
 import 'package:mederp_mobile/viewport_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 /// iOS sends these when a redirect, or a second load, stops the navigation
 /// already in flight. The page that replaces it still opens.
@@ -62,7 +63,36 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
   void initState() {
     super.initState();
     SystemNotifications.onOpen = _openNotice;
-    _controller = WebViewController()
+    PlatformWebViewControllerCreationParams params = const PlatformWebViewControllerCreationParams();
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    }
+    _controller = WebViewController.fromPlatformCreationParams(
+      params,
+      onPermissionRequest: (request) {
+        // iOS quits the app if the page uses the microphone before this grant.
+        // Android already denies capture unless the app holds the permission.
+        if (!Platform.isIOS) {
+          request.deny();
+          return;
+        }
+        final capture =
+            request.types.isNotEmpty &&
+            request.types.every(
+              (type) =>
+                  type == WebViewPermissionResourceType.microphone ||
+                  type == WebViewPermissionResourceType.camera,
+            );
+        if (capture) {
+          request.grant();
+        } else {
+          request.deny();
+        }
+      },
+    )
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
       ..addJavaScriptChannel(

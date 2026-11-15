@@ -5,6 +5,7 @@ import { normalizeAudioMime } from "@/lib/scribe/audio";
 import { requireScribeAppointment, scribeSessionFor, scribeSessionView } from "@/lib/scribe/access";
 import { SCRIBE_MAX_CHUNK_BYTES, SCRIBE_MAX_CHUNKS, SCRIBE_MAX_TRANSCRIPT_CHARS } from "@/lib/scribe/limits";
 import { ScribeProviderError, transcribeAudio, translateUtterance, transcribeModel } from "@/lib/scribe/openai";
+import { doctorMedicineVocabulary, transcribeVocabularyPrompt } from "@/lib/scribe/vocabulary";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -59,7 +60,8 @@ export async function POST(request: Request, context: Ctx) {
   let translated = "";
   try {
     const bytes = new Uint8Array(await audio.arrayBuffer());
-    text = await transcribeAudio({ bytes, mime });
+    const vocabulary = await doctorMedicineVocabulary(gate.actor.hospitalId, gate.appointment.doctorId);
+    text = await transcribeAudio({ bytes, mime, prompt: transcribeVocabularyPrompt(vocabulary) });
     if (text) {
       try {
         translated = await translateUtterance(text);

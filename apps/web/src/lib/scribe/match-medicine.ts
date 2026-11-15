@@ -1,26 +1,44 @@
 import { Prisma } from "@prisma/client";
-import { catalogNameForSpoken } from "@/lib/scribe/draft-schema";
+import { medicineSearchTokens, rankMedicineCandidates } from "@/lib/scribe/medicine-match";
 import { prisma } from "@/lib/prisma";
 
-/** Same DrugCatalog the medicine search uses. A miss stays free text. */
-export async function matchSpokenMedicine(spoken: string) {
+/** Catalog plus the doctor's own names. A weak match stays free text with a few choices. */
+export async function matchSpokenMedicine(
+  spoken: string,
+  options?: { catalogChoice?: string; vocabulary?: string[] },
+) {
   const label = spoken.trim();
-  if (label.length < 2) return { name: label, matched: false };
-  const safe = label.replace(/[%_\\]/g, "").trim();
-  if (safe.length < 2) return { name: label, matched: false };
-
-  try {
-    const rows = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
-      SELECT name
-      FROM "DrugCatalog"
-      WHERE "isDiscontinued" = false
-        AND (name ILIKE ${`${safe}%`} OR "searchText" ILIKE ${`%${safe}%`})
-      ORDER BY CASE WHEN name ILIKE ${`${safe}%`} THEN 0 ELSE 1 END, name ASC
-      LIMIT 8
-    `);
-    return catalogNameForSpoken(label, rows.map((row) => row.name));
-  } catch (error) {
-    console.error("scribe medicine match failed", error instanceof Error ? error.name : "error");
-    return { name: label, matched: false };
+  const vocabulary = options?.vocabulary ?? [];
+  if (label.length < 2 && !(options?.catalogChoice ?? "").trim()) {
+    return { name: label, matched: false, confidence: "none" as const, alternatives: [] as string[] };
   }
+
+  const tokens = medicineSearchTokens(label);
+  let catalogNames: string[] = [];
+  if (tokens.length > 0) {
+    try {
+      const filters = tokens.map((token) => {
+        const safe = token.replace(/[%_\\]/g, "");
+        return Prisma.sql`(name ILIKE ${`${safe}%`} OR "searchText" ILIKE ${`%${safe}%`})`;
+      });
+      const where = filters.slice(1).reduce((query, filter) => Prisma.sql`${query} OR ${filter}`, filters[0] ?? Prisma.sql`FALSE`);
+      const rows = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+        SELECT name
+        FROM "DrugCatalog"
+        WHERE "isDiscontinued" = false
+          AND (${where})
+        ORDER BY name ASC
+        LIMIT 24
+      `);
+      catalogNames = rows.map((row) => row.name);
+    } catch (error) {
+      console.error("scribe medicine match failed", error instanceof Error ? error.name : "error");
+    }
+  }
+
+  return rankMedicineCandidates({
+    spoken: label,
+    catalogChoice: options?.catalogChoice,
+    candidates: [...vocabulary, ...catalogNames],
+  });
 }

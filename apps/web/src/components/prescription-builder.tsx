@@ -145,11 +145,15 @@ export function PrescriptionBuilder({
   onChange,
   allergies = null,
   currentMedications = null,
+  medicineChoices = {},
+  onPickMedicine,
 }: {
   value: string;
   onChange: (value: string) => void;
   allergies?: string | null;
   currentMedications?: string | null;
+  medicineChoices?: Record<string, string[]>;
+  onPickMedicine?: (from: string, to: string) => void;
 }) {
   const listId = useId();
   const [rows, setRows] = useState<RxRow[]>(() => rowsFromText(value));
@@ -714,6 +718,26 @@ export function PrescriptionBuilder({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-medium text-text-primary">{row.name || "Untitled"}</p>
                 {row.notes ? <p className="truncate text-[11px] text-text-secondary">{row.notes}</p> : null}
+                {(medicineChoices[row.name] ?? []).length > 0 ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    <span className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800">Check</span>
+                    {(medicineChoices[row.name] ?? []).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className="max-w-full truncate rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-text-primary hover:border-primary hover:text-primary"
+                        onClick={() => {
+                          setRows((current) =>
+                            current.map((item) => (item.key === row.key ? { ...item, name: option } : item)),
+                          );
+                          onPickMedicine?.(row.name, option);
+                        }}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div className="flex shrink-0">
                 <button

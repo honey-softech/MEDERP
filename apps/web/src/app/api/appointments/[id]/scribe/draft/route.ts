@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { requireScribeAppointment, scribeSessionFor, scribeSessionView } from "@/lib/scribe/access";
 import { parseScribeDraft, type ScribeMedicine } from "@/lib/scribe/draft-schema";
 import { matchSpokenMedicine } from "@/lib/scribe/match-medicine";
+import { doctorMedicineVocabulary } from "@/lib/scribe/vocabulary";
 import { draftConsult, ScribeProviderError, scribeConfigured, scribeModel, scribeNotConfiguredMessage } from "@/lib/scribe/openai";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -40,7 +41,8 @@ export async function POST(request: Request, context: Ctx) {
       english && english !== original
         ? `English wording:\n${english}\n\nOriginal words:\n${original}`
         : original;
-    const raw = await draftConsult(combined);
+    const vocabulary = await doctorMedicineVocabulary(gate.actor.hospitalId, gate.appointment.doctorId);
+    const raw = await draftConsult(combined, vocabulary);
     const parsed = parseScribeDraft(raw);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 502 });
@@ -49,12 +51,19 @@ export async function POST(request: Request, context: Ctx) {
     const medicines: ScribeMedicine[] = [];
     for (const medicine of parsed.draft.medicines) {
       const spoken = medicine.spokenName || medicine.name;
-      const match = await matchSpokenMedicine(spoken);
+      const match = await matchSpokenMedicine(spoken, {
+        catalogChoice: medicine.catalogChoice,
+        vocabulary,
+      });
+      const confident = match.confidence === "high";
       medicines.push({
         ...medicine,
         spokenName: spoken,
-        name: match.matched ? match.name : spoken,
-        matched: match.matched,
+        name: confident ? match.name : spoken,
+        matched: confident,
+        uncertain: medicine.uncertain || !confident,
+        alternatives: confident ? [] : match.alternatives,
+        catalogChoice: undefined,
       });
     }
     const draft = { ...parsed.draft, medicines };

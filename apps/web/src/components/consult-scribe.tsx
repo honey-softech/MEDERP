@@ -6,6 +6,7 @@ import {
   SCRIBE_ASSESSMENT_KEYS,
   draftToAssessment,
   fieldsToCheck,
+  medicineChoicesFromDraft,
   missingLabels,
   type ScribeAssessmentKey,
   type ScribeAssessmentPatch,
@@ -63,7 +64,7 @@ export function ConsultScribe({
 }: {
   appointmentId: string;
   mode?: "edit" | "view";
-  onApply?: (patch: ScribeAssessmentPatch, uncertain: ScribeAssessmentKey[]) => void;
+  onApply?: (patch: ScribeAssessmentPatch, uncertain: ScribeAssessmentKey[], choices?: Record<string, string[]>) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [hidden, setHidden] = useState(false);
@@ -375,7 +376,7 @@ export function ConsultScribe({
         return;
       }
       remember(appliedData.session);
-      onApply?.(patch, fieldsToCheck(draft));
+      onApply?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not draft the visit note.");
     } finally {
@@ -497,7 +498,7 @@ export function ConsultScribe({
       {!loading && mode === "edit" && !session && configured ? (
         <div className="mt-2 space-y-2">
           <p className="text-[13px] text-text-secondary">
-            Say these in order: complaint, how long, examination, diagnosis, each medicine with the dose and days, advice, then when to come back. The note is written into this assessment. Nothing reaches the pharmacy until you approve.
+            Say these in order: complaint, how long, examination, diagnosis, then each medicine on its own: மருந்து, the name, the strength, காலை or மதியம் or இரவு, சாப்பாட்டுக்கு முன் or பின், and how many days. Then advice, then when to come back. The note is written into this assessment. Nothing reaches the pharmacy until you approve.
           </p>
           <label className="flex items-start gap-2 text-[13px] text-text-primary">
             <input
@@ -523,7 +524,7 @@ export function ConsultScribe({
         <div className="mt-2 space-y-2">
           {liveText}
           <p className="text-[12px] text-text-secondary">
-            Complaint, how long, examination, diagnosis, each medicine with dose and days, advice, then when to come back.
+            For each tablet say: மருந்து, name, strength, காலை or மதியம் or இரவு, சாப்பாட்டுக்கு முன் or பின், and the number of days.
           </p>
           <div className="flex flex-wrap gap-2">
             {live ? (

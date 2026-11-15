@@ -28,6 +28,9 @@ export type ScribeMedicine = {
   note: string;
   uncertain: boolean;
   matched: boolean;
+  /** Catalog names to offer when the spoken name is not certain. */
+  alternatives: string[];
+  catalogChoice?: string;
 };
 
 export type ScribeDraft = {
@@ -56,6 +59,8 @@ const medicineSchema = z
     note: z.string(),
     uncertain: z.boolean(),
     matched: z.boolean().optional(),
+    alternatives: z.array(z.string()).optional(),
+    catalogChoice: z.string().optional(),
   })
   .strict();
 
@@ -99,6 +104,7 @@ export function parseScribeDraft(value: unknown): { ok: true; draft: ScribeDraft
     if (!name && !spokenName) return [];
     const durationDays = clampDays(medicine.durationDays, 90);
     const durationUnclear = medicine.durationDays != null && durationDays == null;
+    const doseUnsaid = !medicine.morning && !medicine.afternoon && !medicine.night && !/sos/i.test(medicine.note);
     return [
       {
         name: name || spokenName,
@@ -110,8 +116,10 @@ export function parseScribeDraft(value: unknown): { ok: true; draft: ScribeDraft
         afterFood: medicine.afterFood,
         durationDays,
         note: clip(medicine.note),
-        uncertain: medicine.uncertain || durationUnclear,
+        uncertain: medicine.uncertain || durationUnclear || doseUnsaid,
         matched: medicine.matched ?? false,
+        alternatives: [...new Set((medicine.alternatives ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, 3),
+        catalogChoice: medicine.catalogChoice?.trim() || undefined,
       },
     ];
   });
@@ -242,6 +250,16 @@ export function missingLabels(fields: string[]) {
     if (label) found.add(label);
   }
   return MISSING_ORDER.filter((label) => found.has(label));
+}
+
+export function medicineChoicesFromDraft(draft: ScribeDraft) {
+  const choices: Record<string, string[]> = {};
+  for (const medicine of draft.medicines) {
+    const name = medicine.name.trim();
+    const options = medicine.alternatives.filter((item) => item.trim() && item.trim() !== name);
+    if (name && options.length > 0) choices[name] = options;
+  }
+  return choices;
 }
 
 export function fieldsToCheck(draft: ScribeDraft): ScribeAssessmentKey[] {

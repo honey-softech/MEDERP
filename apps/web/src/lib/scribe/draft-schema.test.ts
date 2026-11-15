@@ -25,6 +25,7 @@ function medicine(overrides: Partial<ScribeDraft["medicines"][number]> = {}): Sc
     note: "",
     uncertain: false,
     matched: true,
+    alternatives: [],
     ...overrides,
   };
 }
@@ -106,6 +107,28 @@ describe("scribe draft", () => {
 
   it("does not write both before-food and after-food on one line", () => {
     expect(medicineNotes(medicine({ beforeFood: true, afterFood: true }))).toBe("1-0-1 for 5 days");
+  });
+
+  it("keeps a medicine when the dose was not said and flags it", () => {
+    const parsed = parseScribeDraft(
+      draft({
+        medicines: [
+          medicine({
+            morning: false,
+            afternoon: false,
+            night: false,
+            beforeFood: false,
+            afterFood: false,
+            durationDays: null,
+            note: "",
+          }),
+        ],
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.draft.medicines[0]?.uncertain).toBe(true);
+    expect(prescriptionFromDraft(parsed.draft)).toBe("Paracetamol 500");
   });
 
   it("lists unheard topics in the order the doctor should ask them", () => {

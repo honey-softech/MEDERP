@@ -238,6 +238,7 @@ export function ConsultAssessmentForm({
   const [handwritingPages, setHandwritingPages] = useState<string[]>(initialHandwritingPages);
   const [aiFields, setAiFields] = useState<Partial<Record<keyof AssessmentValues, boolean>>>({});
   const [uncertainFields, setUncertainFields] = useState<Partial<Record<keyof AssessmentValues, boolean>>>({});
+  const [medicineChoices, setMedicineChoices] = useState<Record<string, string[]>>({});
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
   const [saved, setSaved] = useState(canPreview);
@@ -325,7 +326,11 @@ export function ConsultAssessmentForm({
     setUncertainFields((current) => (current[key] ? { ...current, [key]: false } : current));
   }
 
-  function applyScribe(patch: ScribeAssessmentPatch, uncertain: ScribeAssessmentKey[]) {
+  function applyScribe(
+    patch: ScribeAssessmentPatch,
+    uncertain: ScribeAssessmentKey[],
+    choices: Record<string, string[]> = {},
+  ) {
     if (entryModeRef.current !== "TYPED") chooseEntryMode("TYPED");
     const next: AssessmentValues = { ...valuesRef.current };
     const marks: Partial<Record<keyof AssessmentValues, boolean>> = {};
@@ -341,6 +346,7 @@ export function ConsultAssessmentForm({
     setValues(next);
     setAiFields(marks);
     setUncertainFields(checks);
+    setMedicineChoices(choices);
   }
 
   function fieldMarks(name: keyof AssessmentValues) {
@@ -1073,6 +1079,15 @@ export function ConsultAssessmentForm({
           onChange={(v) => setField("prescription", v)}
           allergies={allergies}
           currentMedications={currentMedications}
+          medicineChoices={medicineChoices}
+          onPickMedicine={(from) =>
+            setMedicineChoices((current) => {
+              if (!(from in current)) return current;
+              const next = { ...current };
+              delete next[from];
+              return next;
+            })
+          }
         />
         {values.prescription.trim() && values.diagnosis.trim() ? (
           <div className="mt-1.5">

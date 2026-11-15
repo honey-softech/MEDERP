@@ -19,7 +19,8 @@ Rules:
 - history is onset, duration, and associated symptoms.
 - examination is only what the doctor said they found.
 - diagnoses are the labels the doctor stated.
-- medicines: keep the spoken name and strength. morning, afternoon, and night are true only when that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. Set uncertain true when the name or dose is unclear.
+- The words மருந்து, மாத்திரை, tablet, or medicine start a new medicine. Do not attach that dose to the previous medicine.
+- medicines: keep the spoken name and strength in name. catalogChoice is an exact name from the known-medicines list, or an empty string when none clearly matches. Do not invent a catalog name. morning, afternoon, and night are true only when that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. If the strength or the morning, afternoon, or night timing was not said, leave it unset and set uncertain true.
 - advice is what the doctor told the patient to do.
 - outcome is FOLLOW_UP when a review was asked, DISCHARGE when the patient was discharged, otherwise an empty string.
 - followUpInDays is the number of days until review, or null.
@@ -52,6 +53,7 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
         additionalProperties: false,
         required: [
           "name",
+          "catalogChoice",
           "morning",
           "afternoon",
           "night",
@@ -63,6 +65,7 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
         ],
         properties: {
           name: { type: "string" },
+          catalogChoice: { type: "string" },
           morning: { type: "boolean" },
           afternoon: { type: "boolean" },
           night: { type: "boolean" },
@@ -117,7 +120,7 @@ function providerMessage(status: number, fallback: string) {
   return fallback;
 }
 
-export async function transcribeAudio(input: { bytes: Uint8Array; mime: string }) {
+export async function transcribeAudio(input: { bytes: Uint8Array; mime: string; prompt?: string }) {
   const key = openAiApiKey();
   if (!key) throw new ScribeProviderError(scribeNotConfiguredMessage(), 503);
   const mime = normalizeAudioMime(input.mime);
@@ -130,7 +133,7 @@ export async function transcribeAudio(input: { bytes: Uint8Array; mime: string }
   body.set("file", new File([copy], audioFilename(mime), { type: mime }));
   body.set("model", transcribeModel());
   body.set("response_format", "json");
-  body.set("prompt", "Outpatient visit. Keep every symptom, medicine name, strength, and dose.");
+  body.set("prompt", input.prompt?.trim() || "Outpatient visit. Keep every symptom, medicine name, strength, and dose.");
 
   let response: Response;
   try {
@@ -201,11 +204,21 @@ export async function translateUtterance(text: string): Promise<string> {
   return typeof content === "string" ? content.trim().replace(/^["']|["']$/g, "") : "";
 }
 
-export async function draftConsult(transcript: string): Promise<unknown> {
+export async function draftConsult(transcript: string, vocabulary: string[] = []): Promise<unknown> {
   const key = openAiApiKey();
   if (!key) throw new ScribeProviderError(scribeNotConfiguredMessage(), 503);
   const text = transcript.trim().slice(0, SCRIBE_MAX_TRANSCRIPT_CHARS);
   if (!text) throw new ScribeProviderError("Record the consultation before drafting.", 400);
+
+  const list = vocabulary
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .slice(0, 60)
+    .map((name) => `- ${name}`)
+    .join("\n");
+  const known = list
+    ? `Known medicines. Set catalogChoice to one of these exact names only when the spoken medicine clearly matches. Otherwise catalogChoice is empty.\n${list}\n\n`
+    : "No known-medicine list. Leave every catalogChoice empty.\n\n";
 
   let response: Response;
   try {
@@ -220,7 +233,7 @@ export async function draftConsult(transcript: string): Promise<unknown> {
         temperature: 0.1,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Transcript:\n"""\n${text}\n"""` },
+          { role: "user", content: `${known}Transcript:\n"""\n${text}\n"""` },
         ],
         response_format: {
           type: "json_schema",

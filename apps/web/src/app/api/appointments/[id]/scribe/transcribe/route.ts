@@ -5,6 +5,7 @@ import { normalizeAudioMime } from "@/lib/scribe/audio";
 import { requireScribeAppointment, scribeSessionFor, scribeSessionView } from "@/lib/scribe/access";
 import { SCRIBE_MAX_CHUNK_BYTES, SCRIBE_MAX_CHUNKS, SCRIBE_MAX_TRANSCRIPT_CHARS } from "@/lib/scribe/limits";
 import { ScribeProviderError, transcribeAudio, translateUtterance, transcribeModel } from "@/lib/scribe/openai";
+import { rejectUploadReason } from "@/lib/scribe/recording-guard";
 import { doctorMedicineVocabulary, transcribeVocabularyPrompt } from "@/lib/scribe/vocabulary";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -28,16 +29,27 @@ export async function POST(request: Request, context: Ctx) {
   const gate = await requireScribeAppointment(id);
   if (!gate.ok) return gate.response;
 
-  const limited = checkRateLimit(`scribe-tx:${gate.actor.id}`, { limit: 160, windowMs: 10 * 60_000 });
+  const limited = checkRateLimit(`scribe-tx:${gate.actor.id}`, { limit: 10, windowMs: 10 * 60_000 });
   if (!limited.ok) return tooMany(limited.retryAfterSec);
 
   const form = await request.formData().catch(() => null);
   const audio = form?.get("audio");
   const sessionId = String(form?.get("sessionId") ?? "");
   const seq = Number(form?.get("seq"));
+  const durationMs = Number(form?.get("durationMs"));
   const replace = String(form?.get("mode") ?? "") === "replace";
   if (!(audio instanceof Blob) || !Number.isInteger(seq) || seq < 1) {
     return NextResponse.json({ error: "Send the next part of the recording." }, { status: 400 });
+  }
+  const blocked = rejectUploadReason({ durationMs, chunkCount: seq - 1 });
+  if (blocked === "duration") {
+    return NextResponse.json({ error: "A recording can be at most 5 minutes." }, { status: 413 });
+  }
+  if (blocked === "count") {
+    return NextResponse.json(
+      { error: "This consultation is long enough. Draft the note from what was captured." },
+      { status: 413 },
+    );
   }
 
   const mime = normalizeAudioMime(audio.type || "audio/webm");
@@ -54,6 +66,21 @@ export async function POST(request: Request, context: Ctx) {
   }
   if (session.status !== "RECORDING" && session.status !== "TRANSCRIBED") {
     return NextResponse.json({ error: "This recording is already closed." }, { status: 409 });
+  }
+  if (session.chunkCount >= SCRIBE_MAX_CHUNKS) {
+    return NextResponse.json(
+      { error: "This consultation is long enough. Draft the note from what was captured.", chunkCount: session.chunkCount },
+      { status: 413 },
+    );
+  }
+  if (seq <= session.chunkCount) {
+    return NextResponse.json({
+      ok: true,
+      duplicate: true,
+      transcript: session.transcript ?? "",
+      chunkCount: session.chunkCount,
+      session: scribeSessionView(session),
+    });
   }
 
   let text = "";

@@ -1,6 +1,11 @@
-export const SCRIBE_MAX_CHUNKS = 150;
-export const SCRIBE_MAX_CHUNK_BYTES = 8_000_000;
+export const SCRIBE_MAX_CHUNKS = 3;
+export const SCRIBE_MAX_CHUNK_BYTES = 6_000_000;
 export const SCRIBE_MAX_TRANSCRIPT_CHARS = 80_000;
 export const SCRIBE_MAX_FIELD_CHARS = 2_000;
 export const SCRIBE_MAX_MEDICINES = 30;
 export const SCRIBE_MAX_DIAGNOSES = 12;
+export const SCRIBE_MAX_RECORDING_MS = 5 * 60_000;
+export const SCRIBE_RECORDING_SLACK_MS = 30_000;
+export const SCRIBE_SILENCE_MS = 60_000;
+export const SCRIBE_SILENCE_ANSWER_MS = 30_000;
+export const SPEECH_RMS = 0.02;

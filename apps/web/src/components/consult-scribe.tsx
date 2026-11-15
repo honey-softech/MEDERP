@@ -12,6 +12,14 @@ import {
   type ScribeAssessmentPatch,
   type ScribeDraft,
 } from "@/lib/scribe/draft-schema";
+import { SCRIBE_MAX_RECORDING_MS } from "@/lib/scribe/limits";
+import {
+  isSpeechLevel,
+  recordingLimitReached,
+  rmsFromSamples,
+  silencePromptDue,
+  silencePromptExpired,
+} from "@/lib/scribe/recording-guard";
 
 type SessionStatus = "RECORDING" | "TRANSCRIBED" | "DRAFTED" | "APPLIED" | "DISCARDED";
 
@@ -79,17 +87,25 @@ export function ConsultScribe({
   const [error, setError] = useState("");
   const [failedChunk, setFailedChunk] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
+  const [silenceAsk, setSilenceAsk] = useState(false);
 
   const recordingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const segmentTimerRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const partsRef = useRef<Blob[]>([]);
   const mimeRef = useRef("audio/webm");
   const sessionIdRef = useRef<string | null>(null);
   const seqRef = useRef(1);
   const uploadChainRef = useRef(Promise.resolve());
   const failedBlobRef = useRef<Blob | null>(null);
+  const startedAtRef = useRef(0);
+  const lastSpeechAtRef = useRef(0);
+  const silenceAskedAtRef = useRef(0);
+  const silenceAskRef = useRef(false);
+  const draftingRef = useRef(false);
+  const stopAndFillRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let cancelled = false;
@@ -133,22 +149,64 @@ export function ConsultScribe({
   useEffect(() => {
     if (!live) return;
     const started = Date.now();
-    const id = window.setInterval(() => setElapsed(Date.now() - started), 1000);
+    startedAtRef.current = started;
+    lastSpeechAtRef.current = started;
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const elapsedMs = now - started;
+      setElapsed(elapsedMs);
+      if (draftingRef.current || !recordingRef.current) return;
+      if (recordingLimitReached(elapsedMs)) {
+        setSilenceAsk(false);
+        silenceAskRef.current = false;
+        stopAndFillRef.current();
+        return;
+      }
+      if (silenceAskRef.current) {
+        if (silencePromptExpired(now - silenceAskedAtRef.current)) {
+          setSilenceAsk(false);
+          silenceAskRef.current = false;
+          stopAndFillRef.current();
+        }
+        return;
+      }
+      const analyser = analyserRef.current;
+      if (analyser) {
+        const samples = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(samples);
+        if (isSpeechLevel(rmsFromSamples(samples))) lastSpeechAtRef.current = now;
+      }
+      if (silencePromptDue(now - lastSpeechAtRef.current, false)) {
+        silenceAskRef.current = true;
+        silenceAskedAtRef.current = now;
+        setSilenceAsk(true);
+      }
+    }, 1000);
     return () => window.clearInterval(id);
   }, [live]);
 
   useEffect(() => {
+    stopAndFillRef.current = () => {
+      void draftNote();
+    };
+  });
+
+  useEffect(() => {
     return () => {
       recordingRef.current = false;
-      if (segmentTimerRef.current != null) window.clearInterval(segmentTimerRef.current);
       if (recorderRef.current?.state === "recording") recorderRef.current.stop();
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      void audioContextRef.current?.close();
     };
   }, []);
 
   function stopTracks() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    analyserRef.current = null;
+    const audio = audioContextRef.current;
+    audioContextRef.current = null;
+    void audio?.close();
   }
 
   function remember(next: SessionView) {
@@ -169,6 +227,7 @@ export function ConsultScribe({
     body.set("sessionId", sessionId);
     body.set("seq", String(seq));
     body.set("mode", "replace");
+    body.set("durationMs", String(Math.max(0, Date.now() - startedAtRef.current)));
     const response = await fetch(`/api/appointments/${appointmentId}/scribe/transcribe`, {
       method: "POST",
       body,
@@ -212,7 +271,6 @@ export function ConsultScribe({
           return;
         }
         recordingRef.current = false;
-        if (segmentTimerRef.current != null) window.clearInterval(segmentTimerRef.current);
         if (recorderRef.current?.state === "recording") recorderRef.current.stop();
         setLive(false);
         setError(message);
@@ -255,14 +313,7 @@ export function ConsultScribe({
       recordingRef.current = false;
       setLive(false);
       stopTracks();
-      return;
     }
-    if (segmentTimerRef.current != null) window.clearInterval(segmentTimerRef.current);
-    segmentTimerRef.current = window.setInterval(() => {
-      if (!recordingRef.current || rec.state !== "recording") return;
-      const blob = currentRecording();
-      if (blob.size > 800) enqueue(blob);
-    }, 20_000);
   }
 
   async function beginStream() {
@@ -277,8 +328,23 @@ export function ConsultScribe({
       return false;
     }
     recordingRef.current = true;
+    silenceAskRef.current = false;
+    setSilenceAsk(false);
+    startedAtRef.current = Date.now();
+    lastSpeechAtRef.current = startedAtRef.current;
     setLive(true);
     setElapsed(0);
+    const audioWindow = window.AudioContext;
+    if (audioWindow) {
+      const audio = new audioWindow();
+      const source = audio.createMediaStreamSource(streamRef.current);
+      const analyser = audio.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      audioContextRef.current = audio;
+      analyserRef.current = analyser;
+      void audio.resume();
+    }
     startSegment();
     return true;
   }
@@ -311,10 +377,8 @@ export function ConsultScribe({
 
   async function finishUploads() {
     recordingRef.current = false;
-    if (segmentTimerRef.current != null) {
-      window.clearInterval(segmentTimerRef.current);
-      segmentTimerRef.current = null;
-    }
+    silenceAskRef.current = false;
+    setSilenceAsk(false);
     const rec = recorderRef.current;
     if (rec && rec.state === "recording") {
       await new Promise<void>((resolve) => {
@@ -329,7 +393,8 @@ export function ConsultScribe({
 
   async function draftNote() {
     const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
+    if (!sessionId || draftingRef.current) return;
+    draftingRef.current = true;
     setBusy("draft");
     setError("");
     try {
@@ -380,8 +445,16 @@ export function ConsultScribe({
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not draft the visit note.");
     } finally {
+      draftingRef.current = false;
       setBusy("");
     }
+  }
+
+  function continueAfterSilence() {
+    silenceAskRef.current = false;
+    silenceAskedAtRef.current = 0;
+    lastSpeechAtRef.current = Date.now();
+    setSilenceAsk(false);
   }
 
   async function retryChunk() {
@@ -448,7 +521,7 @@ export function ConsultScribe({
   const liveText = (
     <div className="grid gap-3 md:grid-cols-2">
       <div>
-        <p className="text-[13px] font-semibold text-text-primary">Live translation</p>
+        <p className="text-[13px] font-semibold text-text-primary">English</p>
         <div
           aria-live="polite"
           className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-app-bg px-2.5 py-2 text-[13px] text-text-primary"
@@ -522,10 +595,32 @@ export function ConsultScribe({
 
       {!loading && mode === "edit" && session && (live || openRecording) && !filled ? (
         <div className="mt-2 space-y-2">
-          {liveText}
+          {live ? (
+            <p className="text-[13px] text-text-secondary">Recording. Press Stop when finished.</p>
+          ) : (
+            liveText
+          )}
+          {live && elapsed >= SCRIBE_MAX_RECORDING_MS - 60_000 ? (
+            <p className="text-[12px] font-medium text-text-primary">
+              Stops in {formatElapsed(Math.max(0, SCRIBE_MAX_RECORDING_MS - elapsed))}
+            </p>
+          ) : null}
           <p className="text-[12px] text-text-secondary">
             For each tablet say: மருந்து, name, strength, காலை or மதியம் or இரவு, சாப்பாட்டுக்கு முன் or பின், and the number of days.
           </p>
+          {silenceAsk ? (
+            <div className="space-y-2 rounded-lg border border-border bg-app-bg px-2.5 py-2">
+              <p className="text-[13px] text-text-primary">No speech for 1 minute. Continue recording or Stop?</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={compactPrimaryButtonClass} disabled={Boolean(busy)} onClick={continueAfterSilence}>
+                  Continue
+                </button>
+                <button type="button" className={compactButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>
+                  {busy === "draft" ? "Filling the assessment…" : "Stop"}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {live ? (
               <button type="button" className={compactPrimaryButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>

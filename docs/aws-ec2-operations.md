@@ -91,6 +91,11 @@ RAZORPAY_PLAN_ID_GROWTH="plan_...."
 # REQUIRED for autodebit tracking (Razorpay Dashboard → Webhooks → signing secret)
 RAZORPAY_WEBHOOK_SECRET="...."
 
+# Optional. Required only when a hospital turns on AI consult scribe.
+# OPENAI_API_KEY="sk-...."
+# OPENAI_TRANSCRIBE_MODEL="gpt-4o-transcribe"
+# OPENAI_SCRIBE_MODEL="gpt-4o-mini"
+
 # WhatsApp / AskEva
 ASKEVA_API_URL="https://backend.askeva.io/v1"
 ASKEVA_API_TOKEN="...."

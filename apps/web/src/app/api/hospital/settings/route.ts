@@ -72,6 +72,11 @@ export async function PATCH(request: Request) {
     }
   }
 
+  const aiScribeSent = body != null && "aiScribeEnabled" in body;
+  if (aiScribeSent) {
+    data.aiScribeEnabled = Boolean(body.aiScribeEnabled);
+  }
+
   const whatsappLanguageSent = body != null && "whatsappLanguage" in body;
   if (whatsappLanguageSent) {
     const language = parseHospitalWhatsAppLanguage(body.whatsappLanguage);
@@ -81,7 +86,7 @@ export async function PATCH(request: Request) {
     data.whatsappLanguage = language.value;
   }
 
-  if (!brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent && !whatsappLanguageSent) {
+  if (!brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent && !whatsappLanguageSent && !aiScribeSent) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -119,16 +124,21 @@ export async function PATCH(request: Request) {
         "nurseAsReceptionist",
         "followUpReminderEnabled",
         "followUpReminderDaysBefore",
+        "aiScribeEnabled",
         "whatsappLanguage",
       ],
     },
   );
 
   const whatsappLanguageOnly =
-    whatsappLanguageSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent;
-  const followUpOnly = followUpReminderSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !whatsappLanguageSent;
+    whatsappLanguageSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent && !aiScribeSent;
+  const aiScribeOnly =
+    aiScribeSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !followUpReminderSent && !whatsappLanguageSent;
+  const followUpOnly = followUpReminderSent && !brandingSent && !policySent && !walkInSent && !nurseReceptionSent && !whatsappLanguageSent && !aiScribeSent;
   const action = whatsappLanguageOnly
     ? "HOSPITAL_WHATSAPP_LANGUAGE_UPDATED"
+    : aiScribeOnly
+    ? "HOSPITAL_AI_SCRIBE_POLICY_UPDATED"
     : followUpOnly
     ? "HOSPITAL_FOLLOW_UP_REMINDER_POLICY_UPDATED"
     : nurseReceptionSent && !brandingSent && !policySent && !walkInSent && !whatsappLanguageSent
@@ -155,6 +165,8 @@ export async function PATCH(request: Request) {
     entityId: hospital.id,
     summary: whatsappLanguageOnly
       ? `${scoped.user.username} set the WhatsApp language to ${whatsappLanguageLabel(data.whatsappLanguage)}.`
+      : aiScribeOnly
+      ? `${scoped.user.username} ${data.aiScribeEnabled ? "turned on" : "turned off"} AI consult scribe.`
       : followUpOnly
       ? reminderEnabled
         ? `${scoped.user.username} turned on follow-up reminders ${reminderDays} day${reminderDays === 1 ? "" : "s"} before.`

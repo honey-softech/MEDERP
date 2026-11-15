@@ -92,6 +92,14 @@ enum VisitAssessmentStatus {
   APPROVED
 }
 
+enum ConsultScribeStatus {
+  RECORDING
+  TRANSCRIBED
+  DRAFTED
+  APPLIED
+  DISCARDED
+}
+
 enum MedicalCertificateType {
   SICK_LEAVE
   FITNESS
@@ -421,6 +429,8 @@ model Hospital {
   nurseAsReceptionist Boolean          @default(false)
   followUpReminderEnabled Boolean      @default(false)
   followUpReminderDaysBefore Int       @default(1)
+  /** Doctor consult recording. Off until the hospital accepts sending audio to OpenAI. */
+  aiScribeEnabled        Boolean           @default(false)
   /** Default language for patient WhatsApp messages: en, hi, ta, kn, ml. */
   whatsappLanguage       String            @default("en")
   trialEndsAt        DateTime?
@@ -473,6 +483,7 @@ model Hospital {
   timesheetWeeks    TimesheetWeek[]
   payrollSundayNotices PayrollSundayNotice[]
   rxTemplates       RxTemplate[]
+  consultScribeSessions ConsultScribeSession[]
 }
 
 model HospitalSubscription {
@@ -581,6 +592,7 @@ model AppUser {
   announcements        HospitalAnnouncement[] @relation("AnnouncementAuthor")
   announcementReplies  HospitalAnnouncementReply[] @relation("AnnouncementReplyAuthor")
   pushTokens           DevicePushToken[]
+  consultScribeSessions ConsultScribeSession[]
 
   @@unique([hospitalId, userCode])
   @@unique([hospitalId, employeeId])
@@ -921,6 +933,7 @@ model Appointment {
   pharmacyRxOrders  PharmacyRxOrder[]
   admissions        Admission[]
   medicalCertificates MedicalCertificate[]
+  consultScribeSessions ConsultScribeSession[]
 
   @@index([hospitalId, scheduledAt])
   @@index([hospitalId, doctorId, scheduledAt])
@@ -976,6 +989,8 @@ model VisitAssessment {
   entryMode            String                @default("TYPED")
   /** JSON array of transparent PNG data URLs, one per handwritten page. */
   handwritingPages     String?               @db.Text
+  /** True when an AI scribe draft was applied and the doctor then approved a typed note. */
+  aiAssisted           Boolean               @default(false)
   status               VisitAssessmentStatus @default(DRAFT)
   approvedAt           DateTime?
   approvedByUserId     String?
@@ -997,6 +1012,32 @@ model VisitAssessment {
   updatedAt            DateTime              @updatedAt
 
   @@index([hospitalId, status, updatedAt])
+}
+
+model ConsultScribeSession {
+  id              String              @id @default(cuid())
+  hospitalId      String
+  hospital        Hospital            @relation(fields: [hospitalId], references: [id])
+  appointmentId   String
+  appointment     Appointment         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  doctorUserId    String
+  doctorUser      AppUser             @relation(fields: [doctorUserId], references: [id])
+  consentAt       DateTime
+  status          ConsultScribeStatus @default(RECORDING)
+  /** Transcript only. Audio is discarded after transcription. */
+  transcript      String?             @db.Text
+  /** English wording of the conversation, updated as each part is transcribed. */
+  translation     String?             @db.Text
+  /** JSON scribe draft shown to the doctor before it is applied. */
+  draftJson       String?             @db.Text
+  transcribeModel String?
+  scribeModel     String?
+  chunkCount      Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([hospitalId, appointmentId, status])
+  @@index([appointmentId, createdAt])
 }
 
 model MedicalCertificate {

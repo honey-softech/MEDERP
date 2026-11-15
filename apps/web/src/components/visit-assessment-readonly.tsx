@@ -41,6 +41,7 @@ export function VisitAssessmentReadonly({
   followUpAt,
   entryMode,
   handwritingPages,
+  aiAssisted = false,
   omitBanner = false,
 }: {
   appointmentId: string;
@@ -59,6 +60,7 @@ export function VisitAssessmentReadonly({
   followUpAt?: Date | string | null;
   entryMode?: string | null;
   handwritingPages?: string[] | null;
+  aiAssisted?: boolean;
   omitBanner?: boolean;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
@@ -87,6 +89,11 @@ export function VisitAssessmentReadonly({
       {omitBanner ? null : (
         <VisitSummaryBanner statusLabel={statusLabel} summaryApproved={summaryApproved} />
       )}
+      {aiAssisted ? (
+        <p className="print:hidden text-xs text-text-secondary">
+          Drafted with AI and approved by the doctor.
+        </p>
+      ) : null}
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-2 lg:gap-4">
         {handwritten ? (

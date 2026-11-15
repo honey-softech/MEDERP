@@ -197,10 +197,20 @@ export function PrescriptionBuilder({
   // adopt that text immediately instead of waiting for a later remount.
   useEffect(() => {
     if (textFromRows(rows) === value) return;
-    setRows(rowsFromText(value));
+    const nextRows = rowsFromText(value);
+    setRows(nextRows);
     setEditingKey(null);
+    if (!allergies?.trim()) return;
+    for (const row of nextRows) {
+      const hit = checkAllergy(allergies, { name: row.name });
+      if (hit) {
+        setAllergyAlert({ ...hit, drugName: row.name });
+        return;
+      }
+    }
+    setAllergyAlert(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rows are compared against the incoming value
-  }, [value]);
+  }, [value, allergies]);
 
   useEffect(() => {
     if (suppressSearchRef.current) {

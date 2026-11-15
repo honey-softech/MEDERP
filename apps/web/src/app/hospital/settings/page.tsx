@@ -7,6 +7,7 @@ import { SignaturePolicyForm } from "@/components/signature-policy-form";
 import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
 import { NurseReceptionistForm } from "@/components/nurse-receptionist-form";
 import { FollowUpReminderPolicyForm } from "@/components/follow-up-reminder-policy-form";
+import { AiScribePolicyForm } from "@/components/ai-scribe-policy-form";
 import { WhatsAppLanguageForm } from "@/components/whatsapp-language-form";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { parseExtraPhones } from "@/lib/hospital-letterhead";
@@ -46,6 +47,7 @@ export default async function HospitalSettingsPage() {
         nurseAsReceptionist: true,
         followUpReminderEnabled: true,
         followUpReminderDaysBefore: true,
+        aiScribeEnabled: true,
         whatsappLanguage: true,
       },
     }),
@@ -126,6 +128,7 @@ export default async function HospitalSettingsPage() {
           followUpReminderDaysBefore: hospital.followUpReminderDaysBefore,
         }}
       />
+      <AiScribePolicyForm initial={{ aiScribeEnabled: hospital.aiScribeEnabled }} />
       <WhatsAppLanguageForm initial={{ whatsappLanguage: hospital.whatsappLanguage }} />
       <WalkInPolicyForm
         initial={{

@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { DoctorVisitActions } from "@/components/doctor-visit-actions";
 import { ConsultAssessmentForm } from "@/components/consult-assessment-form";
+import { ConsultScribe } from "@/components/consult-scribe";
 import { ConsultQueueNav } from "@/components/consult-queue-nav";
 import { PatientContextPanel } from "@/components/patient-context-panel";
 import { LabOrderPanel } from "@/components/lab-order-panel";
@@ -754,6 +755,7 @@ export default async function AppointmentDetailPage({
             }
             initialHandwritingPages={readHandwritingPages(assessment?.handwritingPages)}
             sheet={writingSheet}
+            aiScribeEnabled={Boolean(user.hospital?.aiScribeEnabled)}
             initial={{
               chiefComplaint: assessment?.chiefComplaint ?? "",
               examination: assessment?.examination ?? "",
@@ -798,6 +800,7 @@ export default async function AppointmentDetailPage({
           </div>
         ) : canAssess && visitClosed ? (
           <div className="min-w-0 space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
+            {user.hospital?.aiScribeEnabled ? <ConsultScribe appointmentId={appointment.id} mode="view" /> : null}
             <VisitAssessmentReadonly
               omitBanner
               appointmentId={appointment.id}
@@ -816,6 +819,7 @@ export default async function AppointmentDetailPage({
               followUpAt={assessment?.followUpAt}
               entryMode={assessment?.entryMode}
               handwritingPages={readHandwritingPages(assessment?.handwritingPages)}
+              aiAssisted={Boolean(assessment?.aiAssisted)}
             />
             {canCollectFee && !visitPaid ? (
               <div className="print:hidden">

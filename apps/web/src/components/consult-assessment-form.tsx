@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BloodTestPicker } from "@/components/blood-test-picker";
+import { ConsultScribe } from "@/components/consult-scribe";
 import { HandwritingPad } from "@/components/handwriting-pad";
 import { PrescriptionBuilder } from "@/components/prescription-builder";
 import { ExpandToggle } from "@/components/expand-toggle";
@@ -20,6 +21,7 @@ import {
 import type { AssessmentEntryMode } from "@/lib/handwriting";
 import { approveBlockReason } from "@/lib/handwriting";
 import type { InvestigationPick } from "@/lib/lab-catalog";
+import type { ScribeAssessmentKey, ScribeAssessmentPatch } from "@/lib/scribe/draft-schema";
 
 const ENTRY_MODE_KEY = "mederp.assessment.entryMode";
 const ENTRY_MODE_EVENT = "mederp-entry-mode";
@@ -163,6 +165,7 @@ export function ConsultAssessmentForm({
   initialEntryMode = null,
   initialHandwritingPages = [],
   sheet = null,
+  aiScribeEnabled = false,
   children,
 }: {
   appointmentId: string;
@@ -194,6 +197,8 @@ export function ConsultAssessmentForm({
   initialHandwritingPages?: string[];
   /** Letterhead, identity, and vitals already printed on the handwritten sheet. */
   sheet?: VisitSheetHeaderProps | null;
+  /** Hospital has turned on consult recording. The card stays hidden in handwritten mode. */
+  aiScribeEnabled?: boolean;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -231,6 +236,8 @@ export function ConsultAssessmentForm({
   );
   const entryMode = chosenMode ?? rememberedMode;
   const [handwritingPages, setHandwritingPages] = useState<string[]>(initialHandwritingPages);
+  const [aiFields, setAiFields] = useState<Partial<Record<keyof AssessmentValues, boolean>>>({});
+  const [uncertainFields, setUncertainFields] = useState<Partial<Record<keyof AssessmentValues, boolean>>>({});
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
   const [saved, setSaved] = useState(canPreview);
@@ -310,9 +317,44 @@ export function ConsultAssessmentForm({
   const requiredFieldClass = "border-critical bg-critical-bg/40 ring-1 ring-critical/40";
 
   function setField<K extends keyof AssessmentValues>(key: K, value: AssessmentValues[K]) {
+    if (valuesRef.current[key] === value) return;
     const next = { ...valuesRef.current, [key]: value };
     valuesRef.current = next;
     setValues(next);
+    setAiFields((current) => (current[key] ? { ...current, [key]: false } : current));
+    setUncertainFields((current) => (current[key] ? { ...current, [key]: false } : current));
+  }
+
+  function applyScribe(patch: ScribeAssessmentPatch, uncertain: ScribeAssessmentKey[]) {
+    if (entryModeRef.current !== "TYPED") chooseEntryMode("TYPED");
+    const next: AssessmentValues = { ...valuesRef.current };
+    const marks: Partial<Record<keyof AssessmentValues, boolean>> = {};
+    const checks: Partial<Record<keyof AssessmentValues, boolean>> = {};
+    for (const key of Object.keys(patch) as ScribeAssessmentKey[]) {
+      const value = patch[key];
+      if (typeof value !== "string") continue;
+      next[key] = value;
+      if (value.trim()) marks[key] = true;
+      if (uncertain.includes(key)) checks[key] = true;
+    }
+    valuesRef.current = next;
+    setValues(next);
+    setAiFields(marks);
+    setUncertainFields(checks);
+  }
+
+  function fieldMarks(name: keyof AssessmentValues) {
+    if (!aiFields[name] && !uncertainFields[name]) return null;
+    return (
+      <span className="inline-flex items-center gap-1">
+        {aiFields[name] ? (
+          <span className="rounded bg-primary-light px-1 text-[10px] font-semibold text-primary">AI</span>
+        ) : null}
+        {uncertainFields[name] ? (
+          <span className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800">Check</span>
+        ) : null}
+      </span>
+    );
   }
 
   function addChip(
@@ -686,7 +728,9 @@ export function ConsultAssessmentForm({
 
       <div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Chief complaints</p>
+          <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">
+            Chief complaints {fieldMarks("chiefComplaint")}
+          </p>
           {priorVisit?.chiefComplaint?.trim() && !values.chiefComplaint.trim() ? (
             <button
               type="button"
@@ -776,7 +820,7 @@ export function ConsultAssessmentForm({
         {notesOpen ? (
           <div className="flex min-h-0 flex-1 flex-col gap-2.5 border-t border-border px-3 pb-3 pt-2">
             <label className="flex min-h-0 flex-1 flex-col text-xs font-medium text-text-secondary">
-              Examination
+              <span className="inline-flex items-center gap-1">Examination {fieldMarks("examination")}</span>
               <textarea
                 className={`${areaClass} flex-1 resize-none`}
                 value={values.examination}
@@ -785,7 +829,9 @@ export function ConsultAssessmentForm({
               />
             </label>
             <label className="flex min-h-0 flex-1 flex-col text-xs font-medium text-text-secondary">
-              History of present illness
+              <span className="inline-flex items-center gap-1">
+                History of present illness {fieldMarks("summary")}
+              </span>
               <textarea
                 className={`${areaClass} flex-1 resize-none`}
                 value={values.summary}
@@ -804,7 +850,7 @@ export function ConsultAssessmentForm({
       <div>
         <div className="mb-1 flex items-center justify-between gap-2">
           <p className={`text-[13px] font-semibold 2xl:text-sm ${showDiagnosisError ? "text-critical" : "text-text-primary"}`}>
-            Diagnosis <span className="font-normal text-critical">*</span>
+            Diagnosis <span className="font-normal text-critical">*</span> {fieldMarks("diagnosis")}
           </p>
           {priorVisit?.diagnosis?.trim() && needsDiagnosis ? (
             <button
@@ -965,7 +1011,9 @@ export function ConsultAssessmentForm({
   const outcome = (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Outcome</p>
+        <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">
+          Outcome {fieldMarks("visitOutcome")} {fieldMarks("followUpAt")}
+        </p>
         <button
           type="button"
           className="text-[11px] font-medium text-primary hover:underline"
@@ -1007,7 +1055,9 @@ export function ConsultAssessmentForm({
     <div className="space-y-2.5">
       <div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">Prescription</p>
+          <p className="text-[13px] font-semibold text-text-primary 2xl:text-sm">
+            Prescription {fieldMarks("prescription")}
+          </p>
           {priorVisit?.prescription?.trim() && !values.prescription.trim() ? (
             <button
               type="button"
@@ -1069,7 +1119,9 @@ export function ConsultAssessmentForm({
       </div>
 
       <div>
-        <p className="mb-1 text-[13px] font-semibold text-text-primary 2xl:text-sm">Advice</p>
+        <p className="mb-1 text-[13px] font-semibold text-text-primary 2xl:text-sm">
+          Advice {fieldMarks("advice")}
+        </p>
         <textarea
           className={areaClass}
           rows={2}
@@ -1315,7 +1367,17 @@ export function ConsultAssessmentForm({
     <div
       className={
         cockpit
-          ? "grid w-full min-w-0 grid-cols-1 items-stretch gap-2.5 overflow-x-hidden lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] 2xl:gap-3"
+          ? "flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2.5 overflow-hidden"
+          : "space-y-4"
+      }
+    >
+    {aiScribeEnabled ? (
+      <ConsultScribe appointmentId={appointmentId} onApply={applyScribe} />
+    ) : null}
+    <div
+      className={
+        cockpit
+          ? "grid w-full min-w-0 flex-1 grid-cols-1 items-stretch gap-2.5 overflow-x-hidden lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] 2xl:gap-3"
           : "grid max-w-5xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
       }
     >
@@ -1379,6 +1441,7 @@ export function ConsultAssessmentForm({
       </section>
       </>
       )}
+    </div>
     </div>
     {followUpDialog}
     {testsMountEl

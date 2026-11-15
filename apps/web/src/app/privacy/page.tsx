@@ -82,7 +82,8 @@ export default function PrivacyPage() {
           <p>
             Neither app shows ads or includes a third-party analytics tracker. The Android app does not ask
             for location, contacts, microphone, or camera. The iOS permissions are listed in the iOS app
-            section below.
+            section below. On the website, AI consult scribe uses the microphone only while a doctor is recording
+            a consultation the patient has agreed to.
           </p>
         </Section>
 
@@ -106,6 +107,12 @@ export default function PrivacyPage() {
             <li>Google Firebase, to deliver push notifications to the app.</li>
             <li>The infrastructure provider that hosts MedERP.</li>
             <li>A regulator, court, or other party when the law requires it.</li>
+            <li>
+              OpenAI, only when the clinic turns on AI consult scribe and a doctor records a consultation after the
+              patient agrees. The audio is sent so it can be transcribed and turned into a draft note. MedERP does not
+              store the audio. The transcript and the draft stay in the clinic record for the doctor to review. They
+              are not added to the prescription or the patient copy until the doctor approves.
+            </li>
           </ul>
         </Section>
 
@@ -114,6 +121,8 @@ export default function PrivacyPage() {
             Clinical records in MedERP are health information. They are used so the clinic can care for
             patients and run its operations. They are not used for advertising. The clinic is responsible for
             the accuracy of the records it enters and for giving its patients any notice the law requires.
+            When the clinic turns on AI consult scribe, a consented consultation recording is sent to OpenAI to
+            produce a transcript and a draft. MedERP does not keep the audio.
           </p>
         </Section>
 

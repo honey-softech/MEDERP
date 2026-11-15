@@ -48,6 +48,8 @@ services:
       WHATSAPP_MEDIA_BASE_URL: ${WHATSAPP_MEDIA_BASE_URL:-${NEXT_PUBLIC_API_URL}}
       OTP_DUMMY: ${OTP_DUMMY:-0}
       NODE_OPTIONS: "--max-old-space-size=768 --dns-result-order=ipv4first"
+      # Optional. Read from apps/web/.env when a hospital turns on AI consult scribe.
+      # OPENAI_API_KEY, OPENAI_TRANSCRIBE_MODEL, OPENAI_SCRIBE_MODEL
     volumes:
       - mederp_whatsapp_media:/app/.data/whatsapp-media
     depends_on:

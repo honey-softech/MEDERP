@@ -29,6 +29,7 @@ import {
   serializeHandwritingPages,
   validateHandwritingPages,
 } from "@/lib/handwriting";
+import { resolveAiAssisted } from "@/lib/scribe/draft-schema";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -69,6 +70,7 @@ const ASSESSMENT_AUDIT_FIELDS = [
   "followUpAt",
   "entryMode",
   "handwritingPages",
+  "aiAssisted",
   "status",
   "approvedByDisplayName",
   "approvedByCredentials",
@@ -225,6 +227,25 @@ export async function POST(request: Request, context: Ctx) {
     }
 
     const approve = action === "approve";
+    const sessionApplied =
+      approve && entryMode === "TYPED"
+        ? Boolean(
+            await prisma.consultScribeSession.findFirst({
+              where: {
+                hospitalId: scoped.user.hospitalId,
+                appointmentId: appointment.id,
+                status: "APPLIED",
+              },
+              select: { id: true },
+            }),
+          )
+        : false;
+    const aiAssisted = resolveAiAssisted({
+      approve,
+      entryMode,
+      sessionApplied,
+      previous: Boolean(appointment.assessment?.aiAssisted),
+    });
     const signature = approve ? await activeSignatureFor(scoped.user.id, scoped.user.hospitalId) : null;
     if (approve) {
       const blocked = approveBlockReason({
@@ -259,6 +280,7 @@ export async function POST(request: Request, context: Ctx) {
       followUpAt,
       entryMode,
       handwritingPages: serializeHandwritingPages(handwriting.pages),
+      aiAssisted,
       status: approve || wasApproved ? ("APPROVED" as const) : ("DRAFT" as const),
       approvedAt: approve ? new Date() : wasApproved ? appointment.assessment?.approvedAt ?? null : null,
       approvedByUserId: approve ? scoped.user.id : wasApproved ? appointment.assessment?.approvedByUserId ?? null : null,
@@ -336,7 +358,7 @@ export async function POST(request: Request, context: Ctx) {
           : created
             ? `${scoped.user.username} saved a draft visit summary for ${patientName(appointment.patient)}.`
             : `${scoped.user.username} revised the visit summary for ${patientName(appointment.patient)}.`,
-        metadata: { changes },
+        metadata: { changes, ...(approve ? { aiAssisted: assessment.aiAssisted } : {}) },
       });
     }
 

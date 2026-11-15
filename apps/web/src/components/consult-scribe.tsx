@@ -12,6 +12,7 @@ import {
   type ScribeAssessmentPatch,
   type ScribeDraft,
 } from "@/lib/scribe/draft-schema";
+import { requestInstalledMicrophone, runningInInstalledApp } from "@/lib/native-app-session";
 import { SCRIBE_MAX_RECORDING_MS } from "@/lib/scribe/limits";
 import {
   isSpeechLevel,
@@ -308,7 +309,8 @@ export function ConsultScribe({
       if (blob.size > 0) enqueue(blob, true);
     };
     try {
-      rec.start(1000);
+      // A timed slice of an iOS mp4 recording can kill the web view.
+      rec.start();
     } catch {
       setError("Could not start recording.");
       recordingRef.current = false;
@@ -344,16 +346,20 @@ export function ConsultScribe({
     lastSpeechAtRef.current = startedAtRef.current;
     setLive(true);
     setElapsed(0);
-    const audioWindow = window.AudioContext;
-    if (audioWindow) {
-      const audio = new audioWindow();
-      const source = audio.createMediaStreamSource(streamRef.current);
-      const analyser = audio.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      audioContextRef.current = audio;
-      analyserRef.current = analyser;
-      void audio.resume();
+    try {
+      const audioWindow = window.AudioContext;
+      if (audioWindow) {
+        const audio = new audioWindow();
+        const source = audio.createMediaStreamSource(streamRef.current);
+        const analyser = audio.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        audioContextRef.current = audio;
+        analyserRef.current = analyser;
+        void audio.resume();
+      }
+    } catch {
+      // Recording continues when the silence meter cannot start.
     }
     startSegment();
     return true;
@@ -362,6 +368,14 @@ export function ConsultScribe({
   async function startRecording() {
     setError("");
     setBusy("start");
+    if (runningInInstalledApp()) {
+      const allowed = await requestInstalledMicrophone();
+      if (!allowed) {
+        setBusy("");
+        setError("Allow the microphone to record the consultation.");
+        return;
+      }
+    }
     const micReady = openMicrophone().then(
       (stream) => stream,
       (reason: unknown) => reason,
@@ -396,6 +410,13 @@ export function ConsultScribe({
 
   async function continueRecording() {
     setError("");
+    if (runningInInstalledApp()) {
+      const allowed = await requestInstalledMicrophone();
+      if (!allowed) {
+        setError("Allow the microphone to record the consultation.");
+        return;
+      }
+    }
     await beginStream();
   }
 

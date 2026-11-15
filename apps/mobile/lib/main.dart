@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mederp_mobile/bill_download.dart';
+import 'package:mederp_mobile/capture_permission.dart';
 import 'package:mederp_mobile/pulse_loader.dart';
 import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
@@ -89,6 +90,10 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
             if (download != null) saveNativeBill(download);
             return;
           }
+          if (isMicrophoneRequest(raw)) {
+            unawaited(_answerMicrophoneRequest());
+            return;
+          }
           final sessionAction = nativeSessionAction(raw);
           if (sessionAction == 'signed-out') {
             PushNotifications.stopForSignOut();
@@ -131,24 +136,9 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
       );
     final webKit = _controller.platform;
     if (webKit is WebKitWebViewController) {
-      // grant() answers WebKit without the system alert, so a consult never
-      // asks for the microphone. prompt() shows that alert.
-      unawaited(
-        webKit.setOnPlatformPermissionRequest((request) {
-          final capture =
-              request.types.isNotEmpty &&
-              request.types.every(
-                (type) =>
-                    type == WebViewPermissionResourceType.microphone ||
-                    type == WebViewPermissionResourceType.camera,
-              );
-          if (capture && request is WebKitWebViewPermissionRequest) {
-            request.prompt();
-            return;
-          }
-          request.deny();
-        }),
-      );
+      // Ask iOS first, then allow the page. prompt() and an early grant both
+      // open the microphone while it is still undecided, and iOS quits the app.
+      unawaited(webKit.setOnPlatformPermissionRequest(_allowCaptureAfterIosPrompt));
       unawaited(webKit.setInspectable(kDebugMode));
     }
     // The iOS view has to be on screen before the first load. Reading the
@@ -159,6 +149,48 @@ class _MedErpWebPageState extends State<MedErpWebPage> {
     });
     SystemNotifications.ensureReady().catchError((_) {});
     PushNotifications.start(webView: _controller).catchError((_) {});
+  }
+
+  Future<void> _answerMicrophoneRequest() async {
+    final granted = await requestIosCapture('microphone');
+    try {
+      await _controller.runJavaScript(
+        'window.__mederpMic && window.__mederpMic(${granted ? 'true' : 'false'})',
+      );
+    } catch (_) {}
+  }
+
+  void _allowCaptureAfterIosPrompt(PlatformWebViewPermissionRequest request) {
+    final microphone = request.types.contains(WebViewPermissionResourceType.microphone);
+    final camera = request.types.contains(WebViewPermissionResourceType.camera);
+    final captureOnly =
+        request.types.isNotEmpty &&
+        request.types.every(
+          (type) =>
+              type == WebViewPermissionResourceType.microphone ||
+              type == WebViewPermissionResourceType.camera,
+        );
+    if (!captureOnly) {
+      request.deny();
+      return;
+    }
+    unawaited(() async {
+      try {
+        if (microphone && !await requestIosCapture('microphone')) {
+          await request.deny();
+          return;
+        }
+        if (camera && !await requestIosCapture('camera')) {
+          await request.deny();
+          return;
+        }
+        await request.grant();
+      } catch (_) {
+        try {
+          await request.deny();
+        } catch (_) {}
+      }
+    }());
   }
 
   @override

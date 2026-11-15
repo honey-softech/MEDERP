@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mederp_mobile/bill_download.dart';
+import 'package:mederp_mobile/capture_permission.dart';
 import 'package:mederp_mobile/main.dart';
 import 'package:mederp_mobile/push_notifications.dart';
 import 'package:mederp_mobile/system_notifications.dart';
@@ -17,6 +18,17 @@ void main() {
     expect(mobileUserAgent('Mozilla/5.0 $medErpMobileToken'), 'Mozilla/5.0 $medErpMobileToken');
     expect(mobileUserAgent(iosWebViewUserAgent), contains('iPhone'));
     expect(mobileUserAgent(iosWebViewUserAgent), contains(medErpMobileToken));
+  });
+
+  test('a microphone bridge message is recognized', () {
+    expect(isMicrophoneRequest('{"type":"microphone"}'), isTrue);
+    expect(isMicrophoneRequest('{"type":"signed-in"}'), isFalse);
+    expect(isMicrophoneRequest('not json'), isFalse);
+  });
+
+  test('capture permission stays off outside iOS', () async {
+    expect(await requestIosCapture('microphone'), isFalse);
+    expect(await requestIosCapture('camera'), isFalse);
   });
 
   test('cancelled iOS navigations are not connection failures', () {

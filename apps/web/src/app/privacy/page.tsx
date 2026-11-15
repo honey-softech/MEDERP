@@ -141,11 +141,12 @@ export default function PrivacyPage() {
             <li>Internet, to load the clinic workspace.</li>
             <li>Notifications, for staff alerts.</li>
             <li>Camera, when staff choose to take a photo for a patient record, signature, or document upload.</li>
+            <li>Microphone, only while a doctor records a consultation the patient has agreed to.</li>
             <li>Photo library, when staff choose an existing photo or document to attach.</li>
             <li>Location, only while the app is open and only when a hospital page requests it.</li>
             <li>Files the user picks, to upload a document or to save a bill PDF where the user chooses.</li>
           </ul>
-          <p>The iOS app does not ask for contacts or the microphone.</p>
+          <p>The iOS app does not ask for contacts.</p>
         </Section>
 
         <Section title="How long information is kept">

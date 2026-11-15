@@ -10,6 +10,38 @@ function nativeBridge(): NativeBridge | null {
   return native;
 }
 
+export function runningInInstalledApp() {
+  return nativeBridge() != null;
+}
+
+/**
+ * The installed iPhone app shows the system microphone alert.
+ * A browser has no bridge, so recording asks through the page instead.
+ */
+export function requestInstalledMicrophone() {
+  const bridge = nativeBridge();
+  if (!bridge) return Promise.resolve(true);
+  return new Promise<boolean>((resolve) => {
+    const page = window as Window & { __mederpMic?: (granted: boolean) => void };
+    const timer = window.setTimeout(() => {
+      delete page.__mederpMic;
+      resolve(false);
+    }, 120_000);
+    page.__mederpMic = (granted) => {
+      window.clearTimeout(timer);
+      delete page.__mederpMic;
+      resolve(granted === true);
+    };
+    try {
+      bridge.postMessage(JSON.stringify({ type: "microphone" }));
+    } catch {
+      window.clearTimeout(timer);
+      delete page.__mederpMic;
+      resolve(false);
+    }
+  });
+}
+
 /** Tells the installed app to drop or restore its push registration. No-op in a browser. */
 export function notifyNativeSession(type: "signed-in" | "signed-out") {
   try {

@@ -46,10 +46,47 @@ const FIELD_LABELS: Record<ScribeAssessmentKey, string> = {
   visitOutcome: "Outcome",
 };
 
-function recorderMime() {
-  if (typeof MediaRecorder === "undefined") return "";
-  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
-  return types.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+function appleTouchDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPadOS desktop mode reports a Mac, but still only records audio/mp4.
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+function mimeChoices() {
+  const ordered = appleTouchDevice()
+    ? ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  if (typeof MediaRecorder === "undefined") return [""];
+  const supported = ordered.filter((type) => {
+    try {
+      return MediaRecorder.isTypeSupported(type);
+    } catch {
+      return false;
+    }
+  });
+  // The default is last. iPad can report a type as supported and then reject it.
+  return [...supported, ""];
+}
+
+function openRecorder(stream: MediaStream) {
+  let last: unknown = new Error("Could not start recording.");
+  for (const mime of mimeChoices()) {
+    try {
+      return mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw last;
+}
+
+function storedMime(mime: string) {
+  const base = mime.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (base === "video/mp4" || base === "audio/m4a" || base === "audio/x-m4a") return "audio/mp4";
+  if (base === "video/webm") return "audio/webm";
+  return base || "audio/webm";
 }
 
 function formatElapsed(ms: number) {
@@ -61,11 +98,15 @@ function formatElapsed(ms: number) {
 
 function micMessage(error: unknown) {
   if (error instanceof Error && error.message.startsWith("This browser")) return error.message;
-  if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
-    return runningInInstalledApp()
-      ? "The microphone is off for MedERP. Turn it on in Settings, then record again."
-      : "Allow the microphone to record the consultation.";
+  const name = error instanceof DOMException ? error.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    if (runningInInstalledApp()) return "The microphone is off for MedERP. Turn it on in Settings, then record again.";
+    if (appleTouchDevice()) return "Allow the microphone for mederp.co.in in Safari, then record again.";
+    return "Allow the microphone to record the consultation.";
   }
+  if (name === "NotFoundError") return "No microphone was found on this device.";
+  if (name === "NotReadableError") return "The microphone is being used by another app. Close that app and try again.";
+  if (name === "NotSupportedError") return "Could not start recording on this device.";
   return "Could not use the microphone.";
 }
 
@@ -180,7 +221,7 @@ export function ConsultScribe({
         analyser.getByteTimeDomainData(samples);
         if (isSpeechLevel(rmsFromSamples(samples))) lastSpeechAtRef.current = now;
       }
-      if (runningInInstalledApp()) return;
+      if (runningInInstalledApp() || appleTouchDevice()) return;
       if (silencePromptDue(now - lastSpeechAtRef.current, false)) {
         silenceAskRef.current = true;
         silenceAskedAtRef.current = now;
@@ -214,19 +255,22 @@ export function ConsultScribe({
     void audio?.close();
   }
 
-  async function releaseCapture() {
+  function releaseCaptureNow() {
     recordingRef.current = false;
     const rec = recorderRef.current;
     recorderRef.current = null;
     if (rec && rec.state !== "inactive") {
-      await new Promise<void>((resolve) => {
-        rec.addEventListener("stop", () => resolve(), { once: true });
-        try {
-          rec.stop();
-        } catch {
-          resolve();
-        }
-      });
+      const parts = partsRef.current.slice();
+      const mime = mimeRef.current;
+      rec.onstop = () => {
+        const blob = new Blob(parts, { type: mime || "audio/webm" });
+        if (blob.size > 0) enqueue(blob, true);
+      };
+      try {
+        rec.stop();
+      } catch {
+        // The previous recorder had already stopped.
+      }
     }
     stopTracks();
   }
@@ -245,7 +289,8 @@ export function ConsultScribe({
     if (!sessionId) return;
     const seq = seqRef.current;
     const body = new FormData();
-    body.set("audio", blob, "consult.webm");
+    const type = storedMime(blob.type || mimeRef.current);
+    body.set("audio", new Blob([blob], { type }), type === "audio/mp4" ? "consult.m4a" : "consult.webm");
     body.set("sessionId", sessionId);
     body.set("seq", String(seq));
     body.set("mode", "replace");
@@ -307,20 +352,19 @@ export function ConsultScribe({
   function startSegment() {
     const stream = streamRef.current;
     if (!stream || !recordingRef.current) return;
-    const mime = recorderMime();
     partsRef.current = [];
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      rec = openRecorder(stream);
     } catch {
-      setError("This browser cannot record audio. Use Chrome or Edge.");
+      setError("Could not start recording on this device.");
       recordingRef.current = false;
       setLive(false);
       stopTracks();
       return;
     }
     recorderRef.current = rec;
-    mimeRef.current = rec.mimeType || mime || "audio/webm";
+    mimeRef.current = storedMime(rec.mimeType);
     rec.ondataavailable = (event) => {
       if (event.data.size > 0) partsRef.current.push(event.data);
     };
@@ -341,16 +385,25 @@ export function ConsultScribe({
 
   function openMicrophone() {
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      return Promise.reject(new Error("This browser cannot record audio. Use Chrome or Edge."));
+      return Promise.reject(new Error("This browser cannot record audio."));
     }
-    // Called from the tap, before any await. iOS only shows the microphone
-    // alert when getUserMedia starts inside that tap.
-    return navigator.mediaDevices.getUserMedia({ audio: true });
+    // Called from the tap, before any await. iPad and iPhone only allow the
+    // microphone when getUserMedia starts inside that tap.
+    const plain = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+    return navigator.mediaDevices.getUserMedia({ audio: true }).catch((error: unknown) => {
+      if (
+        error instanceof DOMException &&
+        (error.name === "NotReadableError" || error.name === "OverconstrainedError" || error.name === "AbortError")
+      ) {
+        return navigator.mediaDevices.getUserMedia(plain);
+      }
+      throw error;
+    });
   }
 
   async function beginStream(existing?: MediaStream) {
     if (!existing && (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia)) {
-      setError("This browser cannot record audio. Use Chrome or Edge.");
+      setError("This browser cannot record audio.");
       return false;
     }
     try {
@@ -366,9 +419,9 @@ export function ConsultScribe({
     lastSpeechAtRef.current = startedAtRef.current;
     setLive(true);
     setElapsed(0);
-    // The installed app records with MediaRecorder only. An AudioContext on the
-    // same capture stream makes WKWebView quit.
-    if (!runningInInstalledApp()) {
+    // iPhone, iPad, and the installed app record with MediaRecorder only.
+    // An AudioContext on the same capture stream makes the recording fail.
+    if (!runningInInstalledApp() && !appleTouchDevice()) {
       try {
         const audioWindow = window.AudioContext;
         if (audioWindow) {
@@ -392,6 +445,7 @@ export function ConsultScribe({
   async function startRecording() {
     setError("");
     setBusy("start");
+    releaseCaptureNow();
     const micReady = openMicrophone().then(
       (stream) => stream,
       (reason: unknown) => reason,
@@ -426,8 +480,29 @@ export function ConsultScribe({
 
   async function continueRecording() {
     setError("");
-    await releaseCapture();
-    await beginStream();
+    setBusy("start");
+    // Stop any leftover capture, then open the microphone in this same tap.
+    // Awaiting the old recorder first makes iPad and iPhone reject the click.
+    releaseCaptureNow();
+    const micReady = openMicrophone().then(
+      (stream) => stream,
+      (reason: unknown) => reason,
+    );
+    try {
+      const mic = await micReady;
+      if (!(mic instanceof MediaStream)) {
+        setError(micMessage(mic));
+        return;
+      }
+      const started = await beginStream(mic);
+      if (!started) mic.getTracks().forEach((track) => track.stop());
+    } catch (reason) {
+      const mic = await micReady;
+      if (mic instanceof MediaStream) mic.getTracks().forEach((track) => track.stop());
+      setError(micMessage(reason));
+    } finally {
+      setBusy("");
+    }
   }
 
   async function finishUploads() {
@@ -684,7 +759,7 @@ export function ConsultScribe({
             ) : (
               <>
                 <button type="button" className={compactPrimaryButtonClass} disabled={Boolean(busy)} onClick={() => void continueRecording()}>
-                  Continue
+                  {busy === "start" ? "Starting…" : "Continue"}
                 </button>
                 <button type="button" className={compactButtonClass} disabled={Boolean(busy)} onClick={() => void draftNote()}>
                   {busy === "draft" ? "Filling the assessment…" : "Fill assessment"}

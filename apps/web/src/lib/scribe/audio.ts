@@ -5,7 +5,8 @@ export function normalizeAudioMime(mime: string): string | null {
   const base = mime.split(";")[0]?.trim().toLowerCase() ?? "";
   if (base === "video/webm") return "audio/webm";
   if (base === "audio/x-wav" || base === "audio/wave") return "audio/wav";
-  if (base === "audio/m4a" || base === "audio/x-m4a" || base === "audio/mp4") return "audio/mp4";
+  // iPad and iPhone recorders put audio in an MPEG-4 file and often label it video/mp4.
+  if (base === "audio/m4a" || base === "audio/x-m4a" || base === "audio/mp4" || base === "video/mp4") return "audio/mp4";
   return AUDIO_TYPES.has(base) ? base : null;
 }
 

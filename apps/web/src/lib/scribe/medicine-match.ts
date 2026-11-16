@@ -152,7 +152,14 @@ function similarity(spoken: string, candidate: string) {
   const leftSkeleton = skeleton(spoken);
   const rightSkeleton = skeleton(candidate);
   if (leftSkeleton.length >= 4 && leftSkeleton === rightSkeleton) return 0.92;
-  if (left.length >= 4 && (right.startsWith(left) || left.startsWith(right))) return 0.88;
+  if (
+    left.length >= 5 &&
+    right.length >= 5 &&
+    Math.abs(left.length - right.length) <= 2 &&
+    (right.startsWith(left) || left.startsWith(right))
+  ) {
+    return 0.88;
+  }
   const distance = levenshtein(left, right);
   return 1 - distance / Math.max(left.length, right.length);
 }
@@ -210,6 +217,83 @@ export function rankMedicineCandidates(input: {
     confidence: "low",
     alternatives: close.map((item) => item.name),
   };
+}
+
+const SKIP_WORDS = new Set([
+  "tablet",
+  "tablets",
+  "capsule",
+  "syrup",
+  "medicine",
+  "morning",
+  "afternoon",
+  "night",
+  "days",
+  "pain",
+  "fever",
+  "with",
+  "dose",
+  "after",
+  "before",
+  "food",
+  "patient",
+  "doctor",
+  "since",
+  "have",
+  "been",
+  "from",
+  "this",
+  "that",
+  "said",
+  "give",
+  "take",
+  "today",
+  "headache",
+  "hello",
+  "sir",
+  "outpatient",
+  "visit",
+  "complaint",
+  "infection",
+  "throat",
+  "cough",
+  "cold",
+  "body",
+  "water",
+]);
+
+/** A doctor's own medicine, only when the spoken name is close. A greeting or a different drug is not offered. */
+export function suggestionNames(spoken: string, candidates: string[]) {
+  const ranked = rankMedicineCandidates({ spoken, candidates });
+  if (ranked.confidence === "high") return [ranked.name];
+  return ranked.alternatives.filter((name) => similarity(spoken, name) >= 0.86).slice(0, 4);
+}
+
+/** Drop a medicine catalog the transcriber copied from its instructions. */
+export function withoutPromptEcho(text: string) {
+  return text
+    .replace(/\boutpatient visit\.\s*keep every symptom[^.]*(?:\.|$)/gi, " ")
+    .replace(/\boutpatient visit\.\s*medicines:\s*.+$/gim, " ")
+    .replace(/\bmedicines:\s*(?:[^,.\n]+,\s*){2,}[^.\n]*/gi, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Pull a spoken medicine out of one line, including a misheard brand on its own. */
+export function medicinePhrases(text: string) {
+  const phrases: string[] = [];
+  const cue = /(?:மருந்து|மாத்திரை|tablet|tab|capsule|syrup|medicine)\s+([^\n,.]{2,48})/gi;
+  for (const match of text.matchAll(cue)) {
+    const phrase = match[1]?.trim();
+    if (phrase) phrases.push(phrase);
+  }
+  for (const word of text.split(/[^\p{L}\p{N}]+/u)) {
+    const spoken = (/[\u0B80-\u0BFF]/.test(word) ? transliterateTamil(word) : word).toLowerCase();
+    if (spoken.length < 4 || SKIP_WORDS.has(spoken) || SKIP_WORDS.has(word.toLowerCase()) || /^\d+$/.test(spoken)) continue;
+    phrases.push(word);
+  }
+  return [...new Set(phrases)].slice(0, 4);
 }
 
 /** Short Latin prefixes used to look up the catalog. */

@@ -3,6 +3,9 @@ import { SCRIBE_MAX_TRANSCRIPT_CHARS } from "@/lib/scribe/limits";
 
 const OPENAI_TRANSCRIPTIONS = "https://api.openai.com/v1/audio/transcriptions";
 const OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
+const OPENAI_CLIENT_SECRETS = "https://api.openai.com/v1/realtime/client_secrets";
+
+export type RealtimeLanguage = "auto" | "en" | "ta" | "hi";
 
 const SYSTEM_PROMPT = `You convert an outpatient consultation transcript into a structured visit note for a doctor in India.
 
@@ -11,6 +14,7 @@ The doctor speaks in this order when they can: chief complaint, how long and ass
 Rules:
 - Write clear English clinical wording, even when the conversation is in another language or a mix of languages.
 - Use only facts stated in the transcript. Never invent symptoms, findings, diagnoses, medicines, doses, durations, or advice.
+- If the doctor did not name a medicine, medicines must be an empty array. Never copy a known-medicine list into the note.
 - Do not drop a spoken complaint, diagnosis, medicine name, strength, or dose. If the dose was not said, still keep the medicine and set uncertain true.
 - When both an English wording and the original words are given, keep any symptom, medicine, strength, or dose that appears in either. If they disagree, trust the original words.
 - Leave a field empty only when that topic was never spoken.
@@ -20,6 +24,7 @@ Rules:
 - examination is only what the doctor said they found.
 - diagnoses are the labels the doctor stated.
 - The words மருந்து, மாத்திரை, tablet, or medicine start a new medicine. Do not attach that dose to the previous medicine.
+- A line that starts with "Medicine:" is the doctor's own confirmed medicine. Use that exact name and set catalogChoice to it. Do not replace it with a similar-sounding drug.
 - medicines: keep the spoken name and strength in name. catalogChoice is an exact name from the known-medicines list, or an empty string when none clearly matches. Do not invent a catalog name. morning, afternoon, and night are true only when that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. If the strength or the morning, afternoon, or night timing was not said, leave it unset and set uncertain true.
 - advice is what the doctor told the patient to do.
 - outcome is FOLLOW_UP when a review was asked, DISCHARGE when the patient was discharged, otherwise an empty string.
@@ -118,6 +123,116 @@ function providerMessage(status: number, fallback: string) {
   if (status === 401 || status === 403) return "The OpenAI API key was rejected.";
   if (status === 429) return "The AI service is busy. Wait a moment and try again.";
   return fallback;
+}
+
+/** Short-lived browser credential for a transcription-only realtime session. The API key stays on the server. */
+export async function createRealtimeTranscriptionSecret(input: { prompt: string; language: RealtimeLanguage }) {
+  const key = openAiApiKey();
+  if (!key) throw new ScribeProviderError(scribeNotConfiguredMessage(), 503);
+  const transcription: { model: string; prompt: string; language?: string } = {
+    model: transcribeModel(),
+    prompt: input.prompt.trim().slice(0, 900) || "Outpatient visit. Keep every symptom, medicine name, strength, and dose.",
+  };
+  if (input.language !== "auto") transcription.language = input.language;
+
+  let response: Response;
+  try {
+    response = await fetch(OPENAI_CLIENT_SECRETS, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        expires_after: { anchor: "created_at", seconds: 600 },
+        session: {
+          type: "transcription",
+          audio: {
+            input: {
+              transcription,
+              noise_reduction: { type: "near_field" },
+              turn_detection: {
+                type: "server_vad",
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 700,
+                create_response: false,
+              },
+            },
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    console.error("scribe realtime secret failed", error instanceof Error ? error.name : "error");
+    throw new ScribeProviderError("Could not start live transcription.");
+  }
+
+  const payload = (await response.json().catch(() => null)) as {
+    value?: unknown;
+    expires_at?: unknown;
+    client_secret?: { value?: unknown; expires_at?: unknown };
+  } | null;
+  const secret =
+    typeof payload?.value === "string"
+      ? payload.value
+      : typeof payload?.client_secret?.value === "string"
+        ? payload.client_secret.value
+        : "";
+  if (!response.ok || !secret) {
+    console.error("scribe realtime secret rejected", response.status);
+    throw new ScribeProviderError(
+      providerMessage(response.status, "Could not start live transcription."),
+      response.status === 429 ? 429 : response.status === 503 ? 503 : 502,
+    );
+  }
+  const expiresAt =
+    typeof payload?.expires_at === "number"
+      ? payload.expires_at
+      : typeof payload?.client_secret?.expires_at === "number"
+        ? payload.client_secret.expires_at
+        : 0;
+  return { clientSecret: secret, expiresAt };
+}
+
+/** Keep the SDP line ending OpenAI requires. trim() drops it and the call is rejected. */
+function normalizeSdp(value: string) {
+  const body = value.replace(/^\uFEFF/, "").trim().replace(/\r\n|\r|\n/g, "\r\n");
+  if (!body.startsWith("v=0") || !body.includes("m=audio")) return "";
+  return `${body}\r\n`;
+}
+
+/** Opens the realtime call on the server so the browser never calls OpenAI directly. */
+export async function openRealtimeCall(input: { sdp: string; prompt: string; language: RealtimeLanguage }) {
+  const sdp = normalizeSdp(input.sdp);
+  if (!sdp) throw new ScribeProviderError("Could not start live transcription.", 400);
+  const secret = await createRealtimeTranscriptionSecret({ prompt: input.prompt, language: input.language });
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/realtime/calls", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret.clientSecret}`,
+        "Content-Type": "application/sdp",
+      },
+      body: sdp,
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    console.error("scribe realtime call failed", error instanceof Error ? error.name : "error");
+    throw new ScribeProviderError("Could not start live transcription.", 502);
+  }
+
+  const answer = await response.text();
+  if (response.ok && answer.trim().startsWith("v=")) return answer;
+  const message = answer.replace(/\s+/g, " ").slice(0, 180);
+  console.error("scribe realtime call rejected", response.status, message);
+  throw new ScribeProviderError(
+    providerMessage(response.status, "Could not start live transcription."),
+    response.status === 429 ? 429 : 502,
+  );
 }
 
 export async function transcribeAudio(input: { bytes: Uint8Array; mime: string; prompt?: string }) {

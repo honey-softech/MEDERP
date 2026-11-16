@@ -14,7 +14,12 @@ export async function POST(request: Request, context: Ctx) {
   const gate = await requireScribeAppointment(id);
   if (!gate.ok) return gate.response;
 
-  const limited = checkRateLimit(`scribe-draft:${gate.actor.id}`, { limit: 8, windowMs: 10 * 60_000 });
+  const body = (await request.json().catch(() => null)) as { sessionId?: unknown; preview?: unknown } | null;
+  const preview = body?.preview === true;
+  const limited = checkRateLimit(preview ? `scribe-preview:${gate.actor.id}` : `scribe-draft:${gate.actor.id}`, {
+    limit: preview ? 12 : 8,
+    windowMs: 10 * 60_000,
+  });
   if (!limited.ok) {
     return NextResponse.json(
       { error: "Too many scribe requests. Wait a moment and try again." },
@@ -24,8 +29,6 @@ export async function POST(request: Request, context: Ctx) {
   if (!scribeConfigured()) {
     return NextResponse.json({ error: scribeNotConfiguredMessage() }, { status: 503 });
   }
-
-  const body = (await request.json().catch(() => null)) as { sessionId?: unknown } | null;
   const session = await scribeSessionFor(gate.actor.hospitalId, gate.appointment.id, String(body?.sessionId ?? ""));
   if (!session || session.status === "DISCARDED") {
     return NextResponse.json({ error: "No recording was found for this visit." }, { status: 404 });
@@ -72,7 +75,7 @@ export async function POST(request: Request, context: Ctx) {
       data: {
         draftJson: JSON.stringify(draft),
         scribeModel: scribeModel(),
-        status: session.status === "APPLIED" ? "APPLIED" : "DRAFTED",
+        status: preview || session.status === "APPLIED" ? session.status : "DRAFTED",
       },
     });
     return NextResponse.json({ ok: true, session: scribeSessionView(updated) });

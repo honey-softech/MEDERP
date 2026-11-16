@@ -1320,24 +1320,27 @@ export function ConsultAssessmentForm({
   );
 
   const modeSwitch = (
-    <div
-      role="group"
-      aria-label="How to write this visit"
-      className="inline-flex shrink-0 rounded-lg border border-border bg-app-bg p-0.5"
-    >
-      {(["TYPED", "HANDWRITTEN"] as const).map((mode) => (
-        <button
-          key={mode}
-          type="button"
-          aria-pressed={entryMode === mode}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-            entryMode === mode ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary"
-          }`}
-          onClick={() => chooseEntryMode(mode)}
-        >
-          {mode === "TYPED" ? "Typed" : "Handwritten"}
-        </button>
-      ))}
+    <div className="flex shrink-0 items-center gap-2">
+      {aiScribeEnabled ? <ConsultScribe appointmentId={appointmentId} placement="inline" onApply={applyScribe} /> : null}
+      <div
+        role="group"
+        aria-label="How to write this visit"
+        className="inline-flex shrink-0 rounded-lg border border-border bg-app-bg p-0.5"
+      >
+        {(["TYPED", "HANDWRITTEN"] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={entryMode === mode}
+            className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+              entryMode === mode ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary"
+            }`}
+            onClick={() => chooseEntryMode(mode)}
+          >
+            {mode === "TYPED" ? "Typed" : "Handwritten"}
+          </button>
+        ))}
+      </div>
     </div>
   );
 
@@ -1386,9 +1389,6 @@ export function ConsultAssessmentForm({
           : "space-y-4"
       }
     >
-    {aiScribeEnabled ? (
-      <ConsultScribe appointmentId={appointmentId} onApply={applyScribe} />
-    ) : null}
     <div
       className={
         cockpit

@@ -23,15 +23,10 @@ export function rankPrescribedNames(texts: string[], limit = 60) {
     .map((item) => item.name);
 }
 
-export function transcribeVocabularyPrompt(names: string[]) {
-  const base = "Outpatient visit. Keep every symptom, medicine name, strength, and dose.";
-  const list = names
-    .map((name) => name.trim())
-    .filter(Boolean)
-    .slice(0, 30)
-    .join(", ");
-  if (!list) return base;
-  return `${base} Medicines: ${list}`.slice(0, 900);
+/** Guidance for the transcriber. The doctor's medicine names stay out of this text, because the model was reading that list aloud. */
+export function transcribeVocabularyPrompt(names: string[] = []) {
+  void names;
+  return "Transcribe only the words spoken. Do not add symptoms, medicines, or doses.";
 }
 
 /** Names this doctor already prescribes, so the model picks a known tablet instead of inventing one. */

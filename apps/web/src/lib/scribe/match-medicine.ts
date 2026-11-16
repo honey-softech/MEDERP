@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
-import { medicineSearchTokens, rankMedicineCandidates } from "@/lib/scribe/medicine-match";
+import { medicinePhrases, medicineSearchTokens, rankMedicineCandidates, suggestionNames } from "@/lib/scribe/medicine-match";
+import { doctorMedicineVocabulary } from "@/lib/scribe/vocabulary";
 import { prisma } from "@/lib/prisma";
 
 /** Catalog plus the doctor's own names. A weak match stays free text with a few choices. */
@@ -41,4 +42,24 @@ export async function matchSpokenMedicine(
     catalogChoice: options?.catalogChoice,
     candidates: [...vocabulary, ...catalogNames],
   });
+}
+
+/** Doctor's own medicines that a spoken line may have meant, allowing a loose pronunciation. */
+export async function suggestSpokenMedicines(text: string, hospitalId: string, doctorId: string) {
+  if (/^medicine:/i.test(text.trim())) return [] as string[];
+  const vocabulary = await doctorMedicineVocabulary(hospitalId, doctorId);
+  const names = new Set<string>();
+  for (const phrase of medicinePhrases(text)) {
+    for (const name of suggestionNames(phrase, vocabulary)) names.add(name);
+    if (names.size >= 6) break;
+  }
+  if (names.size === 0) {
+    const phrase = medicinePhrases(text)[0];
+    if (phrase) {
+      const matched = await matchSpokenMedicine(phrase, { vocabulary });
+      if (matched.confidence === "high" && matched.name) names.add(matched.name);
+      for (const name of matched.alternatives) names.add(name);
+    }
+  }
+  return [...names].slice(0, 6);
 }

@@ -1,4 +1,6 @@
 export const SCRIBE_MAX_CHUNKS = 3;
+/** Finished sentences from a live transcript. Separate from the three audio uploads. */
+export const SCRIBE_MAX_SEGMENTS = 300;
 export const SCRIBE_MAX_CHUNK_BYTES = 6_000_000;
 export const SCRIBE_MAX_TRANSCRIPT_CHARS = 80_000;
 export const SCRIBE_MAX_FIELD_CHARS = 2_000;

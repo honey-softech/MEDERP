@@ -7,7 +7,7 @@ const OPENAI_CLIENT_SECRETS = "https://api.openai.com/v1/realtime/client_secrets
 
 export type RealtimeLanguage = "auto" | "en" | "ta" | "hi";
 
-const SYSTEM_PROMPT = `You convert an outpatient consultation transcript into a structured visit note for a doctor in India.
+export const SCRIBE_SYSTEM_PROMPT = `You convert an outpatient consultation transcript into a structured visit note for a doctor in India.
 
 The doctor speaks in this order when they can: chief complaint, how long and associated symptoms, examination, diagnosis, each medicine with strength and timing, advice, then follow-up.
 
@@ -17,19 +17,38 @@ Rules:
 - If the doctor did not name a medicine, medicines must be an empty array. Never copy a known-medicine list into the note.
 - Do not drop a spoken complaint, diagnosis, medicine name, strength, or dose. If the dose was not said, still keep the medicine and set uncertain true.
 - When both an English wording and the original words are given, keep any symptom, medicine, strength, or dose that appears in either. If they disagree, trust the original words.
-- Leave a field empty only when that topic was never spoken.
+- Leave a list empty only when that topic was never spoken.
 - Put every topic that was never spoken into missingFields. Use only these names: chiefComplaint, history, examination, diagnosis, medicines, advice, followUp.
-- chiefComplaint is the patient's complaints, separated by commas.
-- history is onset, duration, and associated symptoms.
-- examination is only what the doctor said they found.
-- diagnoses are the labels the doctor stated.
+- Each complaint, history line, examination finding, diagnosis, and advice item has text, quote, and kind. quote is the exact words from the transcript. kind is one of this_patient, general_statement, possibility, negated, question, patient_said.
+- Only this_patient statements from the doctor go into diagnosis, examination, and medicines. General teaching, causes, risks, possibilities, conditions, and questions never enter those rows. A general statement can go to advice only when it is an instruction to the patient.
+- chiefComplaint items are the patient's complaints.
+- history items are onset, duration, and associated symptoms.
+- examination items are only what the doctor said they found on this patient.
+- diagnosis items are labels for this patient's condition.
 - The words மருந்து, மாத்திரை, tablet, or medicine start a new medicine. Do not attach that dose to the previous medicine.
-- A line that starts with "Medicine:" is the doctor's own confirmed medicine. Use that exact name and set catalogChoice to it. Do not replace it with a similar-sounding drug.
-- medicines: keep the spoken name and strength in name. catalogChoice is an exact name from the known-medicines list, or an empty string when none clearly matches. Do not invent a catalog name. morning, afternoon, and night are true only when that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. If the strength or the morning, afternoon, or night timing was not said, leave it unset and set uncertain true.
-- advice is what the doctor told the patient to do.
+- A line that starts with "Medicine:" is the doctor's own confirmed medicine. Use that exact name, set catalogChoice to it, and quote that line. Do not replace it with a similar-sounding drug.
+- medicines: keep the spoken name and strength in name. quote is the exact words that name the medicine. kind is this_patient only when the doctor prescribed it for this patient. catalogChoice is an exact name from the known-medicines list, or an empty string when none clearly matches. Do not invent a catalog name. morning, afternoon, and night are true only when that time was stated. beforeFood and afterFood are true only when stated. durationDays is the number of days, or null. Put SOS and any other instruction in note. If the strength or the morning, afternoon, or night timing was not said, leave it unset and set uncertain true.
+- advice items are what the doctor told the patient to do.
 - outcome is FOLLOW_UP when a review was asked, DISCHARGE when the patient was discharged, otherwise an empty string.
-- followUpInDays is the number of days until review, or null.
+- followUpQuote is the exact words that support the review or discharge, or empty when neither was said. followUpKind classifies that sentence.
+- followUpInDays is the number of days until review, or null. Use a number only when that number was spoken.
 - Add a field name to uncertainFields only when a word was spoken but the dose or name is unclear. Use these names only: chiefComplaint, history, examination, diagnosis, medicines, advice, followUp, outcome.`;
+
+const EVIDENCE_ITEM_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text", "quote", "kind"],
+  properties: {
+    text: { type: "string" },
+    quote: { type: "string" },
+    kind: {
+      type: "string",
+      enum: ["this_patient", "general_statement", "possibility", "negated", "question", "patient_said"],
+    },
+  },
+} as const;
+
+const EVIDENCE_LIST_SCHEMA = { type: "array", items: EVIDENCE_ITEM_SCHEMA } as const;
 
 const CONSULT_DRAFT_JSON_SCHEMA = {
   type: "object",
@@ -42,15 +61,17 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
     "medicines",
     "advice",
     "followUpInDays",
+    "followUpQuote",
+    "followUpKind",
     "outcome",
     "uncertainFields",
     "missingFields",
   ],
   properties: {
-    chiefComplaint: { type: "string" },
-    history: { type: "string" },
-    examination: { type: "string" },
-    diagnoses: { type: "array", items: { type: "string" } },
+    chiefComplaint: EVIDENCE_LIST_SCHEMA,
+    history: EVIDENCE_LIST_SCHEMA,
+    examination: EVIDENCE_LIST_SCHEMA,
+    diagnoses: EVIDENCE_LIST_SCHEMA,
     medicines: {
       type: "array",
       items: {
@@ -67,6 +88,8 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
           "durationDays",
           "note",
           "uncertain",
+          "quote",
+          "kind",
         ],
         properties: {
           name: { type: "string" },
@@ -79,16 +102,43 @@ const CONSULT_DRAFT_JSON_SCHEMA = {
           durationDays: { type: ["integer", "null"] },
           note: { type: "string" },
           uncertain: { type: "boolean" },
+          quote: { type: "string" },
+          kind: {
+            type: "string",
+            enum: ["this_patient", "general_statement", "possibility", "negated", "question", "patient_said"],
+          },
         },
       },
     },
-    advice: { type: "string" },
+    advice: EVIDENCE_LIST_SCHEMA,
     followUpInDays: { type: ["integer", "null"] },
+    followUpQuote: { type: "string" },
+    followUpKind: {
+      type: "string",
+      enum: ["this_patient", "general_statement", "possibility", "negated", "question", "patient_said"],
+    },
     outcome: { type: "string", enum: ["FOLLOW_UP", "DISCHARGE", ""] },
     uncertainFields: { type: "array", items: { type: "string" } },
     missingFields: { type: "array", items: { type: "string" } },
   },
 } as const;
+
+/**
+ * USD per million tokens from OpenAI's pricing page on 16 Nov 2026.
+ * gpt-4o-mini is $0.15 input and $0.60 output.
+ * Six previews plus one final call, at about 4,000 input and 800 output tokens each,
+ * is about ₹0.70 at ₹94 per dollar. That stays under ₹1 for the note itself.
+ */
+export const SCRIBE_EXTRACTION_USD_PER_MILLION = { input: 0.15, output: 0.6 } as const;
+
+export function extractionSpendInr(input: { calls: number; inputTokens: number; outputTokens: number; usdToInr: number }) {
+  const usd =
+    (input.calls *
+      (input.inputTokens * SCRIBE_EXTRACTION_USD_PER_MILLION.input +
+        input.outputTokens * SCRIBE_EXTRACTION_USD_PER_MILLION.output)) /
+    1_000_000;
+  return usd * input.usdToInr;
+}
 
 export class ScribeProviderError extends Error {
   status: number;
@@ -111,8 +161,22 @@ export function transcribeModel() {
   return process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "gpt-4o-transcribe";
 }
 
+/** Mid-consult field updates. Override with OPENAI_SCRIBE_PREVIEW_MODEL. */
+export function scribePreviewModel() {
+  return process.env.OPENAI_SCRIBE_PREVIEW_MODEL?.trim() || "gpt-4o-mini";
+}
+
+/** The note written when the doctor stops. Override with OPENAI_SCRIBE_MODEL. */
 export function scribeModel() {
   return process.env.OPENAI_SCRIBE_MODEL?.trim() || "gpt-4o-mini";
+}
+
+export function scribeModelFrom(
+  env: { OPENAI_SCRIBE_MODEL?: string; OPENAI_SCRIBE_PREVIEW_MODEL?: string },
+  kind: "preview" | "final",
+) {
+  const value = (kind === "preview" ? env.OPENAI_SCRIBE_PREVIEW_MODEL : env.OPENAI_SCRIBE_MODEL)?.trim();
+  return value || "gpt-4o-mini";
 }
 
 export function scribeNotConfiguredMessage() {
@@ -319,7 +383,7 @@ export async function translateUtterance(text: string): Promise<string> {
   return typeof content === "string" ? content.trim().replace(/^["']|["']$/g, "") : "";
 }
 
-export async function draftConsult(transcript: string, vocabulary: string[] = []): Promise<unknown> {
+export async function draftConsult(transcript: string, vocabulary: string[] = [], model = scribeModel()): Promise<unknown> {
   const key = openAiApiKey();
   if (!key) throw new ScribeProviderError(scribeNotConfiguredMessage(), 503);
   const text = transcript.trim().slice(0, SCRIBE_MAX_TRANSCRIPT_CHARS);
@@ -344,10 +408,10 @@ export async function draftConsult(transcript: string, vocabulary: string[] = []
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: scribeModel(),
+        model,
         temperature: 0.1,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: SCRIBE_SYSTEM_PROMPT },
           { role: "user", content: `${known}Transcript:\n"""\n${text}\n"""` },
         ],
         response_format: {

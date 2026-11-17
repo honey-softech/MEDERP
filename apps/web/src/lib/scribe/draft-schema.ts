@@ -16,6 +16,40 @@ export type ScribeAssessmentKey = (typeof SCRIBE_ASSESSMENT_KEYS)[number];
 
 export type ScribeAssessmentPatch = Partial<Record<ScribeAssessmentKey, string>>;
 
+export type ScribeFillMode = "preview" | "final";
+
+export const EVIDENCE_KINDS = [
+  "this_patient",
+  "general_statement",
+  "possibility",
+  "negated",
+  "question",
+  "patient_said",
+] as const;
+
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+
+/** One statement the note writer attributed to the transcript. */
+export type ScribeCited = {
+  text: string;
+  quote: string;
+  kind: EvidenceKind;
+};
+
+export type ScribeEvidence = {
+  chiefComplaint: ScribeCited[];
+  history: ScribeCited[];
+  examination: ScribeCited[];
+  diagnoses: ScribeCited[];
+  advice: ScribeCited[];
+  followUp: ScribeCited | null;
+};
+
+export type ScribeSources = Record<
+  "chiefComplaint" | "history" | "examination" | "diagnosis" | "medicines" | "advice" | "followUp",
+  string
+>;
+
 export type ScribeMedicine = {
   name: string;
   spokenName: string;
@@ -31,6 +65,8 @@ export type ScribeMedicine = {
   /** Catalog names to offer when the spoken name is not certain. */
   alternatives: string[];
   catalogChoice?: string;
+  quote: string;
+  kind: EvidenceKind;
 };
 
 export type ScribeDraft = {
@@ -44,7 +80,33 @@ export type ScribeDraft = {
   outcome: "FOLLOW_UP" | "DISCHARGE" | "";
   uncertainFields: string[];
   missingFields?: string[];
+  evidence: ScribeEvidence;
+  sources: ScribeSources;
 };
+
+const kindSchema = z.enum(EVIDENCE_KINDS);
+
+const citedSchema = z
+  .object({
+    text: z.string(),
+    quote: z.string(),
+    kind: kindSchema,
+  })
+  .strict();
+
+const citedOrString = z.union([z.string(), citedSchema]);
+const looseText = z.union([z.string(), z.array(citedOrString)]);
+
+const evidenceSchema = z
+  .object({
+    chiefComplaint: z.array(citedSchema),
+    history: z.array(citedSchema),
+    examination: z.array(citedSchema),
+    diagnoses: z.array(citedSchema),
+    advice: z.array(citedSchema),
+    followUp: citedSchema.nullable(),
+  })
+  .strict();
 
 const medicineSchema = z
   .object({
@@ -61,21 +123,38 @@ const medicineSchema = z
     matched: z.boolean().optional(),
     alternatives: z.array(z.string()).optional(),
     catalogChoice: z.string().optional(),
+    quote: z.string().optional(),
+    kind: kindSchema.optional(),
   })
   .strict();
 
 const draftSchema = z
   .object({
-    chiefComplaint: z.string(),
-    history: z.string(),
-    examination: z.string(),
-    diagnoses: z.array(z.string()),
+    chiefComplaint: looseText,
+    history: looseText,
+    examination: looseText,
+    diagnoses: z.array(citedOrString),
     medicines: z.array(medicineSchema),
-    advice: z.string(),
+    advice: looseText,
     followUpInDays: z.number().int().nullable(),
+    followUpQuote: z.string().optional(),
+    followUpKind: kindSchema.optional(),
     outcome: z.enum(["FOLLOW_UP", "DISCHARGE", ""]),
     uncertainFields: z.array(z.string()),
     missingFields: z.array(z.string()).optional(),
+    evidence: evidenceSchema.optional(),
+    sources: z
+      .object({
+        chiefComplaint: z.string().optional(),
+        history: z.string().optional(),
+        examination: z.string().optional(),
+        diagnosis: z.string().optional(),
+        medicines: z.string().optional(),
+        advice: z.string().optional(),
+        followUp: z.string().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -86,6 +165,97 @@ function clip(value: string) {
 function clampDays(value: number | null, max: number) {
   if (value == null || value < 1 || value > max) return null;
   return value;
+}
+
+type CitedInput = { text: string; quote: string; kind: EvidenceKind };
+type LooseText = string | Array<string | CitedInput>;
+
+function readCited(value: LooseText | undefined): ScribeCited[] {
+  if (value == null) return [];
+  const list = typeof value === "string" ? [value] : value;
+  const items: ScribeCited[] = [];
+  for (const entry of list) {
+    if (typeof entry === "string") {
+      const text = clip(entry);
+      if (text) items.push({ text, quote: "", kind: "this_patient" });
+      continue;
+    }
+    const text = clip(entry.text);
+    if (!text) continue;
+    items.push({ text, quote: clip(entry.quote), kind: entry.kind });
+  }
+  return items;
+}
+
+function evidenceHasItems(evidence: ScribeEvidence) {
+  return (
+    evidence.chiefComplaint.length +
+      evidence.history.length +
+      evidence.examination.length +
+      evidence.diagnoses.length +
+      evidence.advice.length >
+      0 || evidence.followUp != null
+  );
+}
+
+function clipCited(items: ScribeCited[], max: number) {
+  const clipped: ScribeCited[] = [];
+  for (const item of items.slice(0, max)) {
+    const text = clip(item.text);
+    if (!text) continue;
+    clipped.push({ text, quote: clip(item.quote), kind: item.kind });
+  }
+  return clipped;
+}
+
+function joinTexts(items: ScribeCited[], separator: string) {
+  return clip(items.map((item) => item.text.trim()).filter(Boolean).join(separator));
+}
+
+function joinQuotes(items: ScribeCited[]) {
+  return clip(items.map((item) => item.quote.trim()).filter(Boolean).join(" · "));
+}
+
+export function assembleDraft(input: {
+  evidence: ScribeEvidence;
+  medicines: ScribeMedicine[];
+  followUpInDays: number | null;
+  outcome: ScribeDraft["outcome"];
+  uncertainFields: string[];
+  missingFields?: string[];
+}): ScribeDraft {
+  const followUp = input.evidence.followUp ? clipCited([input.evidence.followUp], 1)[0] ?? null : null;
+  const evidence: ScribeEvidence = {
+    chiefComplaint: clipCited(input.evidence.chiefComplaint, 12),
+    history: clipCited(input.evidence.history, 12),
+    examination: clipCited(input.evidence.examination, 12),
+    diagnoses: clipCited(input.evidence.diagnoses, SCRIBE_MAX_DIAGNOSES),
+    advice: clipCited(input.evidence.advice, 12),
+    followUp,
+  };
+  const medicines = input.medicines.slice(0, SCRIBE_MAX_MEDICINES);
+  return {
+    chiefComplaint: joinTexts(evidence.chiefComplaint, ", "),
+    history: joinTexts(evidence.history, " "),
+    examination: joinTexts(evidence.examination, " "),
+    diagnoses: evidence.diagnoses.map((item) => item.text.trim()).filter(Boolean),
+    medicines,
+    advice: joinTexts(evidence.advice, " "),
+    followUpInDays: input.followUpInDays,
+    outcome: input.outcome,
+    uncertainFields: input.uncertainFields.slice(0, 20),
+    missingFields: input.missingFields?.slice(0, 8),
+    evidence,
+    sources: {
+      chiefComplaint: joinQuotes(evidence.chiefComplaint),
+      history: joinQuotes(evidence.history),
+      examination: joinQuotes(evidence.examination),
+      diagnosis: joinQuotes(evidence.diagnoses),
+      medicines: joinQuotes(medicines.map((medicine) => ({ text: medicine.name, quote: medicine.quote, kind: medicine.kind }))),
+      advice: joinQuotes(evidence.advice),
+      followUp: evidence.followUp?.quote.trim() ?? "",
+    },
+  };
 }
 
 export function parseScribeDraft(value: unknown): { ok: true; draft: ScribeDraft } | { ok: false; error: string } {
@@ -120,25 +290,54 @@ export function parseScribeDraft(value: unknown): { ok: true; draft: ScribeDraft
         matched: medicine.matched ?? false,
         alternatives: [...new Set((medicine.alternatives ?? []).map((item) => item.trim()).filter(Boolean))].slice(0, 3),
         catalogChoice: medicine.catalogChoice?.trim() || undefined,
+        quote: clip(medicine.quote ?? ""),
+        kind: medicine.kind ?? "this_patient",
       },
     ];
   });
 
+  const stored = raw.evidence;
+  const followQuote = clip(raw.followUpQuote ?? "");
+  const synthesized: ScribeEvidence = {
+    chiefComplaint: readCited(raw.chiefComplaint),
+    history: readCited(raw.history),
+    examination: readCited(raw.examination),
+    diagnoses: readCited(raw.diagnoses),
+    advice: readCited(raw.advice),
+    followUp: followQuote
+      ? { text: followQuote, quote: followQuote, kind: raw.followUpKind ?? "this_patient" }
+      : null,
+  };
+  const evidence = stored && evidenceHasItems(stored) ? stored : synthesized;
+
   return {
     ok: true,
-    draft: {
-      chiefComplaint: clip(raw.chiefComplaint),
-      history: clip(raw.history),
-      examination: clip(raw.examination),
-      diagnoses: raw.diagnoses.map(clip).filter(Boolean).slice(0, SCRIBE_MAX_DIAGNOSES),
+    draft: assembleDraft({
+      evidence,
       medicines,
-      advice: clip(raw.advice),
       followUpInDays,
       outcome: raw.outcome,
-      uncertainFields: [...uncertain].slice(0, 20),
-      missingFields: [...new Set((raw.missingFields ?? []).map((field) => field.trim()).filter(Boolean))].slice(0, 8),
-    },
+      uncertainFields: [...uncertain],
+      missingFields: [...new Set((raw.missingFields ?? []).map((field) => field.trim()).filter(Boolean))],
+    }),
   };
+}
+
+/** Preview fills only fields the doctor has not edited. Stop still fills every field. */
+export function selectScribePatch(input: {
+  patch: ScribeAssessmentPatch;
+  edited: readonly ScribeAssessmentKey[];
+  mode: ScribeFillMode;
+}): ScribeAssessmentPatch {
+  const selected: ScribeAssessmentPatch = {};
+  const edited = new Set(input.mode === "preview" ? input.edited : []);
+  for (const key of SCRIBE_ASSESSMENT_KEYS) {
+    if (edited.has(key)) continue;
+    const value = input.patch[key];
+    if (typeof value !== "string") continue;
+    selected[key] = value;
+  }
+  return selected;
 }
 
 export function medicineNotes(medicine: ScribeMedicine) {

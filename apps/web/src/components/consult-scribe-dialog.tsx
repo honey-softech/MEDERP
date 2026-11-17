@@ -204,6 +204,7 @@ export function ConsultScribeDialog({ capture }: { capture: ScribeCapture }) {
                       key={topic}
                       topic={topic}
                       text={capture.fills[topic]}
+                      quote={capture.sources[topic]}
                       heard={topicHeard(capture.coverage, topic)}
                       current={askNow === topic && !capture.fills[topic].trim()}
                     />
@@ -338,19 +339,31 @@ function ListeningDots({ levels, active }: { levels: number[]; active: boolean }
 function TopicRow({
   topic,
   text,
+  quote,
   heard,
   current,
 }: {
   topic: ScribeTopic;
   text: string;
+  quote: string;
   heard: boolean;
   current: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const value = text.trim();
-  return (
-    <div className={`grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-3 px-3 py-2.5 ${current ? "bg-primary-light" : "bg-surface"}`}>
+  const source = quote.trim();
+  const row = `grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-left ${current ? "bg-primary-light" : "bg-surface"}`;
+  const body = (
+    <>
       <p className={`text-xs ${value || heard ? "font-medium text-text-primary" : "text-text-secondary"}`}>{TOPIC_LABELS[topic]}</p>
       <p className={`truncate text-sm ${value ? "text-text-primary" : "text-text-secondary/70"}`}>{value || "—"}</p>
-    </div>
+      {open && source ? <p className="col-start-2 text-[11px] leading-relaxed text-text-secondary">from: {source}</p> : null}
+    </>
+  );
+  if (!source) return <div className={row}>{body}</div>;
+  return (
+    <button type="button" className={`${row} w-full`} aria-expanded={open} onClick={() => setOpen((shown) => !shown)}>
+      {body}
+    </button>
   );
 }

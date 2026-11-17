@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "lint": "eslint",
     "test": "vitest run",
+    "scribe:eval": "tsx src/lib/scribe/eval/run.ts",
     "test:watch": "vitest",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",

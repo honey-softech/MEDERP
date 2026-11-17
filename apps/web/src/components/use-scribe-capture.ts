@@ -9,6 +9,7 @@ import {
   type ScribeAssessmentKey,
   type ScribeAssessmentPatch,
   type ScribeDraft,
+  type ScribeFillMode,
 } from "@/lib/scribe/draft-schema";
 import { createCaptureHandle, type CaptureHandle } from "@/lib/scribe/capture-handle";
 import { coverText, emptyCoverage, markAsked, type ScribeTopic } from "@/lib/scribe/coverage";
@@ -44,7 +45,12 @@ export type ScribeTextSize = "sm" | "md" | "lg";
 type Options = {
   appointmentId: string;
   onSession?: (session: ScribeSessionView | null) => void;
-  onApply?: (patch: ScribeAssessmentPatch, uncertain: ScribeAssessmentKey[], choices?: Record<string, string[]>) => void;
+  onApply?: (
+    patch: ScribeAssessmentPatch,
+    uncertain: ScribeAssessmentKey[],
+    choices?: Record<string, string[]>,
+    mode?: ScribeFillMode,
+  ) => void;
 };
 
 const ZERO_LEVELS = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -63,6 +69,27 @@ function emptyFills(): Record<ScribeTopic, string> {
     advice: "",
     followUp: "",
   };
+}
+
+function emptySources(): Record<ScribeTopic, string> {
+  return emptyFills();
+}
+
+function sourcesFromDraft(draft: ScribeDraft): Record<ScribeTopic, string> {
+  return {
+    chiefComplaint: draft.sources.chiefComplaint,
+    history: draft.sources.history,
+    examination: draft.sources.examination,
+    diagnosis: draft.sources.diagnosis,
+    medicines: draft.sources.medicines,
+    advice: draft.sources.advice,
+    followUp: draft.sources.followUp,
+  };
+}
+
+function readSuggestions(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 6);
 }
 
 function fillsFromDraft(draft: ScribeDraft): Record<ScribeTopic, string> {
@@ -189,6 +216,7 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [levels, setLevels] = useState<number[]>(ZERO_LEVELS);
   const [fills, setFills] = useState<Record<ScribeTopic, string>>(emptyFills);
+  const [sources, setSources] = useState<Record<ScribeTopic, string>>(emptySources);
   const [fillMessage, setFillMessage] = useState("");
 
   const machineRef = useRef<RecordingState>("idle");
@@ -245,6 +273,7 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     setSuggestions([]);
     setLevels(ZERO_LEVELS);
     setFills(emptyFills());
+    setSources(emptySources());
     setFillMessage("");
     previewAtRef.current = 0;
     previewCountRef.current = 0;
@@ -472,7 +501,11 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),
     });
-    const data = (await response.json().catch(() => ({}))) as { error?: string; session?: ScribeSessionView };
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      suggestions?: unknown;
+      session?: ScribeSessionView;
+    };
     if (!response.ok || !data.session) {
       const message = data.error ?? "Could not draft the visit note.";
       setFillMessage(message);
@@ -515,8 +548,11 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
       return;
     }
     onSessionRef.current?.(appliedData.session);
-    onApplyRef.current?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft));
+    onApplyRef.current?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft), "final");
     setFills(fillsFromDraft(draft));
+    setSources(sourcesFromDraft(draft));
+    const offered = readSuggestions(data.suggestions);
+    if (offered.length > 0) setSuggestions((current) => [...new Set([...offered, ...current])].slice(0, 6));
     setFillMessage("Filled the assessment. Check the note, then Approve.");
     go("done");
   }
@@ -663,14 +699,18 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     });
   }
 
-  function showDraft(draft: ScribeDraft) {
+  function showDraft(draft: ScribeDraft, suggestions: string[]) {
     setFills(fillsFromDraft(draft));
+    setSources(sourcesFromDraft(draft));
+    if (suggestions.length > 0) setSuggestions((current) => [...new Set([...suggestions, ...current])].slice(0, 6));
     const values = draftToAssessment(draft);
     const patch: ScribeAssessmentPatch = {};
     for (const key of SCRIBE_ASSESSMENT_KEYS) {
       if (values[key].trim()) patch[key] = values[key];
     }
-    if (Object.keys(patch).length > 0) onApplyRef.current?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft));
+    if (Object.keys(patch).length > 0) {
+      onApplyRef.current?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft), "preview");
+    }
   }
 
   function scheduleAutoPreview() {
@@ -701,12 +741,16 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, preview: true }),
       });
-      const data = (await response.json().catch(() => ({}))) as { error?: string; session?: ScribeSessionView };
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        suggestions?: unknown;
+        session?: ScribeSessionView;
+      };
       if (!response.ok || !data.session?.draft) {
         if (mode === "pause") setFillMessage(data.error ?? "Could not read the fields yet. Keep speaking, then pause again.");
         return;
       }
-      showDraft(data.session.draft);
+      showDraft(data.session.draft, readSuggestions(data.suggestions));
       if (mode === "pause") setFillMessage("Paused. These are the fields heard so far.");
       onSessionRef.current?.(data.session);
     } finally {
@@ -988,6 +1032,7 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     suggestions,
     levels,
     fills,
+    sources,
     fillMessage,
     buttons,
     stopsInMs: elapsedMs >= SCRIBE_MAX_RECORDING_MS - 60_000 ? Math.max(0, SCRIBE_MAX_RECORDING_MS - elapsedMs) : null,

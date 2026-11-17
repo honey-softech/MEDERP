@@ -9,6 +9,7 @@ import {
   parseScribeDraft,
   prescriptionFromDraft,
   resolveAiAssisted,
+  selectScribePatch,
   type ScribeDraft,
 } from "@/lib/scribe/draft-schema";
 
@@ -26,6 +27,8 @@ function medicine(overrides: Partial<ScribeDraft["medicines"][number]> = {}): Sc
     uncertain: false,
     matched: true,
     alternatives: [],
+    quote: "Paracetamol 500",
+    kind: "this_patient",
     ...overrides,
   };
 }
@@ -41,6 +44,23 @@ function draft(overrides: Partial<ScribeDraft> = {}): ScribeDraft {
     followUpInDays: 5,
     outcome: "FOLLOW_UP",
     uncertainFields: [],
+    evidence: {
+      chiefComplaint: [],
+      history: [],
+      examination: [],
+      diagnoses: [],
+      advice: [],
+      followUp: null,
+    },
+    sources: {
+      chiefComplaint: "",
+      history: "",
+      examination: "",
+      diagnosis: "",
+      medicines: "",
+      advice: "",
+      followUp: "",
+    },
     ...overrides,
   };
 }
@@ -137,6 +157,35 @@ describe("scribe draft", () => {
       "medicines and dose",
       "follow-up",
     ]);
+  });
+
+  it("keeps the quote on each complaint and diagnosis", () => {
+    const parsed = parseScribeDraft({
+      ...draft(),
+      chiefComplaint: [{ text: "Headache", quote: "headache for two days", kind: "patient_said" }],
+      history: [{ text: "For 2 days", quote: "for two days", kind: "patient_said" }],
+      examination: [],
+      diagnoses: [{ text: "Migraine", quote: "this is migraine", kind: "this_patient" }],
+      advice: [{ text: "Rest", quote: "take rest", kind: "this_patient" }],
+      followUpQuote: "come back in five days",
+      followUpKind: "this_patient",
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.draft.chiefComplaint).toBe("Headache");
+    expect(parsed.draft.diagnoses).toEqual(["Migraine"]);
+    expect(parsed.draft.sources.diagnosis).toBe("this is migraine");
+    expect(parsed.draft.sources.followUp).toBe("come back in five days");
+    expect(parsed.draft.evidence.chiefComplaint[0]?.kind).toBe("patient_said");
+  });
+
+  it("fills only untouched fields during a preview", () => {
+    const patch = { chiefComplaint: "Headache", diagnosis: "Migraine", prescription: "Dolo" };
+    expect(selectScribePatch({ patch, edited: ["diagnosis"], mode: "preview" })).toEqual({
+      chiefComplaint: "Headache",
+      prescription: "Dolo",
+    });
+    expect(selectScribePatch({ patch, edited: ["diagnosis"], mode: "final" })).toEqual(patch);
   });
 
   it("flags the history and any uncertain medicine for the doctor to check", () => {

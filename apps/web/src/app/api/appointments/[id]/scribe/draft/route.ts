@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireScribeAppointment, scribeSessionFor, scribeSessionView } from "@/lib/scribe/access";
-import { parseScribeDraft, type ScribeMedicine } from "@/lib/scribe/draft-schema";
+import { assembleDraft, parseScribeDraft, type ScribeMedicine } from "@/lib/scribe/draft-schema";
+import { quoteMentionsSpoken, stripUnsupportedNumbers, verifyEvidence } from "@/lib/scribe/evidence";
 import { matchSpokenMedicine } from "@/lib/scribe/match-medicine";
+import { medicinePhrases } from "@/lib/scribe/medicine-match";
 import { doctorMedicineVocabulary } from "@/lib/scribe/vocabulary";
-import { draftConsult, ScribeProviderError, scribeConfigured, scribeModel, scribeNotConfiguredMessage } from "@/lib/scribe/openai";
+import {
+  draftConsult,
+  ScribeProviderError,
+  scribeConfigured,
+  scribeModel,
+  scribeNotConfiguredMessage,
+  scribePreviewModel,
+} from "@/lib/scribe/openai";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -45,40 +54,70 @@ export async function POST(request: Request, context: Ctx) {
         ? `English wording:\n${english}\n\nOriginal words:\n${original}`
         : original;
     const vocabulary = await doctorMedicineVocabulary(gate.actor.hospitalId, gate.appointment.doctorId);
-    const raw = await draftConsult(combined, vocabulary);
+    const model = preview ? scribePreviewModel() : scribeModel();
+    const raw = await draftConsult(combined, vocabulary, model);
     const parsed = parseScribeDraft(raw);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 502 });
     }
 
+    const verified = verifyEvidence(parsed.draft, combined);
     const medicines: ScribeMedicine[] = [];
-    for (const medicine of parsed.draft.medicines) {
+    const suggestions = new Set<string>();
+    const offer = (names: string[]) => {
+      for (const name of names) {
+        const label = name.trim();
+        if (label) suggestions.add(label);
+      }
+    };
+    for (const medicine of verified.medicines) {
       const spoken = medicine.spokenName || medicine.name;
+      if (!quoteMentionsSpoken(medicine.quote, spoken)) continue;
       const match = await matchSpokenMedicine(spoken, {
         catalogChoice: medicine.catalogChoice,
         vocabulary,
       });
-      const confident = match.confidence === "high";
-      medicines.push({
-        ...medicine,
-        spokenName: spoken,
-        name: confident ? match.name : spoken,
-        matched: confident,
-        uncertain: medicine.uncertain || !confident,
-        alternatives: confident ? [] : match.alternatives,
-        catalogChoice: undefined,
-      });
+      if (match.confidence === "high") {
+        const named = stripUnsupportedNumbers(match.name, medicine.quote).trim() || spoken;
+        medicines.push({
+          ...medicine,
+          spokenName: spoken,
+          name: named,
+          matched: true,
+          uncertain: medicine.uncertain,
+          alternatives: [],
+          catalogChoice: undefined,
+        });
+        continue;
+      }
+      offer(match.alternatives);
+      for (const phrase of medicinePhrases(medicine.quote)) {
+        const loose = await matchSpokenMedicine(phrase, { vocabulary });
+        if (loose.confidence === "high") offer([loose.name]);
+        offer(loose.alternatives);
+      }
     }
-    const draft = { ...parsed.draft, medicines };
+    const draft = assembleDraft({
+      evidence: verified.evidence,
+      medicines,
+      followUpInDays: verified.followUpInDays,
+      outcome: verified.outcome,
+      uncertainFields: verified.uncertainFields,
+      missingFields: verified.missingFields,
+    });
     const updated = await prisma.consultScribeSession.update({
       where: { id: session.id },
       data: {
         draftJson: JSON.stringify(draft),
-        scribeModel: scribeModel(),
+        scribeModel: model,
         status: preview || session.status === "APPLIED" ? session.status : "DRAFTED",
       },
     });
-    return NextResponse.json({ ok: true, session: scribeSessionView(updated) });
+    return NextResponse.json({
+      ok: true,
+      suggestions: [...suggestions].slice(0, 6),
+      session: scribeSessionView(updated),
+    });
   } catch (error) {
     if (error instanceof ScribeProviderError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

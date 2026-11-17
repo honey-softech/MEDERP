@@ -13,6 +13,7 @@ import {
   type ScribeAssessmentKey,
   type ScribeAssessmentPatch,
   type ScribeDraft,
+  type ScribeFillMode,
 } from "@/lib/scribe/draft-schema";
 
 const FIELD_LABELS: Record<ScribeAssessmentKey, string> = {
@@ -35,7 +36,12 @@ export function ConsultScribe({
   appointmentId: string;
   mode?: "edit" | "view";
   placement?: "card" | "inline";
-  onApply?: (patch: ScribeAssessmentPatch, uncertain: ScribeAssessmentKey[], choices?: Record<string, string[]>) => void;
+  onApply?: (
+    patch: ScribeAssessmentPatch,
+    uncertain: ScribeAssessmentKey[],
+    choices?: Record<string, string[]>,
+    mode?: ScribeFillMode,
+  ) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [hidden, setHidden] = useState(false);

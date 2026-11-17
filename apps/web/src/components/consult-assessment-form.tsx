@@ -21,7 +21,7 @@ import {
 import type { AssessmentEntryMode } from "@/lib/handwriting";
 import { approveBlockReason } from "@/lib/handwriting";
 import type { InvestigationPick } from "@/lib/lab-catalog";
-import type { ScribeAssessmentKey, ScribeAssessmentPatch } from "@/lib/scribe/draft-schema";
+import { selectScribePatch, type ScribeAssessmentKey, type ScribeAssessmentPatch, type ScribeFillMode } from "@/lib/scribe/draft-schema";
 
 const ENTRY_MODE_KEY = "mederp.assessment.entryMode";
 const ENTRY_MODE_EVENT = "mederp-entry-mode";
@@ -283,6 +283,7 @@ export function ConsultAssessmentForm({
   }, [testsMountId]);
 
   const valuesRef = useRef(values);
+  const editedRef = useRef(new Set<ScribeAssessmentKey>());
   const investigationsRef = useRef(investigations);
   const entryModeRef = useRef(entryMode);
   const handwritingRef = useRef(handwritingPages);
@@ -318,6 +319,7 @@ export function ConsultAssessmentForm({
   const requiredFieldClass = "border-critical bg-critical-bg/40 ring-1 ring-critical/40";
 
   function setField<K extends keyof AssessmentValues>(key: K, value: AssessmentValues[K]) {
+    editedRef.current.add(key);
     if (valuesRef.current[key] === value) return;
     const next = { ...valuesRef.current, [key]: value };
     valuesRef.current = next;
@@ -330,23 +332,45 @@ export function ConsultAssessmentForm({
     patch: ScribeAssessmentPatch,
     uncertain: ScribeAssessmentKey[],
     choices: Record<string, string[]> = {},
+    mode: ScribeFillMode = "final",
   ) {
     if (entryModeRef.current !== "TYPED") chooseEntryMode("TYPED");
+    const selected = selectScribePatch({ patch, edited: [...editedRef.current], mode });
     const next: AssessmentValues = { ...valuesRef.current };
-    const marks: Partial<Record<keyof AssessmentValues, boolean>> = {};
-    const checks: Partial<Record<keyof AssessmentValues, boolean>> = {};
-    for (const key of Object.keys(patch) as ScribeAssessmentKey[]) {
-      const value = patch[key];
+    const applied: ScribeAssessmentKey[] = [];
+    for (const key of Object.keys(selected) as ScribeAssessmentKey[]) {
+      const value = selected[key];
       if (typeof value !== "string") continue;
       next[key] = value;
-      if (value.trim()) marks[key] = true;
-      if (uncertain.includes(key)) checks[key] = true;
+      applied.push(key);
     }
     valuesRef.current = next;
     setValues(next);
-    setAiFields(marks);
-    setUncertainFields(checks);
-    setMedicineChoices(choices);
+    if (mode === "final") {
+      const marks: Partial<Record<keyof AssessmentValues, boolean>> = {};
+      const checks: Partial<Record<keyof AssessmentValues, boolean>> = {};
+      for (const key of applied) {
+        if (next[key].trim()) marks[key] = true;
+        if (uncertain.includes(key)) checks[key] = true;
+      }
+      setAiFields(marks);
+      setUncertainFields(checks);
+      setMedicineChoices(choices);
+      return;
+    }
+    setAiFields((current) => {
+      const marks = { ...current };
+      for (const key of applied) {
+        if (next[key].trim()) marks[key] = true;
+      }
+      return marks;
+    });
+    setUncertainFields((current) => {
+      const checks = { ...current };
+      for (const key of applied) checks[key] = uncertain.includes(key);
+      return checks;
+    });
+    if (applied.includes("prescription")) setMedicineChoices(choices);
   }
 
   function fieldMarks(name: keyof AssessmentValues) {

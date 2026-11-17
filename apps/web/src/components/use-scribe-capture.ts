@@ -12,6 +12,7 @@ import {
   type ScribeFillMode,
 } from "@/lib/scribe/draft-schema";
 import { createCaptureHandle, type CaptureHandle } from "@/lib/scribe/capture-handle";
+import { CLIP_INTERVAL_MS, reduceCutter, type CutterEffect, type CutterState } from "@/lib/scribe/clip-cycle";
 import { coverText, emptyCoverage, markAsked, type ScribeTopic } from "@/lib/scribe/coverage";
 import { withoutPromptEcho } from "@/lib/scribe/medicine-match";
 import { SCRIBE_MAX_RECORDING_MS } from "@/lib/scribe/limits";
@@ -39,11 +40,12 @@ export type ScribeSessionView = {
   updatedAt: string;
 };
 
-export type ScribeLanguage = "auto" | "en" | "ta" | "hi";
+export type ScribeLanguage = "auto" | "en" | "ta" | "hi" | "kn" | "ml";
 export type ScribeTextSize = "sm" | "md" | "lg";
 
 type Options = {
   appointmentId: string;
+  sarvamEnabled?: boolean;
   onSession?: (session: ScribeSessionView | null) => void;
   onApply?: (
     patch: ScribeAssessmentPatch,
@@ -181,6 +183,14 @@ function micBlocked(error: unknown) {
   return error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
 }
 
+type ClipSlice = {
+  blob: Blob;
+  keep: boolean;
+  durationMs: number;
+  language: ScribeLanguage;
+  failed: boolean;
+};
+
 function languagePayload(language: ScribeLanguage) {
   const transcription: { model: string; prompt: string; language?: string } = {
     model: "gpt-4o-transcribe",
@@ -196,7 +206,7 @@ function languagePayload(language: ScribeLanguage) {
   };
 }
 
-export function useScribeCapture({ appointmentId, onSession, onApply }: Options) {
+export function useScribeCapture({ appointmentId, onSession, onApply, sarvamEnabled = false }: Options) {
   const [machine, setMachine] = useState<RecordingState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [speaking, setSpeaking] = useState(false);
@@ -227,6 +237,16 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
   const sessionIdRef = useRef<string | null>(null);
   const seqRef = useRef(1);
   const languageRef = useRef<ScribeLanguage>("auto");
+  const sarvamEnabledRef = useRef(sarvamEnabled);
+  const listenerRef = useRef<"sarvam" | "openai">("openai");
+  const cutterRef = useRef<CutterState>("idle");
+  const clipTokenRef = useRef(0);
+  const sliceStopRef = useRef<(() => void) | null>(null);
+  const pendingEffectRef = useRef<CutterEffect>("none");
+  const cycleDoneRef = useRef<Promise<void>>(Promise.resolve());
+  const sarvamFailedOverRef = useRef(false);
+  const sarvamHeardRef = useRef(false);
+  const failedClipRef = useRef<ClipSlice | null>(null);
   const mutedRef = useRef(false);
   const lastSpeechRef = useRef(0);
   const silenceAskRef = useRef(false);
@@ -244,6 +264,8 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
   const previewCountRef = useRef(0);
   const previewBusyRef = useRef(false);
   const previewTimerRef = useRef(0);
+  const previewDraftRef = useRef<ScribeDraft | null>(null);
+  const previewHeardRef = useRef("");
 
   function go(to: RecordingState) {
     if (!canTransition(machineRef.current, to)) return false;
@@ -277,8 +299,18 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     setFillMessage("");
     previewAtRef.current = 0;
     previewCountRef.current = 0;
+    previewDraftRef.current = null;
+    previewHeardRef.current = "";
     window.clearTimeout(previewTimerRef.current);
     fallbackBlobRef.current = null;
+    cutterRef.current = "idle";
+    sarvamFailedOverRef.current = false;
+    sarvamHeardRef.current = false;
+    failedClipRef.current = null;
+    clipTokenRef.current += 1;
+    sliceStopRef.current = null;
+    pendingEffectRef.current = "none";
+    listenerRef.current = "openai";
     seqRef.current = 1;
     startedAtRef.current = 0;
     accumRef.current = 0;
@@ -307,7 +339,8 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "start", consent: true }),
     });
-    const data = (await response.json().catch(() => ({}))) as { error?: string; session?: ScribeSessionView };
+    const data = (await response.json().catch(() => ({}))) as { error?: string; session?: ScribeSessionView; sarvam?: boolean };
+    if (typeof data.sarvam === "boolean") sarvamEnabledRef.current = data.sarvam;
     if (!response.ok || !data.session) return { error: data.error ?? "Could not start the recording." };
     return { session: data.session };
   }
@@ -489,6 +522,244 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     return true;
   }
 
+  function usingSarvam() {
+    return listenerRef.current === "sarvam" && !sarvamFailedOverRef.current;
+  }
+
+  function dispatchCutter(event: Parameters<typeof reduceCutter>[1]) {
+    const next = reduceCutter(cutterRef.current, event);
+    cutterRef.current = next.state;
+    if (next.effect !== "none") pendingEffectRef.current = next.effect;
+    if (next.effect === "flush" || next.effect === "flush-and-begin" || next.effect === "drop") sliceStopRef.current?.();
+  }
+
+  function recordSlice(handle: CaptureHandle, token: number): Promise<ClipSlice> {
+    const language = languageRef.current;
+    const started = clock();
+    return new Promise((resolve) => {
+      let recorder: MediaRecorder;
+      try {
+        recorder = openRecorder(handle.stream as MediaStream);
+      } catch {
+        resolve({ blob: new Blob(), keep: false, durationMs: 0, language, failed: true });
+        return;
+      }
+      const parts: Blob[] = [];
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (sliceStopRef.current !== finish) return;
+        if (clipTokenRef.current === token && !handle.closed) {
+          dispatchCutter("interval");
+          return;
+        }
+        pendingEffectRef.current = "drop";
+        finish();
+      }, CLIP_INTERVAL_MS);
+      handle.trackTimer(timer);
+      function payload(keep: boolean): ClipSlice {
+        return {
+          blob: new Blob(parts, { type: storedMime(recorder.mimeType) || "audio/webm" }),
+          keep,
+          durationMs: Math.max(0, clock() - started),
+          language,
+          failed: false,
+        };
+      }
+      function finish() {
+        if (settled) return;
+        settled = true;
+        const keep = pendingEffectRef.current !== "drop";
+        window.clearTimeout(timer);
+        if (sliceStopRef.current === finish) sliceStopRef.current = null;
+        if (recorder.state === "inactive") {
+          resolve(payload(keep));
+          return;
+        }
+        recorder.onstop = () => resolve(payload(keep));
+        try {
+          recorder.stop();
+        } catch {
+          resolve(payload(keep));
+        }
+      }
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) parts.push(event.data);
+      };
+      recorder.start();
+      handle.bind({ recorder });
+      sliceStopRef.current = finish;
+    });
+  }
+
+  async function postClip(slice: ClipSlice): Promise<"saved" | "empty" | "provider" | "failed"> {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || slice.blob.size < 1) return "empty";
+    const seq = seqRef.current;
+    const body = new FormData();
+    const type = storedMime(slice.blob.type);
+    body.set("audio", new Blob([slice.blob], { type }), type === "audio/mp4" ? "clip.m4a" : "clip.webm");
+    body.set("sessionId", sessionId);
+    body.set("seq", String(seq));
+    body.set("durationMs", String(Math.max(0, Math.round(slice.durationMs))));
+    body.set("language", slice.language);
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}/scribe/clip`, { method: "POST", body });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        empty?: boolean;
+        duplicate?: boolean;
+        english?: string;
+        chunkCount?: number;
+        suggestions?: string[];
+        session?: ScribeSessionView;
+      };
+      if (!response.ok) {
+        if (response.status === 409 && typeof data.chunkCount === "number") seqRef.current = data.chunkCount + 1;
+        setError(data.error ?? "Could not save that line of the conversation.");
+        if (response.status === 429 || response.status === 502 || response.status === 503) return "provider";
+        return "failed";
+      }
+      if (typeof data.chunkCount === "number") seqRef.current = data.chunkCount + 1;
+      if (data.session) onSessionRef.current?.(data.session);
+      if (data.duplicate) {
+        if (data.session?.transcript && !storeRef.current.original) {
+          seedTranscript(storeRef.current, data.session.transcript, data.session.translation ?? "");
+          publishTranscript();
+        }
+        return "saved";
+      }
+      if (data.empty) return "empty";
+      const text = withoutPromptEcho(data.english || "").trim();
+      if (!text) return "empty";
+      const itemId = `clip-${seq}`;
+      if (!storeRef.current.byId.has(itemId)) {
+        commitSegment(storeRef.current, { id: itemId, seq, original: text, english: text });
+        publishTranscript();
+        publishCoverage(coverText(coverageRef.current, text));
+      }
+      sarvamHeardRef.current = true;
+      lastSpeechRef.current = clock();
+      setSpeaking(true);
+      if (Array.isArray(data.suggestions)) setSuggestions(data.suggestions.slice(0, 6));
+      setError("");
+      scheduleAutoPreview();
+      return "saved";
+    } catch {
+      setError("Could not save that line of the conversation.");
+      return "provider";
+    }
+  }
+
+  async function failOver(handle: CaptureHandle) {
+    if (sarvamFailedOverRef.current || handle.closed) return;
+    sarvamFailedOverRef.current = true;
+    clipTokenRef.current += 1;
+    cutterRef.current = "idle";
+    pendingEffectRef.current = "drop";
+    sliceStopRef.current?.();
+    sliceStopRef.current = null;
+    const live = await openRealtime(handle);
+    if (!handle.isCurrent(handle.generation)) return;
+    if (live) {
+      setLiveUnavailable(false);
+      setError("");
+      return;
+    }
+    try {
+      startFallback(handle);
+      setLiveUnavailable(true);
+      setError("");
+    } catch {
+      setError("Could not start recording on this device.");
+      go("error");
+    }
+  }
+
+  async function deliverClip(handle: CaptureHandle, slice: ClipSlice) {
+    let outcome = await postClip(slice);
+    if (outcome !== "saved" && outcome !== "empty") outcome = await postClip(slice);
+    if (outcome === "saved" || outcome === "empty") return "ok" as const;
+    failedClipRef.current = slice;
+    if (outcome === "provider" && !sarvamHeardRef.current) {
+      await failOver(handle);
+      return "failover" as const;
+    }
+    return "ok" as const;
+  }
+
+  async function pump(handle: CaptureHandle, token: number) {
+    while (clipTokenRef.current === token && !handle.closed && cutterRef.current === "recording") {
+      const slice = await recordSlice(handle, token);
+      if (slice.failed) {
+        if (clipTokenRef.current !== token || handle.closed) return;
+        setError("Could not start recording on this device.");
+        go("error");
+        handle.close();
+        return;
+      }
+      if (slice.keep && slice.blob.size > 0) {
+        const outcome = await deliverClip(handle, slice);
+        if (outcome === "failover" || handle.closed) return;
+      }
+      if (clipTokenRef.current !== token || handle.closed || cutterRef.current !== "recording") return;
+      pendingEffectRef.current = "none";
+    }
+  }
+
+  function startSarvamCycle(handle: CaptureHandle) {
+    clipTokenRef.current += 1;
+    pendingEffectRef.current = "drop";
+    sliceStopRef.current?.();
+    sliceStopRef.current = null;
+    const token = clipTokenRef.current;
+    cutterRef.current = "recording";
+    pendingEffectRef.current = "none";
+    cycleDoneRef.current = pump(handle, token);
+  }
+
+  async function commitDraft(draft: ScribeDraft, suggestions: string[]): Promise<"ok" | "retry" | "error"> {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      setError("No recording was found for this visit.");
+      go("error");
+      return "error";
+    }
+    const values = draftToAssessment(draft);
+    const patch: ScribeAssessmentPatch = {};
+    for (const key of SCRIBE_ASSESSMENT_KEYS) {
+      if (values[key].trim()) patch[key] = values[key];
+    }
+    if (Object.keys(patch).length === 0) {
+      const message = "Nothing clear was heard. Say the complaint, then each medicine with the dose.";
+      setFillMessage(message);
+      setError(message);
+      go("error");
+      return "error";
+    }
+    const applied = await fetch(`/api/appointments/${appointmentId}/scribe/session`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "applied", sessionId, draft }),
+    });
+    const appliedData = (await applied.json().catch(() => ({}))) as { error?: string; session?: ScribeSessionView };
+    if (applied.status === 409) return "retry";
+    if (!applied.ok || !appliedData.session) {
+      const message = appliedData.error ?? "Could not fill the assessment.";
+      setFillMessage(message);
+      setError(message);
+      go("error");
+      return "error";
+    }
+    onSessionRef.current?.(appliedData.session);
+    onApplyRef.current?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft), "final");
+    setFills(fillsFromDraft(draft));
+    setSources(sourcesFromDraft(draft));
+    if (suggestions.length > 0) setSuggestions((current) => [...new Set([...suggestions, ...current])].slice(0, 6));
+    setFillMessage("Filled the assessment. Check the note, then Approve.");
+    go("done");
+    return "ok";
+  }
+
   async function draftAndApply() {
     const sessionId = sessionIdRef.current;
     if (!sessionId) {
@@ -522,39 +793,12 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
       go("error");
       return;
     }
-    const values = draftToAssessment(draft);
-    const patch: ScribeAssessmentPatch = {};
-    for (const key of SCRIBE_ASSESSMENT_KEYS) {
-      if (values[key].trim()) patch[key] = values[key];
-    }
-    if (Object.keys(patch).length === 0) {
-      const message = "Nothing clear was heard. Say the complaint, then each medicine with the dose.";
+    if ((await commitDraft(draft, readSuggestions(data.suggestions))) === "retry") {
+      const message = "Could not fill the assessment.";
       setFillMessage(message);
       setError(message);
       go("error");
-      return;
     }
-    const applied = await fetch(`/api/appointments/${appointmentId}/scribe/session`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "applied", sessionId, draft }),
-    });
-    const appliedData = (await applied.json().catch(() => ({}))) as { error?: string; session?: ScribeSessionView };
-    if (!applied.ok || !appliedData.session) {
-      const message = appliedData.error ?? "Could not fill the assessment.";
-      setFillMessage(message);
-      setError(message);
-      go("error");
-      return;
-    }
-    onSessionRef.current?.(appliedData.session);
-    onApplyRef.current?.(patch, fieldsToCheck(draft), medicineChoicesFromDraft(draft), "final");
-    setFills(fillsFromDraft(draft));
-    setSources(sourcesFromDraft(draft));
-    const offered = readSuggestions(data.suggestions);
-    if (offered.length > 0) setSuggestions((current) => [...new Set([...offered, ...current])].slice(0, 6));
-    setFillMessage("Filled the assessment. Check the note, then Approve.");
-    go("done");
   }
 
   async function connect(micReady: Promise<MediaStream | unknown>, run: number) {
@@ -588,21 +832,27 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
         handle.close();
         return;
       }
-      let live = false;
-      if (runRef.current === run) live = await openRealtime(handle);
-      if (!handle.isCurrent(handle.generation) || runRef.current !== run) return;
-      if (!live) {
-        try {
-          startFallback(handle);
-          setLiveUnavailable(true);
-        } catch {
-          handle.close();
-          setError("Could not start recording on this device.");
-          go("error");
-          return;
-        }
-      } else {
+      listenerRef.current = sarvamEnabledRef.current && languageRef.current !== "en" ? "sarvam" : "openai";
+      if (listenerRef.current === "sarvam") {
+        startSarvamCycle(handle);
         setLiveUnavailable(false);
+      } else {
+        let live = false;
+        if (runRef.current === run) live = await openRealtime(handle);
+        if (!handle.isCurrent(handle.generation) || runRef.current !== run) return;
+        if (!live) {
+          try {
+            startFallback(handle);
+            setLiveUnavailable(true);
+          } catch {
+            handle.close();
+            setError("Could not start recording on this device.");
+            go("error");
+            return;
+          }
+        } else {
+          setLiveUnavailable(false);
+        }
       }
       lastSpeechRef.current = clock();
       if (!startedAtRef.current) startedAtRef.current = clock();
@@ -620,7 +870,8 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     const from = machineRef.current;
     if (from === "paused" && handleRef.current && !handleRef.current.closed) {
       handleRef.current.resume();
-      if (liveUnavailable && !fallbackBlobRef.current) startFallback(handleRef.current);
+      if (usingSarvam()) startSarvamCycle(handleRef.current);
+      else if (liveUnavailable && !fallbackBlobRef.current) startFallback(handleRef.current);
       mutedRef.current = false;
       setMuted(false);
       setFillMessage("");
@@ -680,6 +931,7 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
       });
       setLevels(next);
       const loud = next.some((level) => level > 0.08);
+      if (loud && listenerRef.current === "sarvam") lastSpeechRef.current = clock();
       setSpeaking((current) => (current === loud ? current : loud));
     };
     void audio.resume().catch(() => undefined);
@@ -699,7 +951,13 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     });
   }
 
+  function heardText() {
+    return `${storeRef.current.english}\n${storeRef.current.original}`.trim();
+  }
+
   function showDraft(draft: ScribeDraft, suggestions: string[]) {
+    previewDraftRef.current = draft;
+    previewHeardRef.current = heardText();
     setFills(fillsFromDraft(draft));
     setSources(sourcesFromDraft(draft));
     if (suggestions.length > 0) setSuggestions((current) => [...new Set([...suggestions, ...current])].slice(0, 6));
@@ -780,8 +1038,12 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     await previewFields("pause");
   }
 
-  function pause() {
+  async function pause() {
     if (!go("paused")) return;
+    if (usingSarvam() && cutterRef.current === "recording") {
+      dispatchCutter("pause");
+      await cycleDoneRef.current;
+    }
     handleRef.current?.pause();
     if (!pauseBeganRef.current) pauseBeganRef.current = Date.now();
     setSpeaking(false);
@@ -811,16 +1073,26 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     if (!canTransition(machineRef.current, "stopping")) return;
     runRef.current += 1;
     go("stopping");
-    setFillMessage("Filling the assessment…");
+    setFillMessage(previewDraftRef.current ? "Saving the last words…" : "Filling the assessment…");
     silenceAskRef.current = false;
     setSilenceAsk(false);
     setSpeaking(false);
+    if (usingSarvam() && cutterRef.current === "recording") {
+      dispatchCutter("stop");
+      await cycleDoneRef.current;
+    }
+    clipTokenRef.current += 1;
     const handle = handleRef.current;
     const blobPromise = fallbackBlobRef.current;
     fallbackBlobRef.current = null;
     handle?.close();
     handleRef.current = null;
     try {
+      const savedClip = failedClipRef.current;
+      if (savedClip) {
+        const outcome = await postClip(savedClip);
+        if (outcome === "saved" || outcome === "empty") failedClipRef.current = null;
+      }
       const savedBlob = failedBlobRef.current;
       if (blobPromise) {
         const blob = await Promise.race([
@@ -844,6 +1116,14 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
         return;
       }
       if (!go("drafting")) return;
+      const cached = previewDraftRef.current;
+      const sameWords = Boolean(cached) && previewHeardRef.current === heardText();
+      if (cached && sameWords) {
+        const reused = await commitDraft(cached, []);
+        if (reused === "retry") await draftAndApply();
+        return;
+      }
+      setFillMessage("Filling the assessment…");
       await draftAndApply();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not draft the visit note.");
@@ -853,6 +1133,7 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
   useEffect(() => {
     onSessionRef.current = onSession;
     onApplyRef.current = onApply;
+    sarvamEnabledRef.current = Boolean(sarvamEnabled);
     stopRef.current = () => {
       void stopAndDraft();
     };
@@ -861,6 +1142,9 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
   async function cancel() {
     if (!canTransition(machineRef.current, "idle")) return;
     runRef.current += 1;
+    clipTokenRef.current += 1;
+    pendingEffectRef.current = "drop";
+    sliceStopRef.current?.();
     handleRef.current?.close();
     handleRef.current = null;
     fallbackBlobRef.current = null;
@@ -886,14 +1170,26 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
     const next = !mutedRef.current;
     mutedRef.current = next;
     setMuted(next);
-    if (next) handle.pause();
-    else handle.resume();
+    if (next) {
+      if (usingSarvam()) dispatchCutter("mute");
+      handle.pause();
+      return;
+    }
+    handle.resume();
+    if (usingSarvam() && machineRef.current === "live") startSarvamCycle(handle);
   }
 
   function retry() {
     if (pendingRef.current) {
       const pending = pendingRef.current;
       void postSegment(pending.itemId, pending.text);
+      return;
+    }
+    if (failedClipRef.current) {
+      const slice = failedClipRef.current;
+      void postClip(slice).then((outcome) => {
+        if (outcome === "saved" || outcome === "empty") failedClipRef.current = null;
+      });
       return;
     }
     if (failedBlobRef.current) {
@@ -917,7 +1213,20 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
   function chooseLanguage(next: ScribeLanguage) {
     languageRef.current = next;
     setLanguageState(next);
-    handleRef.current?.send(JSON.stringify(languagePayload(next)));
+    const handle = handleRef.current;
+    if (handle && !handle.closed && usingSarvam()) {
+      if (next === "en") {
+        if (cutterRef.current === "recording") dispatchCutter("stop");
+        void cycleDoneRef.current.then(async () => {
+          if (languageRef.current !== "en" || sarvamFailedOverRef.current || handle.closed) return;
+          await failOver(handle);
+        });
+        return;
+      }
+      if (cutterRef.current === "recording") dispatchCutter("language");
+      return;
+    }
+    handle?.send(JSON.stringify(languagePayload(next)));
   }
 
   function chooseMedicine(name: string) {
@@ -984,6 +1293,9 @@ export function useScribeCapture({ appointmentId, onSession, onApply }: Options)
       const state = machineRef.current;
       if (state !== "live" && state !== "paused" && state !== "requesting") return;
       runRef.current += 1;
+      clipTokenRef.current += 1;
+      pendingEffectRef.current = "drop";
+      sliceStopRef.current?.();
       handleRef.current?.close();
       handleRef.current = null;
       fallbackBlobRef.current = null;

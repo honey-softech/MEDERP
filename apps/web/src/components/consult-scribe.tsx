@@ -46,6 +46,7 @@ export function ConsultScribe({
   const [loading, setLoading] = useState(true);
   const [hidden, setHidden] = useState(false);
   const [configured, setConfigured] = useState(true);
+  const [sarvamEnabled, setSarvamEnabled] = useState(false);
   const [session, setSession] = useState<ScribeSessionView | null>(null);
   const [consent, setConsent] = useState(false);
   const [cardError, setCardError] = useState("");
@@ -53,6 +54,7 @@ export function ConsultScribe({
 
   const capture = useScribeCapture({
     appointmentId,
+    sarvamEnabled,
     onSession: (next) => {
       setSession(next);
       if (!next) setConsent(false);
@@ -67,6 +69,7 @@ export function ConsultScribe({
         const data = (await response.json().catch(() => ({}))) as {
           error?: string;
           configured?: boolean;
+          sarvam?: boolean;
           session?: ScribeSessionView | null;
         };
         if (cancelled) return;
@@ -79,6 +82,7 @@ export function ConsultScribe({
           return;
         }
         setConfigured(data.configured !== false);
+        setSarvamEnabled(data.sarvam === true);
         if (data.session) setSession(data.session);
       })
       .catch(() => {

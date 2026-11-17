@@ -6,7 +6,7 @@ import { doctorMedicineVocabulary, transcribeVocabularyPrompt } from "@/lib/scri
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const LANGUAGES = new Set<RealtimeLanguage>(["auto", "en", "ta", "hi"]);
+const LANGUAGES = new Set<RealtimeLanguage>(["auto", "en", "ta", "hi", "kn", "ml"]);
 
 export async function POST(request: Request, context: Ctx) {
   const { id } = await context.params;

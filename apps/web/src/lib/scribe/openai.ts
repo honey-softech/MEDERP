@@ -5,7 +5,7 @@ const OPENAI_TRANSCRIPTIONS = "https://api.openai.com/v1/audio/transcriptions";
 const OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_CLIENT_SECRETS = "https://api.openai.com/v1/realtime/client_secrets";
 
-export type RealtimeLanguage = "auto" | "en" | "ta" | "hi";
+export type RealtimeLanguage = "auto" | "en" | "ta" | "hi" | "kn" | "ml";
 
 export const SCRIBE_SYSTEM_PROMPT = `You convert an outpatient consultation transcript into a structured visit note for a doctor in India.
 

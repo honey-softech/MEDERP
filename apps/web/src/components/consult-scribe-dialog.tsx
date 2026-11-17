@@ -8,6 +8,8 @@ const LANGUAGES: { id: ScribeLanguage; label: string }[] = [
   { id: "auto", label: "Auto" },
   { id: "ta", label: "Tamil" },
   { id: "hi", label: "Hindi" },
+  { id: "kn", label: "Kannada" },
+  { id: "ml", label: "Malayalam" },
   { id: "en", label: "English" },
 ];
 
@@ -244,8 +246,8 @@ export function ConsultScribeDialog({ capture }: { capture: ScribeCapture }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex rounded-full bg-app-bg p-0.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-1 rounded-2xl bg-app-bg p-0.5">
               {LANGUAGES.map((item) => (
                 <button
                   key={item.id}
@@ -352,17 +354,26 @@ function TopicRow({
   const [open, setOpen] = useState(false);
   const value = text.trim();
   const source = quote.trim();
-  const row = `grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-left ${current ? "bg-primary-light" : "bg-surface"}`;
+  const long = value.length > 42 || value.includes("\n");
+  const expandable = long || Boolean(source);
+  const row = `group grid w-full grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-left ${current ? "bg-primary-light" : "bg-surface"}`;
+  const valueClass = open
+    ? "whitespace-pre-wrap"
+    : "truncate [@media(hover:hover)]:group-hover:overflow-visible [@media(hover:hover)]:group-hover:text-clip [@media(hover:hover)]:group-hover:whitespace-pre-wrap";
   const body = (
     <>
       <p className={`text-xs ${value || heard ? "font-medium text-text-primary" : "text-text-secondary"}`}>{TOPIC_LABELS[topic]}</p>
-      <p className={`truncate text-sm ${value ? "text-text-primary" : "text-text-secondary/70"}`}>{value || "—"}</p>
-      {open && source ? <p className="col-start-2 text-[11px] leading-relaxed text-text-secondary">from: {source}</p> : null}
+      <p className={`text-sm ${value ? "text-text-primary" : "text-text-secondary/70"} ${valueClass}`}>{value || "—"}</p>
+      {source ? (
+        <p className={`col-start-2 text-[11px] leading-relaxed text-text-secondary ${open ? "" : "hidden [@media(hover:hover)]:group-hover:block"}`}>
+          from: {source}
+        </p>
+      ) : null}
     </>
   );
-  if (!source) return <div className={row}>{body}</div>;
+  if (!expandable) return <div className={row}>{body}</div>;
   return (
-    <button type="button" className={`${row} w-full`} aria-expanded={open} onClick={() => setOpen((shown) => !shown)}>
+    <button type="button" className={row} aria-expanded={open} onClick={() => setOpen((shown) => !shown)}>
       {body}
     </button>
   );

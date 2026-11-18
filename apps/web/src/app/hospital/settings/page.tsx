@@ -1,14 +1,6 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
-import { OtpDangerAction } from "@/components/otp-danger-action";
-import { AdminDoctorProfileForm } from "@/components/admin-doctor-profile-form";
-import { DoctorAvailabilityEditor } from "@/components/doctor-availability-editor";
-import { HospitalBrandingForm } from "@/components/hospital-branding-form";
-import { SignaturePolicyForm } from "@/components/signature-policy-form";
-import { WalkInPolicyForm } from "@/components/walk-in-policy-form";
-import { NurseReceptionistForm } from "@/components/nurse-receptionist-form";
-import { FollowUpReminderPolicyForm } from "@/components/follow-up-reminder-policy-form";
-import { AiScribePolicyForm } from "@/components/ai-scribe-policy-form";
-import { WhatsAppLanguageForm } from "@/components/whatsapp-language-form";
+import { HospitalSettingsClient } from "@/components/settings/hospital-settings-client";
 import { requireHospitalPage } from "@/lib/front-desk";
 import { parseExtraPhones } from "@/lib/hospital-letterhead";
 import { countStaffWithoutSignature } from "@/lib/signatures";
@@ -81,137 +73,98 @@ export default async function HospitalSettingsPage() {
 
   return (
     <AppShell title="Hospital settings">
-      <p className="mb-4 text-sm text-slate-500">
-        Most-used settings first: branding and OPD fee, doctor hours, follow-up reminders, front-desk coverage, then
-        admin doctor and signature policy. Changes are recorded in the audit log.
-      </p>
-      <HospitalBrandingForm
-        initial={{
-          name: hospital.name,
-          code: hospital.code,
-          address: hospital.address ?? "",
-          phone: hospital.phone ?? "",
-          extraPhones: parseExtraPhones(hospital.altPhones),
-          logoData: hospital.logoData ?? "",
-          sealData: hospital.sealData ?? "",
-          opdFee: String(Number(hospital.opdFee ?? 500)),
-        }}
-      />
-
-      <section className="mt-8 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">Doctor availability hours</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Each doctor has their own schedule. Set windows per doctor (multiple per day allowed). Booking
-            shows only the selected doctor&apos;s times.
-          </p>
-        </div>
-        {activeDoctors.length === 0 ? (
-          <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            No active doctors yet. Add a doctor under Hospital users first.
-          </p>
-        ) : (
-          activeDoctors.map((doctor) => (
-            <DoctorAvailabilityEditor
-              key={doctor.id}
-              doctorId={doctor.id}
-              doctorLabel={`Dr ${doctor.firstName} ${doctor.lastName}`.trim()}
-            />
-          ))
-        )}
-      </section>
-
-      <NurseReceptionistForm initial={{ nurseAsReceptionist: hospital.nurseAsReceptionist }} />
-      <FollowUpReminderPolicyForm
-        initial={{
-          followUpReminderEnabled: hospital.followUpReminderEnabled,
-          followUpReminderDaysBefore: hospital.followUpReminderDaysBefore,
-        }}
-      />
-      <AiScribePolicyForm initial={{ aiScribeEnabled: hospital.aiScribeEnabled }} />
-      <WhatsAppLanguageForm initial={{ whatsappLanguage: hospital.whatsappLanguage }} />
-      <WalkInPolicyForm
-        initial={{
-          walkInByDoctor: hospital.walkInByDoctor,
-          walkInByNurse: hospital.walkInByNurse,
-          nurseAsReceptionist: hospital.nurseAsReceptionist,
-        }}
-      />
-
-      <div className="mt-6">
-        <AdminDoctorProfileForm
-          departments={departments.map((dept) => ({
-            id: dept.id,
-            label: `${dept.name} (${dept.code})`,
-          }))}
-          existingDoctors={doctors.map((row) => ({
-            id: row.id,
-            label: `${row.firstName} ${row.lastName}`.trim(),
-            specialization: row.specialization ?? "",
-            medicalRegNo: row.medicalRegNo ?? "",
-            department: row.department ? `${row.department.name} (${row.department.code})` : "",
-            isActive: row.isActive,
-            linkedToAdmin: row.appUserId === user.id,
-            linkedUsername: row.appUser?.username ?? null,
-            linkedRole: row.appUser?.role ?? null,
-          }))}
-          initialEnabled={Boolean(doctorStaff?.isActive)}
-          initialLinkedStaffId={doctorStaff?.id ?? null}
-          initialProfile={
-            doctorStaff
-              ? {
-                  departmentId: doctorStaff.departmentId ?? "",
-                  opdRoom: doctorStaff.opdRoom ?? "",
-                  shift: doctorStaff.shift ?? "",
-                  weeklySchedule: doctorStaff.weeklySchedule ?? "",
-                  medicalRegNo: doctorStaff.medicalRegNo ?? "",
-                  regCouncil: doctorStaff.regCouncil ?? "",
-                  regRegion: doctorStaff.regRegion ?? "",
-                  regIssuedAt: dateIso(doctorStaff.regIssuedAt),
-                  regExpiresAt: dateIso(doctorStaff.regExpiresAt),
-                  medicalDegree: doctorStaff.medicalDegree ?? "",
-                  university: doctorStaff.university ?? "",
-                  graduationYear:
-                    doctorStaff.graduationYear != null ? String(doctorStaff.graduationYear) : "",
-                  postgraduate: doctorStaff.postgraduate ?? "",
-                  fellowship: doctorStaff.fellowship ?? "",
-                  specialization: doctorStaff.specialization ?? "",
-                  subSpecialization: doctorStaff.subSpecialization ?? "",
-                  yearsExperience:
-                    doctorStaff.yearsExperience != null ? String(doctorStaff.yearsExperience) : "",
-                  areasOfExpertise: doctorStaff.areasOfExpertise ?? "",
-                  languagesSpoken: doctorStaff.languagesSpoken ?? "",
-                  consultationType: doctorStaff.consultationType ?? "",
-                  consultationFee: decimalString(doctorStaff.consultationFee),
-                  followUpFee: decimalString(doctorStaff.followUpFee),
-                  teleconsultEnabled: doctorStaff.teleconsultEnabled,
-                  emergencyDutyEnabled: doctorStaff.emergencyDutyEnabled,
-                  firstName: doctorStaff.firstName,
-                  lastName: doctorStaff.lastName,
-                }
-              : null
-          }
-          user={{
-            firstName: user.firstName ?? "",
-            lastName: user.lastName ?? "",
-            mobile: user.mobile,
-            email: user.email ?? "",
+      <Suspense fallback={<p className="text-sm text-text-secondary">Loading settings…</p>}>
+        <HospitalSettingsClient
+          data={{
+            branding: {
+              name: hospital.name,
+              code: hospital.code,
+              address: hospital.address ?? "",
+              phone: hospital.phone ?? "",
+              extraPhones: parseExtraPhones(hospital.altPhones),
+              logoData: hospital.logoData ?? "",
+              sealData: hospital.sealData ?? "",
+              opdFee: String(Number(hospital.opdFee ?? 500)),
+            },
+            frontDesk: {
+              walkInByDoctor: hospital.walkInByDoctor,
+              walkInByNurse: hospital.walkInByNurse,
+              nurseAsReceptionist: hospital.nurseAsReceptionist,
+            },
+            communication: {
+              whatsappLanguage: hospital.whatsappLanguage || "en",
+              followUpReminderEnabled: hospital.followUpReminderEnabled,
+              followUpReminderDaysBefore: hospital.followUpReminderDaysBefore === 2 ? 2 : 1,
+            },
+            policies: {
+              requireSignatureForApproval: hospital.requireSignatureForApproval,
+              aiScribeEnabled: hospital.aiScribeEnabled,
+            },
+            coverage,
+            doctors: activeDoctors.map((doctor) => ({
+              id: doctor.id,
+              label: `Dr ${doctor.firstName} ${doctor.lastName}`.trim(),
+            })),
+            profile: {
+              departments: departments.map((dept) => ({
+                id: dept.id,
+                label: `${dept.name} (${dept.code})`,
+              })),
+              existingDoctors: doctors.map((row) => ({
+                id: row.id,
+                label: `${row.firstName} ${row.lastName}`.trim(),
+                specialization: row.specialization ?? "",
+                medicalRegNo: row.medicalRegNo ?? "",
+                department: row.department ? `${row.department.name} (${row.department.code})` : "",
+                isActive: row.isActive,
+                linkedToAdmin: row.appUserId === user.id,
+                linkedUsername: row.appUser?.username ?? null,
+                linkedRole: row.appUser?.role ?? null,
+              })),
+              initialEnabled: Boolean(doctorStaff?.isActive),
+              initialLinkedStaffId: doctorStaff?.id ?? null,
+              initialProfile: doctorStaff
+                ? {
+                    departmentId: doctorStaff.departmentId ?? "",
+                    opdRoom: doctorStaff.opdRoom ?? "",
+                    shift: doctorStaff.shift ?? "",
+                    weeklySchedule: doctorStaff.weeklySchedule ?? "",
+                    medicalRegNo: doctorStaff.medicalRegNo ?? "",
+                    regCouncil: doctorStaff.regCouncil ?? "",
+                    regRegion: doctorStaff.regRegion ?? "",
+                    regIssuedAt: dateIso(doctorStaff.regIssuedAt),
+                    regExpiresAt: dateIso(doctorStaff.regExpiresAt),
+                    medicalDegree: doctorStaff.medicalDegree ?? "",
+                    university: doctorStaff.university ?? "",
+                    graduationYear:
+                      doctorStaff.graduationYear != null ? String(doctorStaff.graduationYear) : "",
+                    postgraduate: doctorStaff.postgraduate ?? "",
+                    fellowship: doctorStaff.fellowship ?? "",
+                    specialization: doctorStaff.specialization ?? "",
+                    subSpecialization: doctorStaff.subSpecialization ?? "",
+                    yearsExperience:
+                      doctorStaff.yearsExperience != null ? String(doctorStaff.yearsExperience) : "",
+                    areasOfExpertise: doctorStaff.areasOfExpertise ?? "",
+                    languagesSpoken: doctorStaff.languagesSpoken ?? "",
+                    consultationType: doctorStaff.consultationType ?? "",
+                    consultationFee: decimalString(doctorStaff.consultationFee),
+                    followUpFee: decimalString(doctorStaff.followUpFee),
+                    teleconsultEnabled: doctorStaff.teleconsultEnabled,
+                    emergencyDutyEnabled: doctorStaff.emergencyDutyEnabled,
+                    firstName: doctorStaff.firstName,
+                    lastName: doctorStaff.lastName,
+                  }
+                : null,
+              user: {
+                firstName: user.firstName ?? "",
+                lastName: user.lastName ?? "",
+                mobile: user.mobile,
+                email: user.email ?? "",
+              },
+            },
           }}
         />
-      </div>
-
-      <SignaturePolicyForm
-        initial={{ requireSignatureForApproval: hospital.requireSignatureForApproval }}
-        coverage={coverage}
-      />
-
-      <OtpDangerAction
-        title="Close hospital"
-        description="Clinical records stay on file. The hospital phone and every staff login number, including this super admin, are released so they can be used again. The monthly subscription is cancelled so no further charges are taken. Confirm with the login OTP sent on WhatsApp."
-        sendUrl="/api/hospital/close/otp"
-        confirmUrl="/api/hospital/close"
-        confirmLabel="Close hospital"
-      />
+      </Suspense>
     </AppShell>
   );
 }

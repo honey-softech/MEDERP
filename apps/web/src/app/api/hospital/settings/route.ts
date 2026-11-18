@@ -154,30 +154,57 @@ export async function PATCH(request: Request) {
   const reminderDays =
     data.followUpReminderDaysBefore ?? hospital.followUpReminderDaysBefore;
 
+  const groupCount = [
+    brandingSent,
+    policySent,
+    walkInSent,
+    nurseReceptionSent,
+    followUpReminderSent,
+    aiScribeSent,
+    whatsappLanguageSent,
+  ].filter(Boolean).length;
+
+  const summaryParts: string[] = [];
+  if (brandingSent) summaryParts.push("updated hospital print branding");
+  if (policySent) {
+    summaryParts.push(
+      data.requireSignatureForApproval
+        ? "required a signature before approving a visit summary"
+        : "stopped requiring a signature before approving a visit summary",
+    );
+  }
+  if (walkInSent) summaryParts.push("updated who can add walk-ins");
+  if (nurseReceptionSent) {
+    summaryParts.push(
+      data.nurseAsReceptionist ? "let nurses cover receptionist work" : "stopped nurses covering receptionist work",
+    );
+  }
+  if (followUpReminderSent) {
+    summaryParts.push(
+      reminderEnabled
+        ? `turned on follow-up reminders ${reminderDays} day${reminderDays === 1 ? "" : "s"} before`
+        : "turned off automatic follow-up reminders",
+    );
+  }
+  if (aiScribeSent) {
+    summaryParts.push(`${data.aiScribeEnabled ? "turned on" : "turned off"} AI consult scribe`);
+  }
+  if (whatsappLanguageSent) {
+    summaryParts.push(`set the WhatsApp language to ${whatsappLanguageLabel(data.whatsappLanguage)}`);
+  }
+
+  const combinedAction = groupCount > 1 ? "HOSPITAL_SETTINGS_UPDATED" : action;
+
   await writeAuditLog({
     request,
     hospitalId: scoped.user.hospitalId,
     actorUserId: scoped.user.id,
     actorUsername: scoped.user.username,
     actorRole: scoped.user.role,
-    action,
+    action: combinedAction,
     entity: "Hospital",
     entityId: hospital.id,
-    summary: whatsappLanguageOnly
-      ? `${scoped.user.username} set the WhatsApp language to ${whatsappLanguageLabel(data.whatsappLanguage)}.`
-      : aiScribeOnly
-      ? `${scoped.user.username} ${data.aiScribeEnabled ? "turned on" : "turned off"} AI consult scribe.`
-      : followUpOnly
-      ? reminderEnabled
-        ? `${scoped.user.username} turned on follow-up reminders ${reminderDays} day${reminderDays === 1 ? "" : "s"} before.`
-        : `${scoped.user.username} turned off automatic follow-up reminders.`
-      : nurseReceptionSent && !brandingSent && !policySent && !walkInSent
-      ? `${scoped.user.username} ${data.nurseAsReceptionist ? "let nurses cover receptionist work." : "stopped nurses covering receptionist work."}`
-      : walkInSent && !brandingSent && !policySent
-      ? `${scoped.user.username} updated who can add walk-ins.`
-      : policySent && !brandingSent
-        ? `${scoped.user.username} ${data.requireSignatureForApproval ? "required" : "stopped requiring"} signatures for visit summary approval.`
-        : `${scoped.user.username} updated hospital print branding.`,
+    summary: `${scoped.user.username} ${summaryParts.join(", ")}.`,
     metadata: { changes },
   });
 

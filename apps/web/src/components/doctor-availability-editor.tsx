@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { buttonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { fieldClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
@@ -114,8 +114,7 @@ export function DoctorAvailabilityEditor({
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setLoading(true);
-    setError("");
+    let cancelled = false;
     void fetch(`/api/hospital/staff/${doctorId}/availability`)
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
@@ -129,13 +128,19 @@ export function DoctorAvailabilityEditor({
               endTime: w.endTime,
             }))
           : [];
-        setWindows(collapseForEdit(rows));
+        if (!cancelled) setWindows(collapseForEdit(rows));
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "Could not load availability.");
         setWindows([]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [doctorId]);
 
   async function onSave(event: React.FormEvent) {
@@ -170,14 +175,13 @@ export function DoctorAvailabilityEditor({
   }
 
   return (
-    <form onSubmit={onSave} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <form onSubmit={onSave} className="rounded-lg border border-border bg-app-bg p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h4 className="font-semibold text-slate-900">{doctorLabel}</h4>
-          <p className="mt-1 text-xs text-slate-500">
-            Use <strong>Everyday</strong>, <strong>Weekdays</strong>, or <strong>Weekend</strong> for the same
-            hours across those days. Add more windows for afternoon/evening, or pick a single day when needed.
-            Leave empty to allow any time (legacy).
+          <h4 className="text-sm font-semibold text-text-primary">{doctorLabel}</h4>
+          <p className="mt-1 text-sm text-text-secondary">
+            Use Everyday, Weekdays, or Weekend when the hours are the same. Add another window for afternoon or
+            evening. Leave empty to allow any time.
           </p>
         </div>
         <button
@@ -253,9 +257,9 @@ export function DoctorAvailabilityEditor({
         ))}
       </div>
 
-      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      {message ? <p className="mt-3 text-sm text-teal-700">{message}</p> : null}
-      <button className={`${buttonClass} mt-4`} type="submit" disabled={pending || loading}>
+      {error ? <p className="mt-3 text-sm text-critical">{error}</p> : null}
+      {message ? <p className="mt-3 text-sm text-success">{message}</p> : null}
+      <button className={`${primaryButtonClass} mt-4`} type="submit" disabled={pending || loading}>
         {pending ? "Saving…" : "Save availability"}
       </button>
     </form>

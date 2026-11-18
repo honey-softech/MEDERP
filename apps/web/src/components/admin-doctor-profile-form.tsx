@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buttonClass, fieldClass } from "@/components/auth-shell";
+import { fieldClass, primaryButtonClass } from "@/components/auth-shell";
 import { DoctorProfessionalFields, type DoctorProfessionalValues } from "@/components/doctor-professional-fields";
+import { RadioGroupField } from "@/components/settings/radio-group-field";
 
 type ProfileValues = DoctorProfessionalValues & {
   departmentId?: string;
@@ -33,6 +34,39 @@ const emptyProfile: ProfileValues = {
   emergencyDutyEnabled: false,
 };
 
+type PracticeChoice = "off" | "link" | "create";
+
+const OPTIONAL_KEYS = [
+  "lastName",
+  "opdRoom",
+  "shift",
+  "weeklySchedule",
+  "regCouncil",
+  "regRegion",
+  "regIssuedAt",
+  "regExpiresAt",
+  "medicalDegree",
+  "university",
+  "graduationYear",
+  "postgraduate",
+  "fellowship",
+  "subSpecialization",
+  "yearsExperience",
+  "areasOfExpertise",
+  "languagesSpoken",
+  "consultationType",
+  "consultationFee",
+  "followUpFee",
+] as const satisfies readonly (keyof ProfileValues)[];
+
+function hasOptionalDetails(profile: ProfileValues | null) {
+  if (!profile) return false;
+  return OPTIONAL_KEYS.some((key) => {
+    const value = profile[key];
+    return typeof value === "string" && value.trim() !== "";
+  });
+}
+
 export function AdminDoctorProfileForm({
   departments,
   existingDoctors,
@@ -40,6 +74,7 @@ export function AdminDoctorProfileForm({
   initialLinkedStaffId,
   initialProfile,
   user,
+  embedded = false,
 }: {
   departments: { id: string; label: string }[];
   existingDoctors: ExistingDoctorOption[];
@@ -47,18 +82,18 @@ export function AdminDoctorProfileForm({
   initialLinkedStaffId?: string | null;
   initialProfile: ProfileValues | null;
   user: { firstName: string; lastName: string; mobile: string; email: string };
+  /** Sit inside a settings section instead of drawing a separate card. */
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const hasExistingDoctors = existingDoctors.length > 0;
-  const defaultMode: "link" | "create" =
-    initialLinkedStaffId && hasExistingDoctors
+  const initialChoice: PracticeChoice = !initialEnabled
+    ? "off"
+    : initialLinkedStaffId && hasExistingDoctors
       ? "link"
-      : hasExistingDoctors && !initialProfile
-        ? "link"
-        : "create";
+      : "create";
 
-  const [enabled, setEnabled] = useState(initialEnabled);
-  const [mode, setMode] = useState<"link" | "create">(defaultMode);
+  const [choice, setChoice] = useState<PracticeChoice>(initialChoice);
   const [selectedStaffId, setSelectedStaffId] = useState(
     initialLinkedStaffId || existingDoctors.find((row) => row.isActive)?.id || existingDoctors[0]?.id || "",
   );
@@ -68,9 +103,16 @@ export function AdminDoctorProfileForm({
     lastName: user.lastName,
     ...(initialProfile ?? {}),
   });
+  const [moreDetails, setMoreDetails] = useState(() => hasOptionalDetails(initialProfile));
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+
+  const choiceOptions: { value: PracticeChoice; label: string }[] = [
+    { value: "off", label: "No, I only manage the hospital" },
+    ...(hasExistingDoctors ? [{ value: "link" as const, label: "Yes, I am already listed as a doctor" }] : []),
+    { value: "create", label: "Yes, add my doctor details" },
+  ];
 
   const selectedDoctor = useMemo(
     () => existingDoctors.find((row) => row.id === selectedStaffId) ?? null,
@@ -88,9 +130,9 @@ export function AdminDoctorProfileForm({
     setPending(true);
 
     const payload =
-      enabled && mode === "link"
+      choice === "link"
         ? { enabled: true, mode: "link", staffId: selectedStaffId }
-        : enabled
+        : choice === "create"
           ? { enabled: true, mode: "create", ...values }
           : { enabled: false };
 
@@ -106,84 +148,41 @@ export function AdminDoctorProfileForm({
       return;
     }
     setMessage(
-      enabled
-        ? mode === "link"
-          ? "Combined into this admin account. Only this admin mobile can sign in. Use the Doctor | Admin switch in the header to change views."
-          : "Doctor profile saved. Use the Doctor | Admin switch in the header to change views."
-        : "Doctor practice disabled. Admin console stays available.",
+      choice === "link"
+        ? "Combined into this admin account. Only this admin mobile can sign in. Use the Doctor | Admin switch in the header to change views."
+        : choice === "create"
+          ? "Doctor profile saved. Use the Doctor | Admin switch in the header to change views."
+          : "Doctor practice disabled. Admin console stays available.",
     );
     router.refresh();
   }
 
   return (
-    <form onSubmit={save} className="grid max-w-5xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div>
-        <h3 className="font-semibold">Admin as doctor</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Practice as a doctor on this same login. Sign-in stays this admin mobile ({user.mobile}). Linking an
-          existing doctor removes that doctor’s separate login, so admin and doctor are one account.
-        </p>
-      </div>
+    <form
+      onSubmit={save}
+      className={embedded ? "grid gap-4" : "grid max-w-5xl gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"}
+    >
+      {embedded ? null : (
+        <div>
+          <h3 className="font-semibold">Admin as doctor</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Practice as a doctor on this same login. Sign-in stays this admin mobile ({user.mobile}). Linking an
+            existing doctor removes that doctor’s separate login, so admin and doctor are one account.
+          </p>
+        </div>
+      )}
 
-      <label className="flex items-start gap-3 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={enabled}
-          onChange={(event) => setEnabled(event.target.checked)}
-        />
-        <span>
-          <span className="font-medium">I also practice as a doctor</span>
-          <span className="mt-0.5 block text-slate-500">
-            Uses one login for hospital admin and clinical practice.
-          </span>
-        </span>
-      </label>
+      <RadioGroupField
+        name="admin-doctor-choice"
+        ariaLabel="Practise as a doctor"
+        value={choice}
+        options={choiceOptions}
+        onChange={setChoice}
+      />
 
-      {enabled ? (
-        <div className="space-y-4 border-t border-slate-100 pt-4">
-          {hasExistingDoctors ? (
-            <fieldset className="grid gap-3 sm:grid-cols-2">
-              <legend className="mb-1 text-sm font-medium text-slate-800">How do you want to set this up?</legend>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
-                <input
-                  type="radio"
-                  className="mt-1"
-                  name="admin-doctor-mode"
-                  checked={mode === "link"}
-                  onChange={() => setMode("link")}
-                />
-                <span>
-                  <span className="font-medium text-slate-800">Select an existing doctor</span>
-                  <span className="mt-0.5 block text-slate-500">
-                    Link this admin login to a doctor already on staff.
-                  </span>
-                </span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
-                <input
-                  type="radio"
-                  className="mt-1"
-                  name="admin-doctor-mode"
-                  checked={mode === "create"}
-                  onChange={() => setMode("create")}
-                />
-                <span>
-                  <span className="font-medium text-slate-800">Add new doctor details</span>
-                  <span className="mt-0.5 block text-slate-500">
-                    Create a fresh doctor profile for this admin account.
-                  </span>
-                </span>
-              </label>
-            </fieldset>
-          ) : (
-            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-              No doctors are on staff yet. Fill in new doctor details below.
-            </p>
-          )}
-
-          {mode === "link" && hasExistingDoctors ? (
+      {choice === "link" && hasExistingDoctors ? (
             <div className="grid gap-3">
+              <p className="text-sm text-text-secondary">Pick your entry from the doctor list.</p>
               <label className="block text-sm font-medium text-slate-700">
                 Existing doctor
                 <select
@@ -213,24 +212,61 @@ export function AdminDoctorProfileForm({
                   </p>
                   {selectedDoctor.linkedUsername && !selectedDoctor.linkedToAdmin ? (
                     <p className="mt-2 text-xs text-amber-800">
-                      Currently a separate login ({selectedDoctor.linkedUsername}). Linking removes that account.
-                      Only this admin mobile can sign in.
+                      This doctor currently has a separate login ({selectedDoctor.linkedUsername}). Linking removes it, and
+                      you will sign in with your admin mobile only.
                     </p>
                   ) : null}
                 </div>
               ) : null}
             </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm font-medium text-slate-700">
-                First name
-                <input
-                  className={fieldClass}
-                  value={values.firstName ?? ""}
-                  onChange={(e) => setField("firstName", e.target.value)}
-                  required
-                />
-              </label>
+          ) : null}
+
+      {choice === "create" ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="text-sm font-medium text-slate-700">
+            First name <span className="text-red-600">*</span>
+            <input
+              className={fieldClass}
+              value={values.firstName ?? ""}
+              onChange={(e) => setField("firstName", e.target.value)}
+              required
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            Department <span className="text-red-600">*</span>
+            <select
+              className={fieldClass}
+              value={values.departmentId ?? ""}
+              onChange={(e) => setField("departmentId", e.target.value)}
+              required
+            >
+              <option value="">Select department</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <DoctorProfessionalFields
+            values={values}
+            onChange={(key, value) => setField(key, value)}
+            requireCore
+            hideDutyToggles
+            part="core"
+          />
+          <div className="md:col-span-2">
+            <button
+              type="button"
+              className="text-sm font-medium text-primary"
+              aria-expanded={moreDetails}
+              onClick={() => setMoreDetails((open) => !open)}
+            >
+              {moreDetails ? "Hide optional details" : "More details (optional)"}
+            </button>
+          </div>
+          {moreDetails ? (
+            <>
               <label className="text-sm font-medium text-slate-700">
                 Last name
                 <input
@@ -238,22 +274,6 @@ export function AdminDoctorProfileForm({
                   value={values.lastName ?? ""}
                   onChange={(e) => setField("lastName", e.target.value)}
                 />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Department <span className="text-red-600">*</span>
-                <select
-                  className={fieldClass}
-                  value={values.departmentId ?? ""}
-                  onChange={(e) => setField("departmentId", e.target.value)}
-                  required
-                >
-                  <option value="">Select department</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.label}
-                    </option>
-                  ))}
-                </select>
               </label>
               <label className="text-sm font-medium text-slate-700">
                 OPD room
@@ -283,18 +303,21 @@ export function AdminDoctorProfileForm({
               <DoctorProfessionalFields
                 values={values}
                 onChange={(key, value) => setField(key, value)}
-                requireCore
+                hideDutyToggles
+                part="extra"
               />
-            </div>
-          )}
+            </>
+          ) : null}
         </div>
       ) : null}
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {message ? <p className="text-sm text-teal-700">{message}</p> : null}
-      <button className={buttonClass} type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Save doctor profile"}
-      </button>
+      <div>
+        <button className={primaryButtonClass} type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save doctor profile"}
+        </button>
+      </div>
     </form>
   );
 }

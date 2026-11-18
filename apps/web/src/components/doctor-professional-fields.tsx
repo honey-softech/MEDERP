@@ -30,60 +30,85 @@ export function DoctorProfessionalFields({
   values,
   onChange,
   requireCore = false,
+  hideDutyToggles = false,
+  part = "all",
 }: {
   values: DoctorProfessionalValues;
   onChange: (key: keyof DoctorProfessionalValues, value: string | boolean) => void;
   requireCore?: boolean;
+  /** Hide teleconsult and emergency duty. Other screens keep those toggles. */
+  hideDutyToggles?: boolean;
+  /** "core" is registration number and specialty. "extra" is everything else. */
+  part?: "all" | "core" | "extra";
 }) {
+  const showCore = part === "all" || part === "core";
+  const showExtra = part === "all" || part === "extra";
+
   return (
     <>
-      <Field
-        label="Medical registration number"
-        value={values.medicalRegNo}
-        onChange={(v) => onChange("medicalRegNo", v)}
-        required={requireCore}
-      />
-      <Field label="Registration council" value={values.regCouncil} onChange={(v) => onChange("regCouncil", v)} />
-      <Field label="Registration state / country" value={values.regRegion} onChange={(v) => onChange("regRegion", v)} />
-      <Field label="Registration issue date" type="date" value={values.regIssuedAt} onChange={(v) => onChange("regIssuedAt", v)} />
-      <Field label="Registration expiry date" type="date" value={values.regExpiresAt} onChange={(v) => onChange("regExpiresAt", v)} />
-      <Field label="Medical degree" value={values.medicalDegree} onChange={(v) => onChange("medicalDegree", v)} placeholder="MBBS" />
-      <Field label="University" value={values.university} onChange={(v) => onChange("university", v)} />
-      <Field label="Graduation year" value={values.graduationYear} onChange={(v) => onChange("graduationYear", v)} />
-      <Field
-        label="Postgraduate qualification"
-        value={values.postgraduate}
-        onChange={(v) => onChange("postgraduate", v)}
-        placeholder="MD – Cardiology"
-      />
-      <Field label="Fellowship" value={values.fellowship} onChange={(v) => onChange("fellowship", v)} />
-      <SpecialtyField
-        value={values.specialization}
-        onChange={(v) => onChange("specialization", v)}
-        required={requireCore}
-      />
-      <Field label="Sub-specialization" value={values.subSpecialization} onChange={(v) => onChange("subSpecialization", v)} />
-      <Field label="Years of experience" value={values.yearsExperience} onChange={(v) => onChange("yearsExperience", v)} />
-      <Field label="Areas of expertise" value={values.areasOfExpertise} onChange={(v) => onChange("areasOfExpertise", v)} />
-      <Field label="Languages spoken" value={values.languagesSpoken} onChange={(v) => onChange("languagesSpoken", v)} />
-      <Field
-        label="Consultation type"
-        value={values.consultationType}
-        onChange={(v) => onChange("consultationType", v)}
-        placeholder="OPD / Inpatient / Both"
-      />
-      <Field label="Consultation fee" value={values.consultationFee} onChange={(v) => onChange("consultationFee", v)} />
-      <Field label="Follow-up fee" value={values.followUpFee} onChange={(v) => onChange("followUpFee", v)} />
-      <Check
-        label="Teleconsultation enabled"
-        checked={Boolean(values.teleconsultEnabled)}
-        onChange={(v) => onChange("teleconsultEnabled", v)}
-      />
-      <Check
-        label="Emergency duty enabled"
-        checked={Boolean(values.emergencyDutyEnabled)}
-        onChange={(v) => onChange("emergencyDutyEnabled", v)}
-      />
+      {showCore ? (
+        <Field
+          label="Medical registration number"
+          value={values.medicalRegNo}
+          onChange={(v) => onChange("medicalRegNo", v)}
+          required={requireCore}
+        />
+      ) : null}
+      {showExtra ? (
+        <>
+          <Field label="Registration council" value={values.regCouncil} onChange={(v) => onChange("regCouncil", v)} />
+          <Field label="Registration state / country" value={values.regRegion} onChange={(v) => onChange("regRegion", v)} />
+          <Field label="Registration issue date" type="date" value={values.regIssuedAt} onChange={(v) => onChange("regIssuedAt", v)} />
+          <Field label="Registration expiry date" type="date" value={values.regExpiresAt} onChange={(v) => onChange("regExpiresAt", v)} />
+          <Field label="Medical degree" value={values.medicalDegree} onChange={(v) => onChange("medicalDegree", v)} placeholder="MBBS" />
+          <Field label="University" value={values.university} onChange={(v) => onChange("university", v)} />
+          <Field label="Graduation year" value={values.graduationYear} onChange={(v) => onChange("graduationYear", v)} />
+          <Field
+            label="Postgraduate qualification"
+            value={values.postgraduate}
+            onChange={(v) => onChange("postgraduate", v)}
+            placeholder="MD – Cardiology"
+          />
+          <Field label="Fellowship" value={values.fellowship} onChange={(v) => onChange("fellowship", v)} />
+        </>
+      ) : null}
+      {showCore ? (
+        <SpecialtyField
+          value={values.specialization}
+          onChange={(v) => onChange("specialization", v)}
+          required={requireCore}
+        />
+      ) : null}
+      {showExtra ? (
+        <>
+          <Field label="Sub-specialization" value={values.subSpecialization} onChange={(v) => onChange("subSpecialization", v)} />
+          <Field label="Years of experience" value={values.yearsExperience} onChange={(v) => onChange("yearsExperience", v)} />
+          <Field label="Areas of expertise" value={values.areasOfExpertise} onChange={(v) => onChange("areasOfExpertise", v)} />
+          <Field label="Languages spoken" value={values.languagesSpoken} onChange={(v) => onChange("languagesSpoken", v)} />
+          <Field
+            label="Consultation type"
+            value={values.consultationType}
+            onChange={(v) => onChange("consultationType", v)}
+            placeholder="OPD / Inpatient / Both"
+          />
+          <Field label="Consultation fee" value={values.consultationFee} onChange={(v) => onChange("consultationFee", v)} />
+          <Field label="Follow-up fee" value={values.followUpFee} onChange={(v) => onChange("followUpFee", v)} />
+          {hideDutyToggles ? null : (
+            <>
+              <Check
+                label="Teleconsultation enabled"
+                checked={Boolean(values.teleconsultEnabled)}
+                onChange={(v) => onChange("teleconsultEnabled", v)}
+              />
+              <Check
+                label="Emergency duty enabled"
+                checked={Boolean(values.emergencyDutyEnabled)}
+                onChange={(v) => onChange("emergencyDutyEnabled", v)}
+              />
+            </>
+          )}
+        </>
+      ) : null}
     </>
   );
 }

@@ -83,6 +83,7 @@ export {
   doctorIsOnLeave,
   ensureDoctorStaff,
   groupByDoctor,
+  isHistoricalVisit,
   isSameCalendarDay,
   listBookableDoctors,
   localDayKey,

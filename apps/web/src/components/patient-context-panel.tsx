@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { compactButtonClass, fieldClass, secondaryButtonClass } from "@/components/auth-shell";
+import { compactButtonClass, fieldClass, secondaryButtonClass, textActionClass } from "@/components/auth-shell";
 import { ExpandToggle } from "@/components/expand-toggle";
+import { usePastVisits } from "@/components/visit-history-sheet";
 import { VitalsPanel } from "@/components/vitals-panel";
+import { vitalsDeltaLine } from "@/lib/appointments/past-visits";
 import { withReturnVisit } from "@/lib/appointments/return-visit";
 import type { VitalsValues } from "@/lib/vitals";
 
@@ -39,12 +41,14 @@ export function PatientContextPanel({
   priorVisit = null,
   recordVitalsHref = null,
   returnVisitId = null,
+  compareLabel = "Since last visit",
 }: {
   patient: PatientContextData;
   vitals?: VitalsValues | null;
   canEditHistory: boolean;
   recordVitalsHref?: string | null;
   returnVisitId?: string | null;
+  compareLabel?: string;
   priorVisit?: {
     id: string;
     scheduledAtLabel: string;
@@ -54,6 +58,8 @@ export function PatientContextPanel({
   } | null;
 }) {
   const router = useRouter();
+  const openPastVisits = usePastVisits();
+  const sinceLast = vitals && priorVisit?.vitals ? vitalsDeltaLine(vitals, priorVisit.vitals, compareLabel) : "";
   const [historyOpen, setHistoryOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -122,6 +128,7 @@ export function PatientContextPanel({
       </section>
 
       <VitalsPanel vitals={vitals} compact recordHref={recordVitalsHref} />
+      {sinceLast ? <p className="px-1 text-[11px] font-medium text-teal-800">{sinceLast}</p> : null}
 
       {priorVisit ? (
         <section className="rounded-xl border border-primary/30 bg-primary-light/40 p-2.5 shadow-card">
@@ -135,25 +142,43 @@ export function PatientContextPanel({
                 </p>
               ) : null}
             </div>
-            {priorVisit.summaryApproved ? (
+            <div className="flex flex-col items-end gap-1">
+              {openPastVisits ? (
+                <button type="button" className={compactButtonClass} onClick={() => openPastVisits(priorVisit.id)}>
+                  Past visits
+                </button>
+              ) : priorVisit.summaryApproved ? (
+                <Link
+                  href={withReturnVisit(`/appointments/${priorVisit.id}/summary`, returnVisitId)}
+                  className={compactButtonClass}
+                >
+                  Assessment sheet
+                </Link>
+              ) : (
+                <Link href={withReturnVisit(`/appointments/${priorVisit.id}`, returnVisitId)} className={compactButtonClass}>
+                  Open visit
+                </Link>
+              )}
               <Link
-                href={withReturnVisit(`/appointments/${priorVisit.id}/summary`, returnVisitId)}
-                className={compactButtonClass}
+                href={withReturnVisit(`/appointments/${priorVisit.id}`, returnVisitId)}
+                className={textActionClass}
               >
-                Assessment sheet
+                Full record
               </Link>
-            ) : (
-              <Link href={withReturnVisit(`/appointments/${priorVisit.id}`, returnVisitId)} className={compactButtonClass}>
-                Open visit
-              </Link>
-            )}
+            </div>
           </div>
           {priorVisit.vitals && !vitals ? (
             <div className="mt-2">
               <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-text-secondary">
                 Previous vitals
               </p>
-              <VitalsPanel vitals={priorVisit.vitals} compact />
+              {openPastVisits ? (
+                <button type="button" className="w-full text-left" onClick={() => openPastVisits(priorVisit.id)}>
+                  <VitalsPanel vitals={priorVisit.vitals} compact />
+                </button>
+              ) : (
+                <VitalsPanel vitals={priorVisit.vitals} compact />
+              )}
             </div>
           ) : priorVisit.vitals && vitals?.notes?.includes("Carried from prior visit") ? (
             <p className="mt-1.5 text-[11px] text-text-secondary">

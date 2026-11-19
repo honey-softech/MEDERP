@@ -91,7 +91,7 @@ const PAGE_TOURS: PageTour[] = [
       {
         anchor: "page:visit-header",
         title: "This patient",
-        description: "Token, status, and the doctor for this visit. Move to the previous or next patient in today's queue from here.",
+        description: "Token, status, and the doctor for this visit. Past visits open as their own record, so you can tell them apart from the consult you are in.",
         side: "bottom",
       },
       {
@@ -170,7 +170,7 @@ const PAGE_TOURS: PageTour[] = [
       {
         anchor: "page:patient-history",
         title: "Earlier visits",
-        description: "Open a past visit for the summary, the prescription, or a lab report.",
+        description: "A timeline of earlier visits, with the diagnosis and vitals. Reading one does not change it. Editing an old note asks for a reason and your password.",
         side: "top",
       },
       close("Take a tour repeats this record. The user guide covers the same daily steps in writing."),

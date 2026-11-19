@@ -7,16 +7,26 @@ import { isConsultationPaid } from "@/lib/billing/rules";
 import {
   NURSE_VITALS_ROLES,
   canNurseRecordVitals,
+  isHistoricalVisit,
   patientName,
   requireHospitalPage,
   tokenLabel,
 } from "@/lib/front-desk";
+import { currentVisitEditUnlock } from "@/lib/appointments/visit-edit-unlock";
+import { withReturnVisit } from "@/lib/appointments/return-visit";
 import { prisma } from "@/lib/prisma";
 import { toVitalsValues } from "@/lib/vitals";
 
-export default async function UpdateVitalsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function UpdateVitalsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnVisit?: string }>;
+}) {
   const user = await requireHospitalPage();
   const { id } = await params;
+  const { returnVisit } = await searchParams;
   const appointment = await prisma.appointment.findFirst({
     where: { id, hospitalId: user.hospitalId },
     include: {
@@ -39,14 +49,23 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
     (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id);
   if (!canEdit) redirect(`/appointments/${appointment.id}`);
 
-  const visitHref = `/appointments/${appointment.id}`;
+  const historical = isHistoricalVisit(appointment.scheduledAt);
+  const unlock =
+    historical &&
+    (user.role === "DOCTOR" || (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id))
+      ? await currentVisitEditUnlock({ userId: user.id, appointmentId: appointment.id })
+      : null;
+  const visitHref = withReturnVisit(
+    unlock ? `/appointments/${appointment.id}?edit=1` : `/appointments/${appointment.id}`,
+    returnVisit,
+  );
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
   const walkInNeedsPayment = appointment.queueType === "WALK_IN" && !isConsultationPaid(appointment.invoices[0]);
-  const canRecord = canNurseRecordVitals(appointment);
+  const canRecord = canNurseRecordVitals(appointment) || Boolean(unlock);
   const doctorOnVisit =
     user.role === "DOCTOR" || (user.role === "SUPER_ADMIN" && appointment.doctor.appUserId === user.id);
-  const doctorCanSkip = doctorOnVisit && !vitals;
-  const skipVitalsHref = `${visitHref}?skipVitals=1`;
+  const doctorCanSkip = doctorOnVisit && !vitals && !historical;
+  const skipVitalsHref = `/appointments/${appointment.id}?skipVitals=1`;
 
   return (
     <AppShell title="Update vitals" dense>
@@ -99,7 +118,13 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
               appointmentId={appointment.id}
               initial={vitals}
               returnTo={doctorCanSkip ? skipVitalsHref : visitHref}
-              heading={vitals ? "Update today's vitals" : "Record vitals"}
+              heading={
+                unlock
+                  ? "Update this visit's vitals"
+                  : vitals
+                    ? "Update today's vitals"
+                    : "Record vitals"
+              }
             />
           </div>
         </div>

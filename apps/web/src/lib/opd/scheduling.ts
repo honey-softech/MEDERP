@@ -33,6 +33,11 @@ export function isSameCalendarDay(value: Date, reference = new Date()) {
   return value >= start && value < end;
 }
 
+/** A visit from a previous calendar day. Today's consults stay editable without a re-check. */
+export function isHistoricalVisit(scheduledAt: Date, reference = new Date()) {
+  return scheduledAt.getTime() < dayRange(reference).start.getTime();
+}
+
 export function canNurseRecordVitals(appointment: { scheduledAt: Date; status: string }) {
   if (["CANCELLED", "NO_SHOW"].includes(appointment.status)) return false;
   return isSameCalendarDay(appointment.scheduledAt);

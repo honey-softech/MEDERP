@@ -10,9 +10,10 @@ import { PatientContextPanel } from "@/components/patient-context-panel";
 import { LabOrderPanel } from "@/components/lab-order-panel";
 import { VisitAssessmentReadonly, VisitSummaryBanner } from "@/components/visit-assessment-readonly";
 import { VisitLabTestsForm } from "@/components/visit-lab-tests-form";
-import { compactButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
+import { compactButtonClass, compactPrimaryButtonClass, primaryButtonClass, secondaryButtonClass } from "@/components/auth-shell";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
-import { VisitHistorySheet, type PastVisitItem } from "@/components/visit-history-sheet";
+import { EditPastRecordButton, PastRecordEditBar } from "@/components/edit-past-record-dialog";
+import { PastVisitsButton, PastVisitsProvider, type PastVisitItem } from "@/components/visit-history-sheet";
 import {
   CLINICAL_VIEW_ROLES,
   EXTERNAL_REPORT_UPLOAD_ROLES,
@@ -25,6 +26,7 @@ import {
   canNurseRecordVitals,
   dayRange,
   doctorName,
+  isHistoricalVisit,
   isSameCalendarDay,
   canCheckoutVisit,
   canCollectOpdFee,
@@ -51,6 +53,9 @@ import { ACTIVE_ADMISSION_STATUSES, WARD_ADMIT_ROLES } from "@/lib/wards";
 import { followUpReminderHint } from "@/lib/appointments/follow-up-reminder";
 import { withReturnVisit } from "@/lib/appointments/return-visit";
 import { resolveReturnVisit } from "@/lib/appointments/return-visit-lookup";
+import type { PastVisitVitals } from "@/lib/appointments/past-visits";
+import { currentVisitEditUnlock } from "@/lib/appointments/visit-edit-unlock";
+import { printedPersonName } from "@/lib/display";
 
 export default async function AppointmentDetailPage({
   params,
@@ -138,6 +143,8 @@ export default async function AppointmentDetailPage({
             diagnosis: true,
             prescription: true,
             chiefComplaint: true,
+            advice: true,
+            followUpAt: true,
             status: true,
             entryMode: true,
           },
@@ -204,13 +211,21 @@ export default async function AppointmentDetailPage({
   const pastVisits: PastVisitItem[] = pastVisitRows.map((row) => ({
     id: row.id,
     when: row.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }),
+    at: row.scheduledAt.toISOString(),
     doctor: doctorName(row.doctor),
+    doctorId: row.doctorId,
     department: row.department.name,
     diagnosis: row.assessment?.diagnosis ?? "",
     chiefComplaint: row.assessment?.chiefComplaint ?? "",
     handwritten: row.assessment?.entryMode === "HANDWRITTEN",
     summaryApproved: row.assessment?.status === "APPROVED",
     summaryAlreadySent: pastSummarySentIds.has(row.id),
+    prescription: row.assessment?.prescription ?? "",
+    advice: row.assessment?.advice ?? "",
+    followUpLabel: row.assessment?.followUpAt
+      ? row.assessment.followUpAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium" })
+      : null,
+    vitals: row.vitals ? pastVitalsSnapshot(toVitalsValues(row.vitals)) : null,
     reports: row.labOrders
       .filter((order) => order.reportFileName)
       .map((order) => ({ id: order.id, fileName: order.reportFileName as string })),
@@ -267,17 +282,54 @@ export default async function AppointmentDetailPage({
   const visitPaid = isConsultationPaid(appointment.invoices[0]);
   const walkInNeedsPayment = appointment.queueType === "WALK_IN" && !visitPaid;
   const skipVitals = skipVitalsQuery === "1" || skipVitalsQuery === "true";
+  const historicalVisit = isHistoricalVisit(appointment.scheduledAt);
+  const isPastRecord = Boolean(returnToCurrent) || historicalVisit;
+  const pastUnlock = historicalVisit
+    ? await currentVisitEditUnlock({ userId: user.id, appointmentId: appointment.id })
+    : null;
+  const editingPast = historicalVisit && editing && Boolean(pastUnlock);
   const visitClosed =
     appointment.status === "COMPLETED" || appointment.status === "NO_SHOW" || summaryApproved;
   const showEditableAssessment =
-    canAssess && appointment.status !== "CANCELLED" && (!visitClosed || editing);
-  const useCockpit = showEditableAssessment || (canAssess && visitClosed && !editing);
+    canAssess &&
+    appointment.status !== "CANCELLED" &&
+    (isPastRecord ? (historicalVisit ? editingPast : editing) : !visitClosed || editing);
+  const useCockpit =
+    showEditableAssessment || (canAssess && (isPastRecord || visitClosed) && !showEditableAssessment);
+  const [returnVisitMeta, revisionRow] = await Promise.all([
+    returnToCurrent
+      ? prisma.appointment.findFirst({
+          where: { id: returnToCurrent, hospitalId: user.hospitalId },
+          select: { tokenNumber: true, scheduledAt: true },
+        })
+      : Promise.resolve(null),
+    appointment.assessment
+      ? prisma.auditLog.findFirst({
+          where: {
+            hospitalId: user.hospitalId,
+            entity: "VisitAssessment",
+            entityId: appointment.assessment.id,
+            action: { in: ["VISIT_SUMMARY_REVISED", "VISIT_SUMMARY_REPUBLISHED"] },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true, actorUsername: true, metadata: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  const revisionNote = revisionNoteFrom(revisionRow);
+  const pastBackHref = returnToCurrent
+    ? `/appointments/${returnToCurrent}`
+    : `/patients/${appointment.patientId}`;
+  const pastBackLabel = returnVisitMeta
+    ? `Back to ${isSameCalendarDay(returnVisitMeta.scheduledAt) ? "today's" : "current"} consult (${patientName(appointment.patient)}, ${tokenLabel(returnVisitMeta.tokenNumber)})`
+    : "Back to patient file";
   const calendarBackView = calendarView === "week" || calendarView === "list" || calendarView === "month" ? calendarView : "month";
   const calendarBackDate = /^\d{4}-\d{2}-\d{2}$/.test(calendarDate ?? "")
     ? calendarDate
     : localDayKey(appointment.scheduledAt);
   const calendarBack = fromCalendar ? `/appointments?view=${calendarBackView}&date=${calendarBackDate}` : null;
   const vitals = appointment.vitals ? toVitalsValues(appointment.vitals) : null;
+  const todayVitals: PastVisitVitals | null = !isPastRecord && vitals ? pastVitalsSnapshot(vitals) : null;
   const letterhead = user.hospital
     ? visitLetterhead(appointment.assessment ?? { status: "DRAFT" }, user.hospital)
     : null;
@@ -308,7 +360,10 @@ export default async function AppointmentDetailPage({
     visitIsToday &&
     (canRecordVitals || doctorCanEditVitals) &&
     (!walkInNeedsPayment || doctorCanEditVitals);
-  const vitalsHref = `/appointments/${appointment.id}/vitals`;
+  const vitalsHref = withReturnVisit(
+    `/appointments/${appointment.id}/vitals`,
+    isPastRecord ? returnToCurrent : null,
+  );
   const skipVitalsHref = `/appointments/${appointment.id}?skipVitals=1`;
   const showDoctorWalkInChoice =
     showEditableAssessment &&
@@ -319,15 +374,17 @@ export default async function AppointmentDetailPage({
   const showDoctorWalkInPayment =
     canAssess && appointment.queueType === "WALK_IN" && !visitPaid && canCollectOpdFee(user);
   const photo = appointment.patient.photoData || "";
-  const testsLiveInPopup = canAssess && (showEditableAssessment || summaryApproved);
+  const testsLiveInPopup = canAssess && !isPastRecord && (showEditableAssessment || summaryApproved);
+  const labCanCollect = canCollectLab && labEnabled && !isPastRecord;
+  const labCanWork = canWorkLab && labEnabled && !isPastRecord;
   function labOrdersPanel() {
     if (!appointment || !canViewLab || appointment.labOrders.length === 0) return null;
     return (
       <LabOrderPanel
         embedded
         orders={appointment.labOrders}
-        canCollect={canCollectLab && labEnabled}
-        canWork={canWorkLab && labEnabled}
+        canCollect={labCanCollect}
+        canWork={labCanWork}
         canViewReport={canViewLabReport}
         canAttachExternal={canAttachExternal}
         canPrint={canPrintSummary}
@@ -338,10 +395,54 @@ export default async function AppointmentDetailPage({
     );
   }
 
+  const pastVisitWhen = appointment.scheduledAt.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
   return (
-    <AppShell title={scheduleView ? "Appointment" : "Visit details"} dense={useCockpit}>
-      <div className={useCockpit ? "flex min-w-0 flex-col gap-2 overflow-x-hidden lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden" : undefined}>
-      {returnToCurrent ? (
+    <AppShell title={isPastRecord ? "Past visit" : scheduleView ? "Appointment" : "Visit details"} dense={useCockpit}>
+      <PastVisitsProvider
+        visits={pastVisits}
+        patientHref={`/patients/${appointment.patientId}`}
+        canPrintSummary={canPrintSummary}
+        canViewLabReports={canViewLabReport}
+        patientPhone={appointment.patient.phone}
+        returnVisitId={assessmentReturnId}
+        thisDoctorId={appointment.doctorId}
+        todayVitals={todayVitals}
+      >
+      <div className={`${useCockpit ? "flex min-w-0 flex-col gap-2 overflow-x-hidden lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden" : ""} ${isPastRecord ? "rounded-xl bg-amber-50/80 p-2 sm:p-3" : ""}`.trim() || undefined}>
+      {isPastRecord ? (
+        <div className="sticky top-0 z-20 flex shrink-0 flex-col gap-2 rounded-xl border border-amber-300 bg-amber-100 px-3 py-2.5 print:hidden sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-950">
+              Viewing a past visit · {pastVisitWhen} · {doctorName(appointment.doctor)}
+              {assessment?.diagnosis?.trim() ? ` · ${assessment.diagnosis.trim()}` : ""}
+            </p>
+            <p className="text-xs text-amber-900">This is not the current consult.</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {historicalVisit && canAssess && !editingPast ? (
+              <EditPastRecordButton
+                appointmentId={appointment.id}
+                returnVisitId={returnToCurrent}
+                autoOpen={editing && !pastUnlock}
+                label="Edit record (reason and password)"
+              />
+            ) : null}
+            {!historicalVisit && canAssess && !editing ? (
+              <Link href={ownEditHref} className={compactButtonClass}>
+                Edit
+              </Link>
+            ) : null}
+            <Link href={pastBackHref} className={compactPrimaryButtonClass}>
+              {pastBackLabel}
+            </Link>
+          </div>
+        </div>
+      ) : returnToCurrent ? (
         <Link
           href={`/appointments/${returnToCurrent}`}
           className="inline-flex w-fit rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800 hover:underline print:hidden"
@@ -355,7 +456,9 @@ export default async function AppointmentDetailPage({
       ) : null}
       <div data-tour="page:visit-header" className="mb-0 flex shrink-0 flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-start gap-2 sm:items-center">
-          <ConsultQueueNav previousId={scheduleView ? null : previousId} nextId={scheduleView ? null : nextId} />
+          {isPastRecord ? null : (
+            <ConsultQueueNav previousId={scheduleView ? null : previousId} nextId={scheduleView ? null : nextId} />
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
               {prettyEnum(appointment.queueType)} · Token {tokenLabel(appointment.tokenNumber)}
@@ -368,12 +471,17 @@ export default async function AppointmentDetailPage({
               <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs text-teal-800">
                 {prettyEnum(appointment.status)}
               </span>
-              {canDoctorVisit ? (
+              {isPastRecord ? (
+                <span className="rounded-full bg-amber-200 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-950">
+                  Past record
+                </span>
+              ) : null}
+              {canDoctorVisit && !isPastRecord ? (
                 <div className="flex flex-wrap items-center gap-1.5 sm:hidden">
                   {canAssess && showEditableAssessment ? (
                     <div id="visit-tests-mount-mobile" />
                   ) : null}
-                  {canAssess && summaryApproved && !showEditableAssessment ? (
+                  {canAssess && summaryApproved && !showEditableAssessment && !isPastRecord ? (
                     <VisitLabTestsForm
                       variant="toolbar"
                       appointmentId={appointment.id}
@@ -410,19 +518,21 @@ export default async function AppointmentDetailPage({
                   endpoint={`/api/appointments/${appointment.id}/summary/send`}
                   patientPhone={appointment.patient.phone}
                   compact
-                  label="WhatsApp"
+                  label={isPastRecord ? "WhatsApp summary" : "WhatsApp"}
                   resendLabel="Resend"
                   alreadySent={summaryAlreadySent}
                 />
               ) : null}
               {canPrintSummary ? (
                 <Link href={ownSummaryHref} className={compactButtonClass}>
-                  Print
+                  {isPastRecord ? "Print summary" : "Print"}
                 </Link>
               ) : null}
-              <Link href={ownEditHref} className={compactButtonClass}>
-                Edit
-              </Link>
+              {isPastRecord ? null : (
+                <Link href={ownEditHref} className={compactButtonClass}>
+                  Edit
+                </Link>
+              )}
             </>
           ) : null}
           {!canAssess && summaryApproved && canPrintSummary ? (
@@ -431,12 +541,12 @@ export default async function AppointmentDetailPage({
                 endpoint={`/api/appointments/${appointment.id}/summary/send`}
                 patientPhone={appointment.patient.phone}
                 compact
-                label="WhatsApp"
+                label={isPastRecord ? "WhatsApp summary" : "WhatsApp"}
                 resendLabel="Resend"
                 alreadySent={summaryAlreadySent}
               />
               <Link href={ownSummaryHref} className={compactButtonClass}>
-                Print
+                {isPastRecord ? "Print summary" : "Print"}
               </Link>
             </>
           ) : null}
@@ -445,21 +555,13 @@ export default async function AppointmentDetailPage({
               Preview
             </Link>
           ) : null}
-          {scheduleView ? null : (
+          {scheduleView || isPastRecord ? null : (
             <Link href="/queue" className={compactButtonClass}>
               Queue
             </Link>
           )}
-          <VisitHistorySheet
-            visits={pastVisits}
-            patientHref={`/patients/${appointment.patientId}`}
-            canPrintSummary={canPrintSummary}
-            canViewLabReports={canViewLabReport}
-            patientPhone={appointment.patient.phone}
-            label="Past visits"
-            returnVisitId={assessmentReturnId}
-          />
-          {canAssess ? (
+          <PastVisitsButton label="Past visits" />
+          {canAssess && !isPastRecord ? (
             <Link
               href={`/certificates/new?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -467,7 +569,7 @@ export default async function AppointmentDetailPage({
               Certificate
             </Link>
           ) : null}
-          {canAdmit && !activeStay ? (
+          {canAdmit && !activeStay && !isPastRecord ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -480,7 +582,7 @@ export default async function AppointmentDetailPage({
               IPD {activeStay.ipNumber}
             </Link>
           ) : null}
-          {canCheckout && !canManage ? (
+          {canCheckout && !canManage && !isPastRecord ? (
             <AppointmentActions
               id={appointment.id}
               status={appointment.status}
@@ -495,7 +597,7 @@ export default async function AppointmentDetailPage({
           {canAssess && showEditableAssessment ? (
             <div id="visit-tests-mount" />
           ) : null}
-          {canAssess && summaryApproved && !showEditableAssessment ? (
+          {canAssess && summaryApproved && !showEditableAssessment && !isPastRecord ? (
             <VisitLabTestsForm
               variant="toolbar"
               appointmentId={appointment.id}
@@ -507,7 +609,7 @@ export default async function AppointmentDetailPage({
               ordersPanel={labOrdersPanel()}
             />
           ) : null}
-          {canDoctorVisit && !summaryApproved ? (
+          {canDoctorVisit && !summaryApproved && !isPastRecord ? (
             <DoctorVisitActions
               id={appointment.id}
               status={appointment.status}
@@ -522,19 +624,21 @@ export default async function AppointmentDetailPage({
                   endpoint={`/api/appointments/${appointment.id}/summary/send`}
                   patientPhone={appointment.patient.phone}
                   compact
-                  label="WhatsApp"
+                  label={isPastRecord ? "WhatsApp summary" : "WhatsApp"}
                   resendLabel="Resend"
                   alreadySent={summaryAlreadySent}
                 />
               ) : null}
               {canPrintSummary ? (
                 <Link href={ownSummaryHref} className={compactButtonClass}>
-                  Print
+                  {isPastRecord ? "Print summary" : "Print"}
                 </Link>
               ) : null}
-              <Link href={ownEditHref} className={compactButtonClass}>
-                Edit
-              </Link>
+              {isPastRecord ? null : (
+                <Link href={ownEditHref} className={compactButtonClass}>
+                  Edit
+                </Link>
+              )}
             </>
           ) : null}
           {!canAssess && summaryApproved && canPrintSummary ? (
@@ -543,12 +647,12 @@ export default async function AppointmentDetailPage({
                 endpoint={`/api/appointments/${appointment.id}/summary/send`}
                 patientPhone={appointment.patient.phone}
                 compact
-                label="WhatsApp"
+                label={isPastRecord ? "WhatsApp summary" : "WhatsApp"}
                 resendLabel="Resend"
                 alreadySent={summaryAlreadySent}
               />
               <Link href={ownSummaryHref} className={compactButtonClass}>
-                Print
+                {isPastRecord ? "Print summary" : "Print"}
               </Link>
             </>
           ) : null}
@@ -557,21 +661,13 @@ export default async function AppointmentDetailPage({
               Preview
             </Link>
           ) : null}
-          {scheduleView ? null : (
+          {scheduleView || isPastRecord ? null : (
             <Link href="/queue" className={compactButtonClass}>
               Queue
             </Link>
           )}
-          <VisitHistorySheet
-            visits={pastVisits}
-            patientHref={`/patients/${appointment.patientId}`}
-            canPrintSummary={canPrintSummary}
-            canViewLabReports={canViewLabReport}
-            patientPhone={appointment.patient.phone}
-            label="Past visits"
-            returnVisitId={assessmentReturnId}
-          />
-          {canAssess ? (
+          <PastVisitsButton label="Past visits" />
+          {canAssess && !isPastRecord ? (
             <Link
               href={`/certificates/new?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -579,7 +675,7 @@ export default async function AppointmentDetailPage({
               Certificate
             </Link>
           ) : null}
-          {canAdmit && !activeStay ? (
+          {canAdmit && !activeStay && !isPastRecord ? (
             <Link
               href={`/wards/admit?patientId=${appointment.patientId}&appointmentId=${appointment.id}`}
               className={compactButtonClass}
@@ -592,7 +688,7 @@ export default async function AppointmentDetailPage({
               IPD {activeStay.ipNumber}
             </Link>
           ) : null}
-          {canCheckout && !canManage ? (
+          {canCheckout && !canManage && !isPastRecord ? (
             <AppointmentActions
               id={appointment.id}
               status={appointment.status}
@@ -604,7 +700,14 @@ export default async function AppointmentDetailPage({
         </div>
       </div>
 
-      {editing && visitClosed && showEditableAssessment ? (
+      {editingPast && pastUnlock ? (
+        <PastRecordEditBar
+          appointmentId={appointment.id}
+          reason={pastUnlock.reason}
+          expiresAt={pastUnlock.expiresAt}
+          cancelHref={ownVisitHref}
+        />
+      ) : editing && visitClosed && showEditableAssessment ? (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 print:hidden">
           <p className="text-xs text-amber-900">Editing approved visit — publish again when finished.</p>
           <Link href={ownVisitHref} className={compactButtonClass}>
@@ -612,7 +715,7 @@ export default async function AppointmentDetailPage({
           </Link>
         </div>
       ) : null}
-      {!showEditableAssessment && canAssess && visitClosed ? (
+      {!isPastRecord && !showEditableAssessment && canAssess && visitClosed ? (
         <div className="shrink-0 print:hidden">
           <VisitSummaryBanner
             statusLabel={prettyEnum(appointment.status)}
@@ -669,7 +772,10 @@ export default async function AppointmentDetailPage({
           }}
           vitals={vitals}
           canEditHistory={canAssess || canManage}
-          recordVitalsHref={canEditVitals ? vitalsHref : null}
+          recordVitalsHref={
+            isPastRecord ? (editingPast && doctorCanEditVitals ? vitalsHref : null) : canEditVitals ? vitalsHref : null
+          }
+          compareLabel={isPastRecord ? "Since the visit before" : "Since last visit"}
           priorVisit={
             appointment.visitType === "FOLLOW_UP" && priorVisit
               ? {
@@ -686,8 +792,8 @@ export default async function AppointmentDetailPage({
         {useCockpit && canViewLab && !testsLiveInPopup ? (
           <LabOrderPanel
             orders={appointment.labOrders}
-            canCollect={canCollectLab && labEnabled}
-            canWork={canWorkLab && labEnabled}
+            canCollect={labCanCollect}
+            canWork={labCanWork}
             canViewReport={canViewLabReport}
             canAttachExternal={canAttachExternal}
             canPrint={canPrintSummary}
@@ -746,7 +852,7 @@ export default async function AppointmentDetailPage({
             cockpit
             allergies={appointment.patient.allergies}
             currentMedications={appointment.patient.currentMedications}
-            nextAppointmentId={nextId}
+            nextAppointmentId={isPastRecord ? null : nextId}
             testsMountId={useCockpit && showEditableAssessment ? "visit-tests-mount" : null}
             ordersPanel={labOrdersPanel()}
             followUpReminderNote={followUpReminderHint(user.hospital)}
@@ -755,7 +861,7 @@ export default async function AppointmentDetailPage({
             }
             initialHandwritingPages={readHandwritingPages(assessment?.handwritingPages)}
             sheet={writingSheet}
-            aiScribeEnabled={Boolean(user.hospital?.aiScribeEnabled)}
+            aiScribeEnabled={Boolean(user.hospital?.aiScribeEnabled) && !isPastRecord}
             initial={{
               chiefComplaint: assessment?.chiefComplaint ?? "",
               examination: assessment?.examination ?? "",
@@ -769,14 +875,14 @@ export default async function AppointmentDetailPage({
                 : "",
             }}
           >
-            {(showDoctorWalkInPayment || (canCollectFee && !visitPaid)) ? (
+            {!isPastRecord && (showDoctorWalkInPayment || (canCollectFee && !visitPaid)) ? (
               <div className="print:hidden">
                 <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
                   Record payment
                 </Link>
               </div>
             ) : null}
-            {canManage ? (
+            {!isPastRecord && canManage ? (
               <div className="print:hidden">
                 <AppointmentActions
                   id={appointment.id}
@@ -785,7 +891,7 @@ export default async function AppointmentDetailPage({
                   reminderAlreadySent={reminderAlreadySent}
                 />
               </div>
-            ) : canCheckout ? (
+            ) : !isPastRecord && canCheckout ? (
               <div className="print:hidden">
                 <AppointmentActions
                   id={appointment.id}
@@ -798,15 +904,15 @@ export default async function AppointmentDetailPage({
           </ConsultAssessmentForm>
           )}
           </div>
-        ) : canAssess && visitClosed ? (
+        ) : isPastRecord || (canAssess && visitClosed) ? (
           <div data-tour="page:visit-work" className="min-w-0 space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
-            {user.hospital?.aiScribeEnabled ? <ConsultScribe appointmentId={appointment.id} mode="view" /> : null}
+            {!isPastRecord && user.hospital?.aiScribeEnabled ? <ConsultScribe appointmentId={appointment.id} mode="view" /> : null}
             <VisitAssessmentReadonly
               omitBanner
               appointmentId={appointment.id}
               statusLabel={prettyEnum(appointment.status)}
               summaryApproved={summaryApproved}
-              canEdit={canAssess}
+              canEdit={canAssess && !isPastRecord}
               canPrint={canPrintSummary}
               patientPhone={appointment.patient.phone}
               chiefComplaint={assessment?.chiefComplaint}
@@ -820,15 +926,16 @@ export default async function AppointmentDetailPage({
               entryMode={assessment?.entryMode}
               handwritingPages={readHandwritingPages(assessment?.handwritingPages)}
               aiAssisted={Boolean(assessment?.aiAssisted)}
+              revisionNote={revisionNote}
             />
-            {canCollectFee && !visitPaid ? (
+            {!isPastRecord && canCollectFee && !visitPaid ? (
               <div className="print:hidden">
                 <Link href={`/billing/collect/${appointment.id}`} className={`${primaryButtonClass} mb-3 inline-flex`}>
                   Record payment
                 </Link>
               </div>
             ) : null}
-            {canManage ? (
+            {!isPastRecord && canManage ? (
               <div className="print:hidden">
                 <AppointmentActions
                   id={appointment.id}
@@ -837,7 +944,7 @@ export default async function AppointmentDetailPage({
                   reminderAlreadySent={reminderAlreadySent}
                 />
               </div>
-            ) : canCheckout ? (
+            ) : !isPastRecord && canCheckout ? (
               <div className="print:hidden">
                 <AppointmentActions
                   id={appointment.id}
@@ -904,8 +1011,8 @@ export default async function AppointmentDetailPage({
           {canViewLab ? (
             <LabOrderPanel
               orders={appointment.labOrders}
-              canCollect={canCollectLab && labEnabled}
-              canWork={canWorkLab && labEnabled}
+              canCollect={labCanCollect}
+              canWork={labCanWork}
               canViewReport={canViewLabReport}
               canAttachExternal={canAttachExternal}
               canPrint={canPrintSummary}
@@ -938,6 +1045,40 @@ export default async function AppointmentDetailPage({
         )}
       </div>
       </div>
+      </PastVisitsProvider>
     </AppShell>
   );
+}
+
+function pastVitalsSnapshot(vitals: {
+  bpSystolic: number | null;
+  bpDiastolic: number | null;
+  pulseBpm: number | null;
+  temperatureC: number;
+  spo2Percent: number | null;
+  weightKg: number;
+}): PastVisitVitals {
+  return {
+    bpSystolic: vitals.bpSystolic,
+    bpDiastolic: vitals.bpDiastolic,
+    pulseBpm: vitals.pulseBpm,
+    temperatureC: vitals.temperatureC,
+    spo2Percent: vitals.spo2Percent,
+    weightKg: vitals.weightKg,
+  };
+}
+
+function revisionNoteFrom(
+  row: { createdAt: Date; actorUsername: string; metadata: unknown } | null,
+) {
+  if (!row || !row.metadata || typeof row.metadata !== "object" || Array.isArray(row.metadata)) return null;
+  const reason = "reason" in row.metadata && typeof row.metadata.reason === "string" ? row.metadata.reason.trim() : "";
+  if (!reason) return null;
+  const who = printedPersonName(row.actorUsername) || row.actorUsername;
+  const when = row.createdAt.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  return `Edited ${when} by ${who}: ${reason}`;
 }

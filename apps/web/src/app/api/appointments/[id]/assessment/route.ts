@@ -6,11 +6,13 @@ import {
   doctorIsOnLeave,
   doctorName,
   forbidUnless,
+  isHistoricalVisit,
   patientName,
   requireHospitalActor,
   staffIdForAppUser,
   tokenLabel,
 } from "@/lib/front-desk";
+import { currentVisitEditUnlock } from "@/lib/appointments/visit-edit-unlock";
 import { notifySummaryApproved } from "@/lib/notifications";
 import { parseInvestigationPicks } from "@/lib/lab-catalog";
 import { upsertVisitLabOrder } from "@/lib/lab";
@@ -139,6 +141,21 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ error: "You can only assess your own consults." }, { status: 403 });
     }
 
+    let editReason: string | null = null;
+    if (isHistoricalVisit(appointment.scheduledAt)) {
+      const unlock = await currentVisitEditUnlock({
+        userId: scoped.user.id,
+        appointmentId: appointment.id,
+      });
+      if (!unlock) {
+        return NextResponse.json(
+          { error: "This past visit is locked. Enter your password and a reason to edit it." },
+          { status: 403 },
+        );
+      }
+      editReason = unlock.reason;
+    }
+
     const body = await request.json().catch(() => null);
     const action = String(body?.action ?? "save");
     const followUpAt = followUpDate(body?.followUpAt);
@@ -182,7 +199,7 @@ export async function POST(request: Request, context: Ctx) {
           entity: "VisitAssessment",
           entityId: assessment.id,
           summary: `${scoped.user.username} updated the follow-up date for ${patientName(appointment.patient)}.`,
-          metadata: { changes },
+          metadata: { changes, ...(editReason ? { reason: editReason } : {}) },
         });
       }
       await syncFollowUpReminder({
@@ -358,7 +375,11 @@ export async function POST(request: Request, context: Ctx) {
           : created
             ? `${scoped.user.username} saved a draft visit summary for ${patientName(appointment.patient)}.`
             : `${scoped.user.username} revised the visit summary for ${patientName(appointment.patient)}.`,
-        metadata: { changes, ...(approve ? { aiAssisted: assessment.aiAssisted } : {}) },
+        metadata: {
+          changes,
+          ...(editReason ? { reason: editReason } : {}),
+          ...(approve ? { aiAssisted: assessment.aiAssisted } : {}),
+        },
       });
     }
 

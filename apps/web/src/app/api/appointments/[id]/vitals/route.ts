@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { diffAuditFields, writeAuditLog } from "@/lib/audit";
 import { NURSE_VITALS_ROLES, canNurseRecordVitals, patientName, requireHospitalActor, tokenLabel } from "@/lib/front-desk";
+import { currentVisitEditUnlock } from "@/lib/appointments/visit-edit-unlock";
 import { notifyDoctorVitalsReady } from "@/lib/notifications";
 import { bmiLabel, calculateBmi, parseOptionalNumber, parseRequiredNumber } from "@/lib/vitals";
 
@@ -33,11 +34,18 @@ export async function POST(request: Request, context: Ctx) {
     if (["CANCELLED", "NO_SHOW"].includes(appointment.status)) {
       return NextResponse.json({ error: "Vitals cannot be recorded for this visit." }, { status: 409 });
     }
+    let editReason: string | null = null;
     if (!canNurseRecordVitals(appointment)) {
-      return NextResponse.json(
-        { error: "Vitals can only be recorded for today's visits. Previous visit records are locked." },
-        { status: 409 },
-      );
+      const unlock = isConsultingDoctor
+        ? await currentVisitEditUnlock({ userId: scoped.user.id, appointmentId: appointment.id })
+        : null;
+      if (!unlock) {
+        return NextResponse.json(
+          { error: "Vitals can only be recorded for today's visits. Previous visit records are locked." },
+          { status: 409 },
+        );
+      }
+      editReason = unlock.reason;
     }
 
     const body = await request.json().catch(() => null);
@@ -106,6 +114,7 @@ export async function POST(request: Request, context: Ctx) {
       entityId: vitals.id,
       summary: `${scoped.user.username} recorded vitals for ${patientName(appointment.patient)} (BMI ${bmi}, ${bmiLabel(bmi)}).`,
       metadata: {
+        ...(editReason ? { reason: editReason } : {}),
         changes: diffAuditFields(
           appointment.vitals as unknown as Record<string, unknown> | undefined,
           vitals as unknown as Record<string, unknown>,

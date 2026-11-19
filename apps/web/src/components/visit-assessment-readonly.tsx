@@ -43,6 +43,7 @@ export function VisitAssessmentReadonly({
   handwritingPages,
   aiAssisted = false,
   omitBanner = false,
+  revisionNote = null,
 }: {
   appointmentId: string;
   statusLabel: string;
@@ -62,6 +63,7 @@ export function VisitAssessmentReadonly({
   handwritingPages?: string[] | null;
   aiAssisted?: boolean;
   omitBanner?: boolean;
+  revisionNote?: string | null;
 }) {
   const medicines = parseMedications(readableClinicalText(prescription));
   const diagnosisText = readableClinicalText(diagnosis);
@@ -93,6 +95,9 @@ export function VisitAssessmentReadonly({
         <p className="print:hidden text-xs text-text-secondary">
           Drafted with AI and approved by the doctor.
         </p>
+      ) : null}
+      {revisionNote ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{revisionNote}</p>
       ) : null}
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-2 lg:gap-4">

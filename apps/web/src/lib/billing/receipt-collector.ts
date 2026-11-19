@@ -1,3 +1,4 @@
+import { printedPersonName } from "@/lib/display";
 import { prisma } from "@/lib/prisma";
 import { signatureCredentialsFor, signatureNameFor } from "@/lib/signatures";
 
@@ -15,7 +16,7 @@ export async function resolveReceiptCollector(payments: {
   const latestCollection = payments.find((payment) => payment.kind === "COLLECTION") ?? null;
   if (latestCollection?.receivedBySignature) {
     return {
-      name: latestCollection.receivedBySignature.displayName,
+      name: printedPersonName(latestCollection.receivedBySignature.displayName),
       credentials: latestCollection.receivedBySignature.credentials,
       imageData: latestCollection.receivedBySignature.imageData,
     };
@@ -37,7 +38,7 @@ export async function resolveReceiptCollector(payments: {
   if (!receiver) return null;
   const live = receiver.signatures[0] ?? null;
   return {
-    name: live?.displayName ?? signatureNameFor(receiver),
+    name: printedPersonName(live?.displayName) || signatureNameFor(receiver),
     credentials: live?.credentials ?? signatureCredentialsFor(receiver),
     imageData: live?.imageData ?? null,
   };

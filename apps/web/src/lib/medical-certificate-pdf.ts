@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { printableDoctorLabel } from "@/lib/display";
 import { ageGenderLine } from "@/lib/visit-summary";
 import { certificateLetter, certificateTitle, formatCertDate } from "@/lib/medical-certificates";
 import {
@@ -63,7 +64,9 @@ export async function buildMedicalCertificatePdf(input: MedicalCertificatePdfInp
     purpose: input.certificate.purpose,
     issuedAt: input.certificate.issuedAt,
   });
-  const issuer = input.certificate.issuedByDisplayName || input.certificate.issuedByUsername;
+  const issuer =
+    printableDoctorLabel(input.certificate.issuedByDisplayName || input.certificate.issuedByUsername) ||
+    "Doctor";
   const printedAt = input.printedAt ?? printClock();
 
   return new Promise((resolve, reject) => {

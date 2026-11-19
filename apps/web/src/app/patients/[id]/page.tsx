@@ -11,7 +11,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PatientVisitHistory } from "@/components/patient-visit-history";
 import { SendPatientMessageButton } from "@/components/send-patient-message-button";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
-import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageLabel, hasFrontDeskAccess, hasRoleAccess, inr, patientName, prettyEnum } from "@/lib/front-desk";
+import { CLINICAL_VIEW_ROLES, DOCTOR_VISIT_ROLES, LAB_REPORT_VIEW_ROLES, PRINT_SUMMARY_ROLES, canAddWalkIn, ageLabel, hasFrontDeskAccess, hasRoleAccess, inr, patientName, prettyEnum, printableDoctorLabel } from "@/lib/front-desk";
 import { patientWhatsAppLanguageLabel } from "@/lib/messaging/whatsapp-language";
 import { prisma } from "@/lib/prisma";
 import { hospitalHasWardsModule } from "@/lib/subscription-tiers";
@@ -303,7 +303,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                     <span className="text-slate-500">
                       {" "}
                       · {certificateTitle(row.type)} · {formatCertDate(row.issuedAt)} ·{" "}
-                      {row.issuedByDisplayName || row.issuedByUsername} · {prettyEnum(row.status)}
+                      {printableDoctorLabel(row.issuedByDisplayName || row.issuedByUsername) || "Doctor"} · {prettyEnum(row.status)}
                     </span>
                   </span>
                   {row.status === "ISSUED" ? (

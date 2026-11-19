@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clinicDayKey, rankTerms } from "@/lib/appointments/frequent-terms";
+import { clinicDayKey, DIAGNOSIS_SUGGESTION_LIMIT, rankTerms } from "@/lib/appointments/frequent-terms";
 import { resolveDoctorStaffId } from "@/lib/appointments/doctor-staff";
 import { requireHospitalActor } from "@/lib/front-desk";
 import { prisma } from "@/lib/prisma";
@@ -34,13 +34,16 @@ export async function GET() {
       createdAt: { gte: since },
       appointment: { doctorId },
     },
-    select: { diagnosis: true, chiefComplaint: true, advice: true },
+    select: { diagnosis: true, chiefComplaint: true },
   });
 
   const payload: FrequentPayload = {
-    diagnoses: rankTerms(rows.map((row) => row.diagnosis)),
+    diagnoses: rankTerms(rows.map((row) => row.diagnosis), DIAGNOSIS_SUGGESTION_LIMIT, {
+      chipsOnly: true,
+    }),
     complaints: rankTerms(rows.map((row) => row.chiefComplaint)),
-    advice: rankTerms(rows.map((row) => row.advice)),
+    // Advice chips are the curated common list, not text saved on past visits.
+    advice: [],
   };
   cache.set(key, { day, payload });
   return NextResponse.json(payload);

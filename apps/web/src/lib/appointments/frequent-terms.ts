@@ -1,5 +1,20 @@
+/** Diagnosis chips stay a short list. Advice uses the curated common suggestions instead. */
+export const DIAGNOSIS_SUGGESTION_LIMIT = 3;
+
+const SUGGESTION_CHIP_MAX_LENGTH = 40;
+
+/** Reusable chip labels are short. Sentences typed on a visit are not suggestions. */
+export function isSuggestionChip(label: string) {
+  const text = label.trim();
+  return text.length > 0 && text.length <= SUGGESTION_CHIP_MAX_LENGTH && !/[.?!]/.test(text);
+}
+
 /** Split free-text assessment fields into chips and return the most common labels. */
-export function rankTerms(rawValues: Array<string | null | undefined>, limit = 8): string[] {
+export function rankTerms(
+  rawValues: Array<string | null | undefined>,
+  limit = 8,
+  options?: { chipsOnly?: boolean },
+): string[] {
   const counts = new Map<string, { label: string; count: number }>();
   for (const raw of rawValues) {
     if (!raw) continue;
@@ -7,6 +22,7 @@ export function rankTerms(rawValues: Array<string | null | undefined>, limit = 8
     for (const part of raw.split(/[,;\n]+/)) {
       const label = part.trim();
       if (!label) continue;
+      if (options?.chipsOnly && !isSuggestionChip(label)) continue;
       const key = label.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);

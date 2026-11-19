@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clinicDayKey, rankTerms } from "@/lib/appointments/frequent-terms";
+import { clinicDayKey, DIAGNOSIS_SUGGESTION_LIMIT, rankTerms } from "@/lib/appointments/frequent-terms";
 
 describe("rankTerms", () => {
   it("counts individual chips, not the whole comma-separated string", () => {
@@ -23,6 +23,24 @@ describe("rankTerms", () => {
 
   it("ignores blanks", () => {
     expect(rankTerms([null, "", "  ,  ", "URTI"])).toEqual(["URTI"]);
+  });
+
+  it("keeps diagnosis suggestions to a few short labels", () => {
+    const ranked = rankTerms(
+      [
+        "Fever",
+        "Fever",
+        "Normal bacterial fever",
+        "a minimum amount of sleep is definitely necessary",
+        "and you should not take too much stress. Try this for three days",
+        "Gastritis",
+        "URTI",
+        "Headache",
+      ],
+      DIAGNOSIS_SUGGESTION_LIMIT,
+      { chipsOnly: true },
+    );
+    expect(ranked).toEqual(["Fever", "Gastritis", "Headache"]);
   });
 });
 

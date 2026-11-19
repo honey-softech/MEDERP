@@ -21,6 +21,7 @@ import {
 import type { AssessmentEntryMode } from "@/lib/handwriting";
 import { approveBlockReason } from "@/lib/handwriting";
 import type { InvestigationPick } from "@/lib/lab-catalog";
+import { DIAGNOSIS_SUGGESTION_LIMIT, isSuggestionChip } from "@/lib/appointments/frequent-terms";
 import { selectScribePatch, type ScribeAssessmentKey, type ScribeAssessmentPatch, type ScribeFillMode } from "@/lib/scribe/draft-schema";
 
 const ENTRY_MODE_KEY = "mederp.assessment.entryMode";
@@ -735,8 +736,11 @@ export function ConsultAssessmentForm({
   }
 
   const complaintSuggestions = frequent?.complaints?.length ? frequent.complaints : COMPLAINT_SUGGESTIONS;
-  const adviceSuggestions = frequent?.advice?.length ? frequent.advice : ADVICE_SUGGESTIONS;
-  const diagnosisSuggestions = frequent?.diagnoses ?? [];
+  // Common advice stays on the form. Phrases saved while testing are not suggestions.
+  const adviceSuggestions = ADVICE_SUGGESTIONS;
+  const diagnosisSuggestions = (frequent?.diagnoses ?? [])
+    .filter(isSuggestionChip)
+    .slice(0, DIAGNOSIS_SUGGESTION_LIMIT);
 
   const findings = (
     <div className="flex min-h-0 flex-1 flex-col space-y-2.5">

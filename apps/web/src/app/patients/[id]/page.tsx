@@ -158,7 +158,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
   return (
     <AppShell title={patientName(patient)}>
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div data-tour="page:patient-actions" className="mb-6 flex flex-wrap items-center gap-3">
         {patient.photoData ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={patient.photoData} alt="" className="h-16 w-16 rounded-2xl object-cover" />
@@ -222,7 +222,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </section>
       ) : null}
 
-      <section className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-6">
+      <section data-tour="page:patient-profile" className="mb-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-6">
         <h3 className="font-semibold">Profile</h3>
         <dl className="mt-3 grid gap-2 sm:grid-cols-2">
           <div><dt className="text-slate-500">Name</dt><dd>{patientName(patient)}</dd></div>

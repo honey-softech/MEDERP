@@ -1616,11 +1616,25 @@ html:has(.landing) body {
   font-family: var(--font-geist-sans), sans-serif;
 }
 
-.mederp-tour-link {
-  display: inline-block;
-  margin-top: 0.5rem;
+.mederp-tour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.mederp-tour-link,
+.mederp-tour-menu {
   color: var(--primary);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.mederp-tour-menu {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
 }

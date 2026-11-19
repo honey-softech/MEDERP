@@ -353,6 +353,7 @@ export function AppShellFrame({
   dense = false,
   viewMode,
   tourRole,
+  tourViewerId,
 }: {
   title: string;
   brand: string;
@@ -363,6 +364,7 @@ export function AppShellFrame({
   dense?: boolean;
   viewMode?: ViewMode;
   tourRole?: string;
+  tourViewerId?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -529,7 +531,12 @@ export function AppShellFrame({
               hrefs={allHrefs}
               includeViewMode={Boolean(viewMode)}
               collapsed={collapsed}
-              onBeforeStart={() => {
+              viewerId={tourViewerId}
+              onPrepare={(mode) => {
+                if (mode === "page") {
+                  setMobileOpen(false);
+                  return;
+                }
                 setMobileOpen(true);
                 setCollapsed(false);
                 try {

@@ -470,6 +470,7 @@ export async function AppShell({
       nav={nav}
       dense={dense}
       viewMode={view.canActAsDoctor ? view.mode : undefined}
+      tourViewerId={user.id}
       tourRole={
         !user.hospitalId || isPlatformRole(user.role)
           ? undefined

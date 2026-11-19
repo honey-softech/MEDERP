@@ -36,6 +36,16 @@ const ADMIN: TourStepDef[] = [
     description: "Search the hospital register and open a patient's record.",
   },
   {
+    href: "/wards",
+    title: "Wards",
+    description: "Admitted patients, beds, and who is currently in house.",
+  },
+  {
+    href: "/certificates",
+    title: "Certificates",
+    description: "Medical certificates issued from a visit.",
+  },
+  {
     href: "/billing",
     title: "Billing",
     description: "Raise and review bills for visits and other charges.",
@@ -44,6 +54,11 @@ const ADMIN: TourStepDef[] = [
     href: "/billing/collections",
     title: "Collections",
     description: "See what has been collected and what is still due.",
+  },
+  {
+    href: "/billing/reports",
+    title: "Reports",
+    description: "Summaries for the period: what was billed and what was collected.",
   },
   {
     href: "/staff",
@@ -114,6 +129,21 @@ const DOCTOR: TourStepDef[] = [
     description: "Look up a patient and review earlier visits.",
   },
   {
+    href: "/wards",
+    title: "Wards",
+    description: "Admitted patients and the bed they are in.",
+  },
+  {
+    href: "/staff",
+    title: "Staff",
+    description: "The hospital directory. Useful when you need another doctor or the front desk.",
+  },
+  {
+    href: "/billing",
+    title: "Billing",
+    description: "Bills raised for visits, when you need to see what was charged.",
+  },
+  {
     href: "/certificates",
     title: "Certificates",
     description: "Issue and review medical certificates you have signed.",
@@ -147,6 +177,16 @@ const RECEPTION: TourStepDef[] = [
     description: "See who has arrived and who is still waiting.",
   },
   {
+    href: "/wards",
+    title: "Wards",
+    description: "Who is admitted, when the desk is asked about a bed.",
+  },
+  {
+    href: "/staff",
+    title: "Staff",
+    description: "The staff directory, including the doctors you book.",
+  },
+  {
     href: "/billing",
     title: "Billing",
     description: "Create the bill for a visit.",
@@ -155,6 +195,21 @@ const RECEPTION: TourStepDef[] = [
     href: "/billing/collections",
     title: "Collections",
     description: "Record what the patient paid and what is still due.",
+  },
+  {
+    href: "/billing/reports",
+    title: "Reports",
+    description: "Summaries for the period: what was billed and what was collected.",
+  },
+  {
+    href: "/billing/lab",
+    title: "Lab collections",
+    description: "Payments collected against lab orders.",
+  },
+  {
+    href: "/pharmacy/prescriptions",
+    title: "Pharmacy bills",
+    description: "Bills raised from prescriptions.",
   },
 ];
 
@@ -180,27 +235,72 @@ const NURSE: TourStepDef[] = [
     description: "Find a patient and open the record.",
   },
   {
+    href: "/appointments",
+    title: "Appointments",
+    description: "Booked visits for the day. Open one when you need to record vitals.",
+  },
+  {
+    href: "/certificates",
+    title: "Certificates",
+    description: "Certificates prepared from a visit, for a doctor to complete.",
+  },
+  {
+    href: "/staff",
+    title: "Staff",
+    description: "The staff directory.",
+  },
+  {
     href: "/wards",
     title: "Wards",
     description: "Admitted patients, beds, and ward stays.",
+  },
+  {
+    href: "/billing",
+    title: "Billing",
+    description: "Bills for visits. Open one when you are asked what is due.",
+  },
+  {
+    href: "/billing/collections",
+    title: "Collections",
+    description: "What was collected today, and what is still due.",
+  },
+  {
+    href: "/billing/reports",
+    title: "Reports",
+    description: "Summaries for the period: what was billed and what was collected.",
   },
 ];
 
 const NURSE_FRONT_DESK: TourStepDef[] = [
   ...NURSE,
   {
-    href: "/appointments",
-    title: "Appointments",
-    description: "You also cover the front desk. Book and review visits from here.",
+    href: "/billing/lab",
+    title: "Lab collections",
+    description: "Payments collected against lab orders, when you are covering the desk.",
   },
   {
-    href: "/billing",
-    title: "Billing",
-    description: "Raise a bill when you are collecting at the desk.",
+    href: "/pharmacy/prescriptions",
+    title: "Pharmacy bills",
+    description: "Bills raised from prescriptions.",
   },
 ];
 
 const CLOSING: TourStepDef[] = [
+  {
+    href: "/leave",
+    title: "Leave",
+    description: "Request leave and see what has been approved.",
+  },
+  {
+    href: "/timesheet",
+    title: "Timesheet",
+    description: "Record attendance for your shift.",
+  },
+  {
+    href: "/helpdesk",
+    title: "Helpdesk",
+    description: "Questions about MedERP. Open a ticket and follow the reply here.",
+  },
   {
     anchor: "account",
     title: "Account",
@@ -214,7 +314,7 @@ const CLOSING: TourStepDef[] = [
   {
     anchor: "take-tour",
     title: "Take the tour again",
-    description: "This button stays in the sidebar. Open it any time you want this walkthrough again.",
+    description: "This button stays in the sidebar. On a working page it walks through that page. Anywhere else, it walks through this menu.",
   },
 ];
 

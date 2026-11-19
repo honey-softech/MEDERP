@@ -29,7 +29,7 @@ export const GUIDES: Record<GuideRole, GuideDoc> = {
         heading: "Getting started",
         body: [
           "Sign in with the mobile number your account was created with. The sidebar is grouped by how you work: Clinical, Billing, People, Settings, and Support.",
-          "If you also consult, use the Doctor / Admin switch in the header. Doctor view shows the consult menu. Admin view shows hospital setup. Take a tour follows whichever view you are in.",
+          "If you also consult, use the Doctor / Admin switch in the header. Doctor view shows the consult menu. Admin view shows hospital setup. Take a tour follows whichever view you are in, and on a working page it walks through that page before the menu.",
         ],
       },
       {
@@ -52,7 +52,7 @@ export const GUIDES: Record<GuideRole, GuideDoc> = {
         body: [
           "Billing is where bills are raised. Collections shows what was received and what is still due. Reports summarises the period.",
           "Hospital settings holds the name, timings, and details printed on bills and certificates. Subscription is your plan and renewal. Audit log records important changes.",
-          "Helpdesk is for product questions. Take a tour, at the bottom of the sidebar, repeats this walkthrough whenever you want it.",
+          "Helpdesk is for product questions. Take a tour, at the bottom of the sidebar, walks through the page you are on. Open it again any time, or use it from the dashboard to walk the menu.",
         ],
       },
     ],
@@ -80,7 +80,7 @@ export const GUIDES: Record<GuideRole, GuideDoc> = {
         heading: "If you also administer the hospital",
         body: [
           "The Doctor / Admin switch in the header changes the sidebar. Admin view is for users, settings, and subscription. Switch back to Doctor before the next consult.",
-          "Take a tour, at the bottom of the sidebar, walks through this menu again.",
+          "Take a tour, at the bottom of the sidebar, walks through the queue and the visit while you are on those pages, and walks the menu from anywhere else.",
         ],
       },
     ],
@@ -108,7 +108,7 @@ export const GUIDES: Record<GuideRole, GuideDoc> = {
         heading: "Your own time",
         body: [
           "Leave and Timesheet are under Support, for your own attendance. Helpdesk is for product questions.",
-          "Take a tour, at the bottom of the sidebar, repeats these steps.",
+          "Take a tour, at the bottom of the sidebar, walks through the page you have open: the register, the day book, the queue, or billing.",
         ],
       },
     ],
@@ -136,7 +136,7 @@ export const GUIDES: Record<GuideRole, GuideDoc> = {
         heading: "If you also cover the front desk",
         body: [
           "Appointments books the visit. Billing and Collections are for the bill and the payment.",
-          "Leave and Timesheet are under Support. Take a tour, at the bottom of the sidebar, walks through your menu again.",
+          "Leave and Timesheet are under Support. Take a tour, at the bottom of the sidebar, walks through the nurse station, vitals, and wards while you are on those pages.",
         ],
       },
     ],

@@ -40,7 +40,7 @@ export default async function NurseStationPage() {
 
   return (
     <AppShell title="Nurse station">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div data-tour="page:nurse-intro" className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-slate-500">
           When reception books a consult or adds a walk-in, you are notified here. Height, weight, and temperature are required; other vitals are optional. The doctor will see them in the room.
         </p>
@@ -50,14 +50,14 @@ export default async function NurseStationPage() {
           </Link>
         ) : null}
       </div>
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div data-tour="page:nurse-stats" className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Vitals pending" value={String(pending.length)} />
         <Stat label="Arrived, waiting on vitals" value={String(arrivedPending.length)} />
         <Stat label="Vitals recorded today" value={String(done.length)} />
       </div>
 
       <h3 className="mb-3 font-semibold">Needs vitals</h3>
-      <div className="space-y-3">
+      <div data-tour="page:nurse-pending" className="space-y-3">
         {pending.length === 0 ? (
           <p className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             No pending vitals. New bookings and walk-ins will appear here and in your notifications.

@@ -65,7 +65,7 @@ export function PatientVisitHistory({
   const last = visits[0];
 
   return (
-    <section className="mt-8 max-w-5xl space-y-6">
+    <section data-tour="page:patient-history" className="mt-8 max-w-5xl space-y-6">
       {last ? (
         <article className="rounded-2xl border border-teal-200 bg-teal-50/50 p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">

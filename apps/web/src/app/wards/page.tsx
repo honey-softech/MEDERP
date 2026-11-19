@@ -65,7 +65,7 @@ export default async function WardsPage() {
 
   return (
     <AppShell title="Wards & beds">
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div data-tour={canAdmit || canSetup ? "page:wards-actions" : undefined} className="mb-4 flex flex-wrap gap-2">
         {canAdmit ? (
           <Link href="/wards/admit" className={primaryButtonClass}>
             Admit patient
@@ -78,7 +78,7 @@ export default async function WardsPage() {
         ) : null}
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
+      <div data-tour="page:wards-stats" className="mb-6 grid gap-4 sm:grid-cols-4">
         <Stat label="Beds" value={String(beds.length)} />
         <Stat label="Occupied" value={String(occupied)} />
         <Stat label="Available" value={String(available)} />
@@ -87,6 +87,7 @@ export default async function WardsPage() {
       <WardCapacityCards rows={capacity} />
       <p className="mb-6 text-sm text-slate-500">{inHouse} inpatient{inHouse === 1 ? "" : "s"} currently in house.</p>
 
+      <div data-tour="page:wards-board">
       {wards.length === 0 ? (
         <p className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
           No wards yet. Super admin can create them under Ward setup.
@@ -171,6 +172,7 @@ export default async function WardsPage() {
           })}
         </div>
       )}
+      </div>
     </AppShell>
   );
 }

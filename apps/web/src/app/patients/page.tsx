@@ -21,7 +21,7 @@ export default async function PatientsPage() {
 
   return (
     <AppShell title="Patients">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div data-tour="page:patients-toolbar" className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-500">Search by name, phone, UHID, or family group</p>
         {canRegisterPatient(user) ? (
           <Link href="/patients/new" className={primaryButtonClass}>
@@ -29,6 +29,7 @@ export default async function PatientsPage() {
           </Link>
         ) : null}
       </div>
+      <div data-tour="page:patients-register">
       <FilterableTable
         searchPlaceholder="Search name, phone, or UHID"
         rows={patients.map((row) => ({
@@ -57,6 +58,7 @@ export default async function PatientsPage() {
             : []),
         ]}
       />
+      </div>
     </AppShell>
   );
 }

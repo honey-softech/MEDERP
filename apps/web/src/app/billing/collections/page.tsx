@@ -74,7 +74,7 @@ export default async function CollectionsPage({
           Monthly reports →
         </Link>
       </div>
-      <form className="mb-6 flex max-w-sm items-end gap-3" action="/billing/collections">
+      <form data-tour="page:collections-date" className="mb-6 flex max-w-sm items-end gap-3" action="/billing/collections">
         <label className="text-sm font-medium text-slate-700">
           Date
           <input
@@ -89,7 +89,7 @@ export default async function CollectionsPage({
         </button>
       </form>
 
-      <section className="grid gap-4 sm:grid-cols-4">
+      <section data-tour="page:collections-totals" className="grid gap-4 sm:grid-cols-4">
         <article className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-sm text-slate-500">Net collection</p>
           <p className="mt-2 text-2xl font-semibold">{inr(net)}</p>
@@ -108,7 +108,7 @@ export default async function CollectionsPage({
         </article>
       </section>
 
-      <section className="mt-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section data-tour="page:collections-doctors" className="mt-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="font-semibold">Amount credited to each doctor</h3>
         <p className="mt-1 text-sm text-slate-500">Consultation collections from today&apos;s paid visits, by payment method.</p>
         {doctorRows.length === 0 ? (

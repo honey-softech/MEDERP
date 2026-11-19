@@ -157,7 +157,7 @@ export default async function AppointmentsPage({
 
   return (
     <AppShell title="Appointments">
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div data-tour={canManage || canAddWalkIn(user) ? "page:appt-book" : undefined} className="mb-4 flex flex-wrap gap-2">
         {canManage ? (
           <>
             <Link href="/appointments/new" className={primaryButtonClass}>
@@ -184,7 +184,7 @@ export default async function AppointmentsPage({
         ) : null}
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+      <div data-tour="page:appt-views" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
         <div className="flex flex-wrap items-center gap-1.5">
           <Link
             href={buildHref({ view: "week", date: dateValue, ...filterBase })}
@@ -261,7 +261,7 @@ export default async function AppointmentsPage({
         </p>
       </div>
 
-      <form className="mb-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-4" action="/appointments">
+      <form data-tour="page:appt-filters" className="mb-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-4" action="/appointments">
         <input type="hidden" name="view" value={view} />
         <label className="text-sm font-medium text-slate-700">
           Jump to date

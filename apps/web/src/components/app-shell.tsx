@@ -470,6 +470,17 @@ export async function AppShell({
       nav={nav}
       dense={dense}
       viewMode={view.canActAsDoctor ? view.mode : undefined}
+      tourRole={
+        !user.hospitalId || isPlatformRole(user.role)
+          ? undefined
+          : useDoctorNav
+            ? "DOCTOR"
+            : user.role === "NURSE" && isNurseReceptionist(user)
+              ? "NURSE_RECEPTIONIST"
+              : user.role === "SUPER_ADMIN" || user.role === "DOCTOR" || user.role === "RECEPTIONIST" || user.role === "NURSE"
+                ? user.role
+                : undefined
+      }
     >
       {children}
     </AppShellFrame>

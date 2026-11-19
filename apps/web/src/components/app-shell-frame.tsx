@@ -5,9 +5,11 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
+import { ProductTourButton } from "@/components/product-tour-button";
 import { RealtimeProvider } from "@/components/realtime-provider";
 import { SessionKeepAlive } from "@/components/session-keep-alive";
 import { ViewModeToggle } from "@/components/view-mode-toggle";
+import { navTourAttr } from "@/lib/tour-steps";
 import type { ViewMode } from "@/lib/view-mode";
 
 export type NavLink = { href: string; label: string };
@@ -97,7 +99,7 @@ function navIconKind(href: string): NavIconKind {
   if (href.includes("join-requests")) return "inbox";
   if (href.startsWith("/hospital/subscription")) return "card";
   if (href.startsWith("/hospital/lab-prices") || href.startsWith("/drug-brands")) return "tag";
-  if (href.startsWith("/medicine-catalog")) return "book";
+  if (href.startsWith("/medicine-catalog") || href.startsWith("/guide")) return "book";
   if (href.startsWith("/pharmacy/prescriptions")) return "rx";
   if (href.startsWith("/pharmacy/stock-in")) return "package";
   if (href.startsWith("/billing/reports")) return "chart";
@@ -350,6 +352,7 @@ export function AppShellFrame({
   children,
   dense = false,
   viewMode,
+  tourRole,
 }: {
   title: string;
   brand: string;
@@ -359,6 +362,7 @@ export function AppShellFrame({
   children: React.ReactNode;
   dense?: boolean;
   viewMode?: ViewMode;
+  tourRole?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -493,6 +497,7 @@ export function AppShellFrame({
                         <Link
                           href={item.href}
                           title={item.label}
+                          data-tour={navTourAttr(item.href)}
                           onClick={() => {
                             persistNavScroll();
                             setMobileOpen(false);
@@ -518,10 +523,43 @@ export function AppShellFrame({
             ))}
           </nav>
 
-          <div className="shrink-0 border-t border-border p-2">
+          <div className="shrink-0 space-y-0.5 border-t border-border p-2">
+            <ProductTourButton
+              role={tourRole}
+              hrefs={allHrefs}
+              includeViewMode={Boolean(viewMode)}
+              collapsed={collapsed}
+              onBeforeStart={() => {
+                setMobileOpen(true);
+                setCollapsed(false);
+                try {
+                  localStorage.setItem(NAV_COLLAPSED_KEY, "0");
+                } catch {
+                  /* ignore */
+                }
+              }}
+            />
+            {tourRole ? (
+              <Link
+                href="/guide"
+                title="User guide"
+                data-tour="guide"
+                onClick={() => setMobileOpen(false)}
+                className={navItemClass(pathname === "/guide" || pathname.startsWith("/guide/"))}
+              >
+                {pathname === "/guide" || pathname.startsWith("/guide/") ? (
+                  <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
+                ) : null}
+                <span className={iconWellClass(pathname === "/guide" || pathname.startsWith("/guide/"))}>
+                  <NavGlyph href="/guide" />
+                </span>
+                <span className={navLabelClass(collapsed)}>User guide</span>
+              </Link>
+            ) : null}
             <Link
               href="/account"
               title="Account"
+              data-tour="account"
               onClick={() => setMobileOpen(false)}
               className={navItemClass(pathname === "/account" || pathname.startsWith("/account/"))}
             >
@@ -560,7 +598,11 @@ export function AppShellFrame({
               <h2 className="truncate text-base font-semibold sm:text-lg">{title}</h2>
               {userLabel ? <p className="truncate text-xs text-text-secondary">{userLabel}</p> : null}
             </div>
-            {viewMode ? <ViewModeToggle mode={viewMode} /> : null}
+            {viewMode ? (
+              <span data-tour="view-mode" className="inline-flex shrink-0">
+                <ViewModeToggle mode={viewMode} />
+              </span>
+            ) : null}
             <NotificationBell />
             <LogoutButton />
           </header>

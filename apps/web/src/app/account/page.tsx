@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AccountPanel } from "@/components/account-panel";
 import { selfServiceBlockReason } from "@/lib/account-lifecycle";
 import { getCurrentUser, isPlatformRole } from "@/lib/auth";
 import { personLabel } from "@/lib/display";
-import { cardClass } from "@/lib/ui";
+import { cardClass, textActionClass } from "@/lib/ui";
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
@@ -32,6 +33,13 @@ export default async function AccountPage() {
 
   return (
     <AppShell title="Account">
+      {user.role === "SUPER_ADMIN" || user.role === "DOCTOR" || user.role === "RECEPTIONIST" || user.role === "NURSE" ? (
+        <div className="mx-auto mb-4 flex max-w-xl justify-end">
+          <Link href="/guide" className={textActionClass}>
+            User guide
+          </Link>
+        </div>
+      ) : null}
       <AccountPanel
         name={name}
         roleLabel={user.role.replace(/_/g, " ")}

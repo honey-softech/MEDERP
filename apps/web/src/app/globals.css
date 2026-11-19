@@ -1611,3 +1611,16 @@ html:has(.landing) body {
 .auth-card a {
   touch-action: manipulation;
 }
+
+.mederp-tour.driver-popover {
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+.mederp-tour-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

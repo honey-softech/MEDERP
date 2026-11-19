@@ -243,22 +243,7 @@ const softwareAdminNav: NavSection[] = [
 
 const superAdminNav: NavSection[] = [
   {
-    items: [
-      { href: "/", label: "Dashboard" },
-    ],
-  },
-  {
-    title: "Administration",
-    items: [
-      { href: "/hospital/users", label: "Hospital users" },
-      { href: "/hospital/join-requests", label: "Join requests" },
-      { href: "/hospital/settings", label: "Hospital settings" },
-      { href: "/hospital/leaves", label: "Staff leave" },
-      { href: "/hospital/timesheets", label: "Timesheets" },
-      { href: "/hospital/subscription", label: "Subscription" },
-      { href: "/drug-brands", label: "Medicine brands" },
-      { href: "/hospital/audit-log", label: "Audit log" },
-    ],
+    items: [{ href: "/", label: "Dashboard" }],
   },
   {
     title: "Clinical",
@@ -267,23 +252,7 @@ const superAdminNav: NavSection[] = [
       { href: "/appointments", label: "Appointments" },
       { href: "/patients", label: "Patients" },
       { href: "/wards", label: "Wards" },
-      { href: "/staff", label: "Staff" },
       { href: "/certificates", label: "Certificates" },
-    ],
-  },
-  {
-    title: "Diagnostics",
-    items: [
-      { href: "/hospital/lab-prices", label: "Lab prices" },
-      { href: "/lab", label: "Laboratory" },
-    ],
-  },
-  {
-    title: "Pharmacy",
-    items: [
-      { href: "/pharmacy/prescriptions", label: "Prescription billing" },
-      { href: "/pharmacy", label: "Inventory" },
-      { href: "/pharmacy/stock-in", label: "Stock in (GRN)" },
     ],
   },
   {
@@ -292,7 +261,24 @@ const superAdminNav: NavSection[] = [
       { href: "/billing", label: "Billing" },
       { href: "/billing/collections", label: "Collections" },
       { href: "/billing/reports", label: "Reports" },
-      { href: "/billing/lab", label: "Lab collections" },
+    ],
+  },
+  {
+    title: "People",
+    items: [
+      { href: "/staff", label: "Staff" },
+      { href: "/hospital/users", label: "Hospital users" },
+      { href: "/hospital/join-requests", label: "Join requests" },
+      { href: "/hospital/leaves", label: "Staff leave" },
+      { href: "/hospital/timesheets", label: "Timesheets" },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { href: "/hospital/settings", label: "Hospital settings" },
+      { href: "/hospital/subscription", label: "Subscription" },
+      { href: "/hospital/audit-log", label: "Audit log" },
     ],
   },
   {

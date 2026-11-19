@@ -30,15 +30,21 @@ export function titleCasePersonName(value: string) {
 
 /**
  * Remove internal role tags (adm, doc, nur, …) and uniqueness digits from a login handle
- * so display names stay human — e.g. dhanushadm → dhanush, priyasharmadoc2 → priyasharma.
+ * so display names stay human — e.g. dhanush.adm → dhanush, priyasharma.doc.2 → priyasharma.
+ * Older handles without the dot (dhanushadm) still strip.
  */
 export function stripUsernameRoleSuffix(handle: string) {
   const trimmed = handle.trim();
   if (!trimmed) return "";
-  const withoutDigits = trimmed.replace(/\d+$/, "");
-  const core = withoutDigits || trimmed;
+  const withoutDigits = trimmed.replace(/(?:[.\s]+)?\d+$/, "");
+  const core = (withoutDigits || trimmed).replace(/[.\s]+$/, "");
   const lower = core.toLowerCase();
   for (const suffix of USERNAME_ROLE_SUFFIXES) {
+    for (const marker of [`.${suffix}`, ` ${suffix}`]) {
+      if (lower.endsWith(marker) && core.length > marker.length) {
+        return core.slice(0, -marker.length);
+      }
+    }
     if (lower.endsWith(suffix) && core.length > suffix.length + 1) {
       return core.slice(0, -suffix.length);
     }
@@ -46,11 +52,12 @@ export function stripUsernameRoleSuffix(handle: string) {
   return core;
 }
 
-/** Login username from first name, last name, and role — e.g. ravikumardoc. */
+/** Login username from first name, last name, and role — e.g. ravikumar.doc, nurse.nur. */
 export function suggestedUsername(firstName: string, lastName: string, role?: string | null) {
-  const name = [letters(firstName), letters(lastName)].filter(Boolean).join("") || "staff";
   const suffix = (role && USERNAME_ROLE_SUFFIX[role]) || "doc";
-  return `${name}${suffix}`.slice(0, 48);
+  const raw = [letters(firstName), letters(lastName)].filter(Boolean).join("") || "staff";
+  const name = raw.slice(0, Math.max(1, 48 - suffix.length - 1));
+  return `${name}.${suffix}`;
 }
 
 /** Name printed under a signature, e.g. Dr. Ravi Kumar. */

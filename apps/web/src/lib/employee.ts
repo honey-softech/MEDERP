@@ -299,16 +299,17 @@ export function parseEmployeeBody(body: Record<string, unknown> | null, role: Ap
 }
 
 export async function uniqueUsername(base: string, excludeId?: string) {
-  let username = base || "staff";
+  const root = base || "staff";
+  let username = root;
   for (let i = 0; i < 40; i++) {
     const clash = await prisma.appUser.findFirst({
       where: { username, ...(excludeId ? { id: { not: excludeId } } : {}) },
       select: { id: true },
     });
     if (!clash) return username;
-    username = `${base}${i + 2}`;
+    username = `${root}.${i + 2}`;
   }
-  return `${base}${Date.now().toString().slice(-4)}`;
+  return `${root}.${Date.now().toString().slice(-4)}`;
 }
 
 export function staffDataFromEmployee(hospitalId: string, input: EmployeeInput): Prisma.StaffUncheckedCreateInput {

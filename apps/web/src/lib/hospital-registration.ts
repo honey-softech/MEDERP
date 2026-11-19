@@ -10,7 +10,7 @@ import {
   slugFromHospitalName,
 } from "@/lib/hospital-code";
 import { mobileValidationError } from "@/lib/phone";
-import { allocateHospitalUserIdentity, parseEmployeeBody, uniqueUsername, upsertAdminDoctorStaff } from "@/lib/employee";
+import { allocateHospitalUserIdentity, parseEmployeeBody, suggestedUsername, uniqueUsername, upsertAdminDoctorStaff } from "@/lib/employee";
 import { ensureDepartmentByName, seedHospitalDepartments } from "@/lib/front-desk";
 import { seedHospitalWards } from "@/lib/wards";
 import { calculateRegistrationTotal, createPlatformInvoice } from "@/lib/platform-billing";
@@ -167,8 +167,8 @@ function resolveTierId(input: {
 function usernameBaseFromAdmin(displayName: string, email: string, mobile: string) {
   const fromName = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
   const fromEmail = email.split("@")[0]?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
-  const base = (fromName || fromEmail || `admin${mobile.slice(-4)}`).slice(0, 40);
-  return `${base}adm`.slice(0, 48);
+  const base = fromName || fromEmail || `admin${mobile.slice(-4)}`;
+  return suggestedUsername(base, "", "SUPER_ADMIN");
 }
 
 /** Validate registration fields and compute quote without creating the hospital. */

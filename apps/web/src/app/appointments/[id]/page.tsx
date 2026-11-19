@@ -429,7 +429,7 @@ export default async function AppointmentDetailPage({
                 appointmentId={appointment.id}
                 returnVisitId={returnToCurrent}
                 autoOpen={editing && !pastUnlock}
-                label="Edit record (reason and password)"
+                label="Edit record"
               />
             ) : null}
             {!historicalVisit && canAssess && !editing ? (

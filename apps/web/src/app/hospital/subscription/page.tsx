@@ -12,7 +12,8 @@ import { hospitalAccessBlocked } from "@/lib/hospital-access";
 import { MAX_REFERRALS_PER_HOSPITAL, MAX_TOTAL_FREE_MONTHS, referralSummary } from "@/lib/hospital-referrals";
 import { ReferralCodeCopy } from "@/components/referral-code-copy";
 import { OtpDangerAction } from "@/components/otp-danger-action";
-import { isMobileAppRequest } from "@/lib/mobile-app";
+import { isMobileAppRequest, mederpWebHost } from "@/lib/mobile-app";
+import { ManagePlanOnWeb } from "@/components/manage-plan-on-web";
 
 function inr(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -129,8 +130,8 @@ export default async function HospitalSubscriptionPage() {
         </p>
       ) : null}
       {isMobileApp ? (
-        <div className="mb-8 space-y-4">
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-8">
+          <ManagePlanOnWeb host={mederpWebHost()}>
             <h3 className="font-semibold">Current plan</h3>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
               <div>
@@ -161,7 +162,7 @@ export default async function HospitalSubscriptionPage() {
                 </dd>
               </div>
             </dl>
-          </section>
+          </ManagePlanOnWeb>
         </div>
       ) : (
         <HospitalSeatSubscriptionForm

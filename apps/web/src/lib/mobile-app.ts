@@ -9,6 +9,11 @@ export function mederpWebUrl(path: string) {
   return `${MEDERP_PUBLIC_ORIGIN}${normalized}`;
 }
 
+/** Hostname shown in the mobile app when billing must happen on the website. */
+export function mederpWebHost() {
+  return new URL(MEDERP_PUBLIC_ORIGIN).host;
+}
+
 /** True when the request comes from the iOS or Android WebView. */
 export async function isMobileAppRequest() {
   const userAgent = (await headers()).get("user-agent") ?? "";

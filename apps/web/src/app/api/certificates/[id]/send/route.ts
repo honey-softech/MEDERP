@@ -7,7 +7,7 @@ import { renderTemplate } from "@/lib/messaging/templates";
 import { resolveWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { buildMedicalCertificatePdf } from "@/lib/medical-certificate-pdf";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
-import { patientName, PRINT_SUMMARY_ROLES, requireHospitalActor } from "@/lib/front-desk";
+import { patientName, printableDoctorLabel, PRINT_SUMMARY_ROLES, requireHospitalActor } from "@/lib/front-desk";
 import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { prisma } from "@/lib/prisma";
 
@@ -53,7 +53,7 @@ export async function POST(request: Request, context: Ctx) {
   const variables = {
     patient: patientName(certificate.patient),
     hospital: certificate.hospital.name,
-    doctor: certificate.issuedByDisplayName || certificate.issuedByUsername,
+    doctor: printableDoctorLabel(certificate.issuedByDisplayName || certificate.issuedByUsername) || "Doctor",
     when: formatCertDate(certificate.issuedAt),
     type: certificateTitle(certificate.type),
     certificateNo: certificate.certificateNo,

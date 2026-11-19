@@ -8,6 +8,7 @@ import {
   parsePatientAge,
   personLabel,
   printableDoctorLabel,
+  printedPersonName,
 } from "@/lib/display";
 
 describe("patient age helpers", () => {
@@ -76,6 +77,22 @@ describe("doctorName", () => {
       }),
     ).toBe("Dr. Priyasharma");
     expect(printableDoctorLabel("Dr. dhanushadm")).toBe("Dr. Dhanush");
+    expect(printableDoctorLabel("Dr. dhanush.adm")).toBe("Dr. Dhanush");
+    expect(printableDoctorLabel("Dhanush Adm")).toBe("Dr. Dhanush");
+    expect(doctorName({
+      firstName: "dhanush.adm",
+      lastName: "",
+      appUser: { username: "dhanush.adm" },
+    })).toBe("Dr. Dhanush");
+  });
+
+  it("prints the person's name without a role tag", () => {
+    expect(printedPersonName("nurse.nur")).toBe("Nurse");
+    expect(printedPersonName("receptionist.rec")).toBe("Receptionist");
+    expect(printedPersonName("receptionistrec")).toBe("Receptionist");
+    expect(printedPersonName("dhanush.adm")).toBe("Dhanush");
+    expect(printedPersonName("Dr. dhanush.adm")).toBe("Dr. Dhanush");
+    expect(printedPersonName("Priya Sharma")).toBe("Priya Sharma");
   });
 
   it("never shows a login handle as a person's name", () => {

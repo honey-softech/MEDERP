@@ -7,7 +7,9 @@ import { SendPatientMessageButton } from "@/components/send-patient-message-butt
 import { secondaryButtonClass } from "@/components/auth-shell";
 import {
   PRINT_SUMMARY_ROLES,
+  personLabel,
   physicianLine,
+  printableDoctorLabel,
   requireHospitalPage,
   tokenLabel,
 } from "@/lib/front-desk";
@@ -100,10 +102,15 @@ export default async function InvestigationSlipPage({ params }: { params: Promis
           visitDate={formatClinicDateTime(appointment.scheduledAt)}
           token={tokenLabel(appointment.tokenNumber)}
           items={items}
-          printedBy={user.username}
+          printedBy={personLabel({
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            role: user.role,
+          })}
           printedAt={printedAt}
           signatureImage={signature?.imageData}
-          signatureName={signature?.displayName}
+          signatureName={printableDoctorLabel(signature?.displayName)}
           signatureCredentials={signature?.credentials}
         />
       </div>

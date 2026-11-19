@@ -8,6 +8,7 @@ import {
   PRINT_SUMMARY_ROLES,
   patientName,
   prettyEnum,
+  printableDoctorLabel,
   requireHospitalPage,
 } from "@/lib/front-desk";
 import { certificateTitle, formatCertDate } from "@/lib/medical-certificates";
@@ -47,7 +48,7 @@ export default async function CertificatesPage() {
           mrn: row.patient.mrn,
           type: certificateTitle(row.type),
           issued: formatCertDate(row.issuedAt),
-          doctor: row.issuedByDisplayName || row.issuedByUsername,
+          doctor: printableDoctorLabel(row.issuedByDisplayName || row.issuedByUsername) || "—",
           status: prettyEnum(row.status),
           href: `/certificates/${row.id}`,
         }))}

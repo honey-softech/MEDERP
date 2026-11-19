@@ -6,7 +6,7 @@ import { clipWhatsAppVar, renderTemplate } from "@/lib/messaging/templates";
 import { resolveWhatsAppLanguage } from "@/lib/messaging/whatsapp-language";
 import { deliverMessage, messagingProvider } from "@/lib/messaging/providers";
 import { uploadWhatsAppDocument } from "@/lib/messaging/whatsapp-media";
-import { patientName, PRINT_SUMMARY_ROLES, requireHospitalActor } from "@/lib/front-desk";
+import { patientName, personLabel, printableDoctorLabel, PRINT_SUMMARY_ROLES, requireHospitalActor } from "@/lib/front-desk";
 import { letterheadPhoneText } from "@/lib/hospital-letterhead";
 import { prisma } from "@/lib/prisma";
 
@@ -88,10 +88,15 @@ export async function POST(request: Request, context: Ctx) {
     scheduledAt: appointment.scheduledAt,
     tokenNumber: appointment.tokenNumber,
     items,
-    requestedBy: signature?.displayName,
+    requestedBy: printableDoctorLabel(signature?.displayName),
     requestedByCredentials: signature?.credentials,
     requestedByImage: signature?.imageData,
-    printedBy: scoped.user.username,
+    printedBy: personLabel({
+      firstName: scoped.user.firstName,
+      lastName: scoped.user.lastName,
+      username: scoped.user.username,
+      role: scoped.user.role,
+    }),
   });
 
   let documentMediaId: string | undefined;

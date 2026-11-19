@@ -48,6 +48,8 @@ export {
   ageYears,
   doctorName,
   humanizeLoginHandle,
+  personLabel,
+  printedPersonName,
   inr,
   patientName,
   physicianLine,

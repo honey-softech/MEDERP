@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { printedPersonName } from "@/lib/display";
 import { VITAL_RANGES, bmiLabel, formatIdealRange, vitalAlert } from "@/lib/vitals";
 import type { VitalsValues } from "@/lib/vitals";
 
@@ -58,7 +59,7 @@ export function VitalsPanel({
           <h3 className={`text-sm font-semibold ${recorded ? "text-teal-950" : "text-text-primary"}`}>Vitals</h3>
           <div className="flex items-center gap-2">
             {vitals?.recordedByUsername ? (
-              <p className="text-[11px] text-teal-800">{vitals.recordedByUsername}</p>
+              <p className="text-[11px] text-teal-800">{printedPersonName(vitals.recordedByUsername)}</p>
             ) : null}
             {recordHref ? (
               <Link href={recordHref} className="text-[13px] font-medium text-primary hover:underline">
@@ -159,7 +160,7 @@ export function VitalsPanel({
         <div className="flex flex-wrap items-center gap-2">
           {vitals.recordedByUsername ? (
             <p className="text-xs text-teal-800">
-              Recorded by {vitals.recordedByUsername}
+              Recorded by {printedPersonName(vitals.recordedByUsername)}
               {vitals.recordedAt
                 ? ` · ${new Date(vitals.recordedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}`
                 : ""}

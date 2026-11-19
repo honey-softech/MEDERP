@@ -10,6 +10,7 @@ import {
   DOCTOR_VISIT_ROLES,
   PRINT_SUMMARY_ROLES,
   patientName,
+  printableDoctorLabel,
   requireHospitalPage,
 } from "@/lib/front-desk";
 import { certificateWhatsAppSent } from "@/lib/messaging/whatsapp-sent";
@@ -109,7 +110,7 @@ export default async function CertificatePrintPage({ params }: { params: Promise
           printedAt={printedAt}
           voided={!issued}
           signatureImage={certificate.issuedBySignature?.imageData}
-          signatureName={certificate.issuedByDisplayName || certificate.issuedByUsername}
+          signatureName={printableDoctorLabel(certificate.issuedByDisplayName || certificate.issuedByUsername)}
           signatureCredentials={certificate.issuedByCredentials}
         />
       </div>

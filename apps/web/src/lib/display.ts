@@ -76,6 +76,16 @@ export function humanizeLoginHandle(username: string) {
   return titleCasePersonName(stripped);
 }
 
+/** Name shown to patients. Login tags such as .adm and .nur are left off. */
+export function printedPersonName(value: string | null | undefined) {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  const doctor = /^dr\.?\s+/i.test(raw);
+  const body = humanizeLoginHandle(raw.replace(/^dr\.?\s+/i, ""));
+  if (!body) return "";
+  return doctor ? `Dr. ${body.replace(/^dr\.?\s+/i, "")}` : body;
+}
+
 /** True when a stored staff label was seeded from the login handle / email local-part. */
 export function isLoginHandleDisplayName(
   display: string,
@@ -98,10 +108,7 @@ function formatDoctorDisplayName(full: string) {
   const cleaned = normalizePersonName(full);
   if (!cleaned) return "Dr.";
   const withoutDr = cleaned.replace(/^dr\.?\s+/i, "").trim();
-  // Single-token labels often came from the login handle (e.g. dhanushadm) — strip role tags.
-  const namePart = withoutDr.includes(" ")
-    ? titleCasePersonName(withoutDr)
-    : humanizeLoginHandle(withoutDr) || titleCasePersonName(withoutDr);
+  const namePart = humanizeLoginHandle(withoutDr) || titleCasePersonName(withoutDr);
   if (!namePart) return "Dr.";
   return `Dr. ${namePart}`;
 }

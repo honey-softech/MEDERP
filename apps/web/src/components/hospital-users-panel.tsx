@@ -34,7 +34,7 @@ export function HospitalUsersPanel({
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
+      <div data-tour="page:users-create" className="mb-6 flex flex-wrap items-center justify-end gap-2">
         {disabled && subscriptionHref ? (
           <a href={subscriptionHref} className={secondaryButtonClass}>
             Add user to subscription
@@ -58,7 +58,7 @@ export function HospitalUsersPanel({
           onClose={() => setDialog(null)}
         />
       ) : null}
-      <div className="mt-8">
+      <div data-tour="page:users-list" className="mt-8">
         <FilterableTable
           rows={users.map((row) => ({
             ...row,

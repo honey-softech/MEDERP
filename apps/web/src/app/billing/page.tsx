@@ -18,7 +18,7 @@ export default async function BillingPage() {
 
   return (
     <AppShell title="Billing">
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div data-tour="page:billing-actions" className="mb-4 flex flex-wrap gap-2">
         <Link href="/billing/new" className={primaryButtonClass}>
           New invoice
         </Link>
@@ -32,6 +32,7 @@ export default async function BillingPage() {
           Monthly reports
         </Link>
       </div>
+      <div data-tour="page:billing-list">
       <FilterableTable
         rows={invoices.map((row) => ({
           id: row.id,
@@ -51,6 +52,7 @@ export default async function BillingPage() {
           { key: "status", header: "Status" },
         ]}
       />
+      </div>
     </AppShell>
   );
 }

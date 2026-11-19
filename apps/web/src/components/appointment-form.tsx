@@ -271,17 +271,19 @@ export function AppointmentForm({
       onSubmit={onSubmit}
       className="w-full space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
     >
-      <PatientPicker
-        initial={initialPatient}
-        registerHref={registerHref}
-        labelAction={
-          <Link href={registerHref} className={`${primaryButtonClass} h-8 px-3 text-xs sm:h-9 sm:text-sm`}>
-            Register patient
-          </Link>
-        }
-      />
+      <div data-tour="page:book-patient">
+        <PatientPicker
+          initial={initialPatient}
+          registerHref={registerHref}
+          labelAction={
+            <Link href={registerHref} className={`${primaryButtonClass} h-8 px-3 text-xs sm:h-9 sm:text-sm`}>
+              Register patient
+            </Link>
+          }
+        />
+      </div>
 
-      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+      <div data-tour="page:book-doctor" className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
         {lockDoctor && defaultDoctorId ? (
           <label className="text-sm font-medium text-slate-700">
             Doctor
@@ -333,7 +335,7 @@ export function AppointmentForm({
       </div>
 
       {isWalkIn ? (
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        <div data-tour="page:book-when" className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
           <div className="text-sm font-medium text-slate-700">
             Date
             <p className={`${fieldClass} flex items-center bg-slate-50 font-normal`}>Today — {todayLabel}</p>
@@ -362,7 +364,7 @@ export function AppointmentForm({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        <div data-tour="page:book-when" className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
             Date
             <input
@@ -464,7 +466,7 @@ export function AppointmentForm({
         Check in now and issue token
       </label>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <button className={buttonClass} type="submit" disabled={pending || (!isWalkIn && selectedOnLeave) || walkInNoWindowToday}>
+      <button data-tour="page:book-save" className={buttonClass} type="submit" disabled={pending || (!isWalkIn && selectedOnLeave) || walkInNoWindowToday}>
         {pending ? "Saving…" : isWalkIn ? "Add walk-in" : "Book appointment"}
       </button>
     </form>

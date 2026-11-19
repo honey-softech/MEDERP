@@ -55,7 +55,7 @@ export function SettingsLayout({
 
   return (
     <div className="grid items-start gap-4 md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <label className="text-sm font-medium text-text-primary md:hidden">
+      <label data-tour="page:settings-nav" className="text-sm font-medium text-text-primary md:hidden">
         Section
         <select
           className={fieldClass}
@@ -71,7 +71,7 @@ export function SettingsLayout({
         </select>
       </label>
 
-      <nav className="hidden md:block" aria-label="Settings sections">
+      <nav data-tour="page:settings-nav" className="hidden md:block" aria-label="Settings sections">
         <ul className="space-y-1">
           {SETTINGS_TABS.map((item) => {
             const active = item.id === tab;
@@ -100,7 +100,7 @@ export function SettingsLayout({
         </ul>
       </nav>
 
-      <section className={`${cardClass} p-4 sm:p-6 ${danger ? "border-critical" : ""}`}>
+      <section data-tour="page:settings-panel" className={`${cardClass} p-4 sm:p-6 ${danger ? "border-critical" : ""}`}>
         <h3 className={`text-lg font-semibold ${danger ? "text-critical" : "text-text-primary"}`}>{current.label}</h3>
         <p className="mt-1 text-sm text-text-secondary">{current.description}</p>
         <div className="mt-2">{children}</div>

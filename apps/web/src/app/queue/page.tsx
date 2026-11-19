@@ -134,7 +134,7 @@ export default async function QueuePage({
     <AppShell title={myDoctorId ? "My OPD queue" : "OPD queue"} dense>
       <div className="mb-3 flex min-w-0 flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[13px] text-text-secondary 2xl:text-sm">
+          <p data-tour="page:queue-summary" className="text-[13px] text-text-secondary 2xl:text-sm">
             {isToday
               ? myDoctorId
                 ? "Your tokens start at T-001 each day."
@@ -146,16 +146,18 @@ export default async function QueuePage({
           </p>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <OpdDayNav action="/queue" dateValue={dateValue} />
+          <div data-tour="page:queue-day">
+            <OpdDayNav action="/queue" dateValue={dateValue} />
+          </div>
           {canAddWalkIn(user) && isToday ? (
-            <Link href="/appointments/new?walkin=1" className={compactPrimaryButtonClass}>
+            <Link href="/appointments/new?walkin=1" data-tour="page:queue-walkin" className={compactPrimaryButtonClass}>
               Add walk-in
             </Link>
           ) : null}
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div data-tour="page:queue-board" className="space-y-6">
         {doctorQueues.length === 0 ? (
           <p className="rounded-xl border border-border bg-surface p-5 text-sm text-text-secondary shadow-card">
             No patients in {isToday ? "today's" : "this day's"} OPD queue.
@@ -185,6 +187,7 @@ export default async function QueuePage({
                   {group.items.map((row) => (
                     <article
                       key={row.id}
+                      data-tour="page:queue-card"
                       className="min-w-0 rounded-xl border border-border bg-surface p-3 shadow-card"
                     >
                       <div className="flex min-w-0 items-start justify-between gap-2">

@@ -50,7 +50,7 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
 
   return (
     <AppShell title="Update vitals" dense>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div data-tour="page:vitals-patient" className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold text-text-primary">
           {patientName(appointment.patient)} · Token {tokenLabel(appointment.tokenNumber)}
         </p>
@@ -94,7 +94,7 @@ export default async function UpdateVitalsPage({ params }: { params: Promise<{ i
               </Link>
             </div>
           ) : null}
-          <div className="rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
+          <div data-tour="page:vitals-form" className="rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
             <VitalsForm
               appointmentId={appointment.id}
               initial={vitals}

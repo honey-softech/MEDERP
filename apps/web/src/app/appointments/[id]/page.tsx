@@ -353,7 +353,7 @@ export default async function AppointmentDetailPage({
           ← Appointments
         </Link>
       ) : null}
-      <div className="mb-0 flex shrink-0 flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <div data-tour="page:visit-header" className="mb-0 flex shrink-0 flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-start gap-2 sm:items-center">
           <ConsultQueueNav previousId={scheduleView ? null : previousId} nextId={scheduleView ? null : nextId} />
           <div className="min-w-0 flex-1">
@@ -650,7 +650,7 @@ export default async function AppointmentDetailPage({
             ) : null}
           </div>
         ) : null}
-        <div className={useCockpit ? "min-w-0 space-y-2 lg:min-h-0 lg:w-[clamp(12rem,18vw,20rem)] lg:shrink-0 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]" : undefined}>
+        <div data-tour="page:visit-context" className={useCockpit ? "min-w-0 space-y-2 lg:min-h-0 lg:w-[clamp(12rem,18vw,20rem)] lg:shrink-0 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]" : undefined}>
         <PatientContextPanel
           patient={{
             id: appointment.patient.id,
@@ -699,7 +699,7 @@ export default async function AppointmentDetailPage({
         </div>
 
         {showEditableAssessment ? (
-          <div className="flex min-w-0 flex-col space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-hidden">
+          <div data-tour="page:visit-work" className="flex min-w-0 flex-col space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-hidden">
           {showDoctorWalkInChoice ? (
             <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
               <p className="text-sm text-text-secondary">
@@ -799,7 +799,7 @@ export default async function AppointmentDetailPage({
           )}
           </div>
         ) : canAssess && visitClosed ? (
-          <div className="min-w-0 space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
+          <div data-tour="page:visit-work" className="min-w-0 space-y-3 lg:min-h-0 lg:flex-1 lg:self-stretch lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
             {user.hospital?.aiScribeEnabled ? <ConsultScribe appointmentId={appointment.id} mode="view" /> : null}
             <VisitAssessmentReadonly
               omitBanner
@@ -849,7 +849,7 @@ export default async function AppointmentDetailPage({
             ) : null}
           </div>
         ) : (
-        <div className="min-w-0 space-y-4">
+        <div data-tour="page:visit-work" className="min-w-0 space-y-4">
           {walkInNeedsPayment ? (
             <div className="rounded-xl border border-border bg-surface p-4 shadow-card print:hidden">
               <p className="mb-3 text-sm text-text-secondary">Record the consultation fee, then record vitals.</p>
